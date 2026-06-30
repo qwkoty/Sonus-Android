@@ -7,7 +7,7 @@ async function get(path) {
 }
 
 export const music = {
-  search: (keyword, platforms = 'netease,kugou', limit = 20) =>
+  search: (keyword, platforms = 'netease,qq', limit = 20) =>
     get(`/api/music/search?keyword=${encodeURIComponent(keyword)}&platforms=${platforms}&limit=${limit}`),
   url: (id, platform) =>
     get(`/api/music/url?id=${encodeURIComponent(id)}&platform=${encodeURIComponent(platform)}`),

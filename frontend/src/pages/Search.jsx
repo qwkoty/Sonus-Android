@@ -7,7 +7,7 @@ import SongItem from '../components/SongItem';
 const hotTags = ['周杰伦', '林俊杰', '陈奕迅', 'Taylor Swift', '告五人', '周杰伦', '薛之谦', '邓紫棋'];
 
 function formatPlatform(p) {
-  const map = { netease: '网易云', kugou: '酷狗', qq: 'QQ音乐' };
+  const map = { netease: '网易云', qq: 'QQ音乐' };
   return map[p] || p;
 }
 
@@ -24,7 +24,7 @@ export default function Search() {
     setError('');
     setResults([]);
     try {
-      const res = await music.search(kw, 'netease,kugou', 20);
+      const res = await music.search(kw, 'netease,qq', 20);
       const list = (res.data || []).map((item) => ({
         ...item,
         cover: item.cover || `https://picsum.photos/seed/${item.id}/400/400`,
