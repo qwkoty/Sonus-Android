@@ -3,13 +3,13 @@ services:
     name: sonus
     runtime: node
     plan: free
-    buildCommand: cd frontend && npm install && npm run build && cd ../backend && npm install
-    startCommand: cd backend && npm start
+    buildCommand: npm run build
+    startCommand: npm start
     envVars:
       - key: NODE_ENV
         value: production
-      - key: PORT
-        value: 10000
+      - key: NODE_VERSION
+        value: "22.14.0"
       - key: FRONTEND_URL
         value: https://sonus.onrender.com
       - key: APP_ID

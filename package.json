@@ -1,0 +1,15 @@
+{
+  "name": "sonus",
+  "version": "1.0.0",
+  "description": "Sonus — minimalist music player with aggregated sources",
+  "private": true,
+  "scripts": {
+    "build:frontend": "cd frontend && npm install && npm run build",
+    "build:backend": "cd backend && npm install",
+    "build": "npm run build:frontend && npm run build:backend",
+    "start": "cd backend && node server.js"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  }
+}
