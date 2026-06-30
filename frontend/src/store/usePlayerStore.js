@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { music } from '../api/music';
 
 const demoPlaylist = [
   { id: 1, title: 'Midnight City', artist: 'M83', cover: 'https://picsum.photos/seed/midnight/400/400', url: '' },
@@ -18,14 +19,29 @@ export const usePlayerStore = create((set, get) => ({
   playMode: 'list',
   fullscreen: false,
   liked: new Set(),
+  isLoadingUrl: false,
 
   setPlaylist: (list) => set({ playlist: list }),
 
-  playTrack: (track) => set({
-    currentTrack: track,
-    isPlaying: true,
-    currentTime: 0,
-  }),
+  playTrack: async (track) => {
+    set({ currentTrack: track, isPlaying: true, currentTime: 0, isLoadingUrl: false });
+
+    // 聚合音源需要动态获取播放链接
+    if (track.platform && track.rawId && !track.url) {
+      set({ isLoadingUrl: true });
+      try {
+        const res = await music.url(track.rawId, track.platform);
+        const url = res?.data?.url || '';
+        set((s) => ({
+          currentTrack: { ...s.currentTrack, url },
+          isLoadingUrl: false,
+        }));
+      } catch (err) {
+        console.error('获取播放链接失败', err);
+        set({ isLoadingUrl: false });
+      }
+    }
+  },
 
   togglePlay: () => set((s) => ({ isPlaying: !s.isPlaying })),
 
@@ -40,11 +56,11 @@ export const usePlayerStore = create((set, get) => ({
       while (nextIdx === idx && playlist.length > 1) {
         nextIdx = Math.floor(Math.random() * playlist.length);
       }
-      set({ currentTrack: playlist[nextIdx], isPlaying: true, currentTime: 0 });
+      get().playTrack(playlist[nextIdx]);
       return;
     }
     idx = (idx + 1) % playlist.length;
-    set({ currentTrack: playlist[idx], isPlaying: true, currentTime: 0 });
+    get().playTrack(playlist[idx]);
   },
 
   prev: () => {
@@ -52,7 +68,7 @@ export const usePlayerStore = create((set, get) => ({
     if (!playlist.length) return;
     let idx = playlist.findIndex((t) => t.id === currentTrack?.id);
     idx = (idx - 1 + playlist.length) % playlist.length;
-    set({ currentTrack: playlist[idx], isPlaying: true, currentTime: 0 });
+    get().playTrack(playlist[idx]);
   },
 
   seek: (time) => set({ currentTime: time }),

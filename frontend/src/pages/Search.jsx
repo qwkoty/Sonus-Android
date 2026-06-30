@@ -1,31 +1,46 @@
 import { useState } from 'react';
-import { Search as SearchIcon, X, TrendingUp } from 'lucide-react';
+import { Search as SearchIcon, X, TrendingUp, Music } from 'lucide-react';
 import { usePlayerStore } from '../store/usePlayerStore';
+import { music } from '../api/music';
 import SongItem from '../components/SongItem';
 
-const hotTags = ['电子', '氛围', '后摇', '爵士', '古典', '合成器', '白噪音', '独立'];
+const hotTags = ['周杰伦', '林俊杰', '陈奕迅', 'Taylor Swift', '告五人', '周杰伦', '薛之谦', '邓紫棋'];
+
+function formatPlatform(p) {
+  const map = { netease: '网易云', kugou: '酷狗', qq: 'QQ音乐' };
+  return map[p] || p;
+}
 
 export default function Search() {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState([]);
   const [searching, setSearching] = useState(false);
+  const [error, setError] = useState('');
   const playTrack = usePlayerStore((s) => s.playTrack);
 
   const doSearch = async (kw) => {
     if (!kw.trim()) return;
     setSearching(true);
+    setError('');
+    setResults([]);
     try {
-      // 模拟搜索结果（接入真实API后可替换为 qqmusic.search）
-      const demo = [
-        { id: 10 + Math.random(), title: `${kw} - Remix`, artist: 'Various Artists', cover: `https://picsum.photos/seed/${kw}1/400/400` },
-        { id: 11 + Math.random(), title: `${kw} (Live)`, artist: 'Indie Band', cover: `https://picsum.photos/seed/${kw}2/400/400` },
-        { id: 12 + Math.random(), title: `The Sound of ${kw}`, artist: 'Ambient Project', cover: `https://picsum.photos/seed/${kw}3/400/400` },
-      ];
-      await new Promise((r) => setTimeout(r, 400));
-      setResults(demo);
+      const res = await music.search(kw, 'netease,kugou', 20);
+      const list = (res.data || []).map((item) => ({
+        ...item,
+        cover: item.cover || `https://picsum.photos/seed/${item.id}/400/400`,
+      }));
+      setResults(list);
+      if (list.length === 0) setError('未找到相关声波');
+    } catch (err) {
+      setError('搜索失败，请稍后重试');
+      console.error(err);
     } finally {
       setSearching(false);
     }
+  };
+
+  const handlePlay = (track) => {
+    playTrack(track);
   };
 
   return (
@@ -58,18 +73,18 @@ export default function Search() {
           }}
         />
         {query && (
-          <button onClick={() => { setQuery(''); setResults([]); }}>
+          <button onClick={() => { setQuery(''); setResults([]); setError(''); }}>
             <X size={18} color="var(--text-muted)" />
           </button>
         )}
       </div>
 
       {/* Hot Tags */}
-      {results.length === 0 && (
+      {results.length === 0 && !searching && !error && (
         <div className="animate-fadeIn">
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
             <TrendingUp size={18} color="var(--accent)" />
-            <h2 style={{ fontSize: 17, fontWeight: 700 }}>热门标签</h2>
+            <h2 style={{ fontSize: 17, fontWeight: 700 }}>热门搜索</h2>
           </div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
             {hotTags.map((tag) => (
@@ -102,7 +117,15 @@ export default function Search() {
           </div>
           <div style={{ background: 'var(--bg-secondary)', borderRadius: 16, padding: '8px 16px' }}>
             {results.map((track, i) => (
-              <SongItem key={track.id} track={track} index={i} onPlay={playTrack} />
+              <div key={track.id}>
+                <SongItem track={track} index={i} onPlay={handlePlay} />
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, paddingLeft: 66, paddingBottom: 4 }}>
+                  <Music size={10} color="var(--text-muted)" />
+                  <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>
+                    {formatPlatform(track.platform)}
+                  </span>
+                </div>
+              </div>
             ))}
           </div>
         </div>
@@ -111,6 +134,12 @@ export default function Search() {
       {searching && (
         <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)', fontSize: 13 }}>
           正在搜寻声波...
+        </div>
+      )}
+
+      {error && !searching && (
+        <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)', fontSize: 13 }}>
+          {error}
         </div>
       )}
     </div>

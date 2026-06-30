@@ -4,6 +4,7 @@ const cors = require('cors');
 const path = require('path');
 
 const qqmusicRoutes = require('./routes/qqmusic');
+const musicRoutes = require('./routes/music');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -19,6 +20,7 @@ app.get('/health', (req, res) => {
 });
 
 app.use('/api/qqmusic', qqmusicRoutes);
+app.use('/api/music', musicRoutes);
 
 // Serve static frontend in production
 if (process.env.NODE_ENV === 'production') {
