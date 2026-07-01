@@ -28,7 +28,6 @@ export default function Visualizer({ isPlaying, coverRadius = 80 }) {
 
       const dpr = Math.min(window.devicePixelRatio || 1, 2);
       const INNER_R = coverRadius * dpr;
-      // 确保音柱不超出画布范围
       const MAX_BAR_LEN = Math.min(w, h) / 2 - INNER_R - 6 * dpr;
       if (MAX_BAR_LEN < 4) {
         rafRef.current = requestAnimationFrame(draw);
@@ -38,27 +37,34 @@ export default function Visualizer({ isPlaying, coverRadius = 80 }) {
       let freqData = readFrequencyData();
       const hasData = freqData.length > 0 && isPlaying;
 
-      if (!hasData) {
-        freqData = new Uint8Array(BARS).map((_, i) =>
-          Math.max(4, Math.sin(i * 0.35 + Date.now() * 0.0012) * 8 + 8)
-        );
-      }
-
       const step = Math.max(1, Math.floor(freqData.length / BARS));
+      const t = Date.now() * 0.001;
 
       for (let i = 0; i < BARS; i++) {
         const angle = (i / BARS) * Math.PI * 2 - Math.PI / 2;
-        const idx = Math.min(i * step, freqData.length - 1);
-        const value = freqData[idx] || 0;
-        const normalized = value / 255;
 
-        const barLen = Math.max(1.5, normalized * MAX_BAR_LEN * (hasData ? 1.0 : 0.45));
+        let barLen;
+        let alpha;
+
+        if (hasData) {
+          const idx = Math.min(i * step, freqData.length - 1);
+          const value = freqData[idx] || 0;
+          const normalized = value / 255;
+          barLen = Math.max(1.5, normalized * MAX_BAR_LEN);
+          alpha = 0.15 + normalized * 0.85;
+        } else {
+          // 待机动画：用正弦波模拟，直接映射到像素长度
+          const wave = Math.sin(i * 0.35 + t * 1.5) * 0.5 + 0.5; // 0~1
+          const wave2 = Math.sin(i * 0.15 + t * 0.8) * 0.3 + 0.7; // 0.4~1
+          barLen = Math.max(2, wave * wave2 * MAX_BAR_LEN * 0.4);
+          alpha = 0.08 + wave * 0.12;
+        }
+
         const x1 = cx + Math.cos(angle) * INNER_R;
         const y1 = cy + Math.sin(angle) * INNER_R;
         const x2 = cx + Math.cos(angle) * (INNER_R + barLen);
         const y2 = cy + Math.sin(angle) * (INNER_R + barLen);
 
-        const alpha = 0.15 + normalized * 0.85;
         ctx.strokeStyle = `rgba(255,255,255,${alpha})`;
         ctx.lineWidth = 2 * dpr;
         ctx.lineCap = 'round';
