@@ -14,35 +14,37 @@ export default function Visualizer3D({ isPlaying }) {
     const H = mount.offsetHeight;
 
     const scene = new THREE.Scene();
-    // 增加相机距离，留出更多边界空间
-    const camera = new THREE.PerspectiveCamera(40, W / H, 0.1, 100);
-    camera.position.set(0, 3.2, 8.5);
+    scene.background = new THREE.Color(0x05070a); // 深蓝黑背景，不是纯黑
+    scene.fog = new THREE.FogExp2(0x05070a, 0.08);
+
+    const camera = new THREE.PerspectiveCamera(42, W / H, 0.1, 100);
+    camera.position.set(0, 2.8, 8.5);
     camera.lookAt(0, 0.4, 0);
 
-    const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setSize(W, H);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.4;
+    renderer.toneMappingExposure = 1.2;
     mount.appendChild(renderer.domElement);
 
-    // 灯光
-    scene.add(new THREE.AmbientLight(0x223355, 0.35));
-    const keyLight = new THREE.PointLight(0x66aaff, 2.2, 30);
-    keyLight.position.set(0, 7, 5);
+    // ---- 灯光 ----
+    scene.add(new THREE.AmbientLight(0x334466, 0.8));
+    const keyLight = new THREE.PointLight(0x66aaff, 2.5, 30);
+    keyLight.position.set(0, 5, 4);
     scene.add(keyLight);
-    const fillLight = new THREE.PointLight(0xff5588, 0.5, 30);
-    fillLight.position.set(-4, 4, -4);
+    const fillLight = new THREE.PointLight(0xff66aa, 1.0, 30);
+    fillLight.position.set(-4, 3, -3);
     scene.add(fillLight);
-    const rim = new THREE.DirectionalLight(0xffffff, 0.5);
-    rim.position.set(0, 8, -5);
-    scene.add(rim);
+    const rimLight = new THREE.DirectionalLight(0xaaddff, 0.8);
+    rimLight.position.set(0, 6, -5);
+    scene.add(rimLight);
 
-    // ---- 连续网格地形（圆盘形），R_MAX 缩小避免超出边界 ----
+    // ---- 网格地形 ----
     const SECTORS = 72;
     const RINGS = 24;
-    const R_MAX = 2.2;   // 从 2.8 缩小，确保不超出边界
-    const R_MIN = 0.42;  // 中心留空
+    const R_MAX = 2.0;
+    const R_MIN = 0.35;
 
     const vertexCount = (SECTORS + 1) * (RINGS + 1);
     const positions = new Float32Array(vertexCount * 3);
@@ -78,67 +80,73 @@ export default function Visualizer3D({ isPlaying }) {
     terrainGeo.setIndex(indices);
     terrainGeo.computeVertexNormals();
 
-    // 使用平滑着色 + 无 wireframe 的更干净材质
     const terrainMat = new THREE.MeshStandardMaterial({
       vertexColors: true,
-      roughness: 0.15,
-      metalness: 0.75,
+      roughness: 0.2,
+      metalness: 0.6,
       flatShading: false,
       side: THREE.DoubleSide,
       emissive: 0x112244,
-      emissiveIntensity: 0.4,
+      emissiveIntensity: 0.6,
     });
 
     const terrain = new THREE.Mesh(terrainGeo, terrainMat);
     scene.add(terrain);
 
-    // 柔和的顶部辉光层（不带架构线）
-    const wireMat = new THREE.MeshBasicMaterial({
-      color: 0x88ccff,
-      wireframe: true,
-      transparent: true,
-      opacity: 0.0, // 默认关闭架构线
-    });
-    const wireframe = new THREE.Mesh(terrainGeo, wireMat);
-    scene.add(wireframe);
-
-    // 中心发光球
-    const sphereGeo = new THREE.IcosahedronGeometry(0.32, 2);
-    const sphereMat = new THREE.MeshStandardMaterial({
+    // ---- 中心发光核 ----
+    const coreGeo = new THREE.IcosahedronGeometry(0.28, 3);
+    const coreMat = new THREE.MeshStandardMaterial({
       color: 0xffffff,
-      roughness: 0.08,
+      roughness: 0.05,
       metalness: 0.95,
-      emissive: 0x4488ff,
-      emissiveIntensity: 0.6,
+      emissive: 0x55aaff,
+      emissiveIntensity: 1.5,
     });
-    const sphere = new THREE.Mesh(sphereGeo, sphereMat);
-    sphere.position.y = 0.25;
-    scene.add(sphere);
+    const core = new THREE.Mesh(coreGeo, coreMat);
+    core.position.y = 0.2;
+    scene.add(core);
 
-    // 底部光盘
-    const discGeo = new THREE.CircleGeometry(R_MAX + 0.15, 64);
-    const discMat = new THREE.MeshBasicMaterial({
-      color: 0x112244,
+    // 核心外层光晕
+    const glowGeo = new THREE.SphereGeometry(0.42, 32, 32);
+    const glowMat = new THREE.MeshBasicMaterial({
+      color: 0x4488ff,
       transparent: true,
-      opacity: 0.18,
+      opacity: 0.15,
+    });
+    const glow = new THREE.Mesh(glowGeo, glowMat);
+    glow.position.y = 0.2;
+    scene.add(glow);
+
+    // ---- 地面反射盘 ----
+    const discGeo = new THREE.CircleGeometry(R_MAX + 0.3, 64);
+    const discMat = new THREE.MeshBasicMaterial({
+      color: 0x0a1220,
+      transparent: true,
+      opacity: 0.6,
+      side: THREE.DoubleSide,
     });
     const disc = new THREE.Mesh(discGeo, discMat);
     disc.rotation.x = -Math.PI / 2;
-    disc.position.y = -0.03;
+    disc.position.y = -0.05;
     scene.add(disc);
 
-    // 底部外圈光环
-    const glowRingGeo = new THREE.RingGeometry(R_MAX, R_MAX + 0.06, 64);
-    const glowRingMat = new THREE.MeshBasicMaterial({
+    // ---- 外圈光环 ----
+    const ringGeo = new THREE.RingGeometry(R_MAX, R_MAX + 0.05, 64);
+    const ringMat = new THREE.MeshBasicMaterial({
       color: 0x55aaff,
       transparent: true,
-      opacity: 0.25,
+      opacity: 0.35,
       side: THREE.DoubleSide,
     });
-    const glowRing = new THREE.Mesh(glowRingGeo, glowRingMat);
-    glowRing.rotation.x = -Math.PI / 2;
-    glowRing.position.y = -0.01;
-    scene.add(glowRing);
+    const ring = new THREE.Mesh(ringGeo, ringMat);
+    ring.rotation.x = -Math.PI / 2;
+    ring.position.y = -0.02;
+    scene.add(ring);
+
+    // ---- 网格地板 ----
+    const gridHelper = new THREE.GridHelper(8, 40, 0x223355, 0x111827);
+    gridHelper.position.y = -0.06;
+    scene.add(gridHelper);
 
     const TOTAL = 72;
     const smoothHeights = new Float32Array(vertexCount);
@@ -155,10 +163,10 @@ export default function Visualizer3D({ isPlaying }) {
         for (let i = 0; i < 6; i++) bass += spectrum[i] || 0;
         bass /= 6;
       } else {
-        bass = (Math.sin(elapsed * 1.5) * 0.5 + 0.5) * 0.1;
+        bass = (Math.sin(elapsed * 1.5) * 0.5 + 0.5) * 0.12;
       }
 
-      // 更新网格顶点高度和颜色
+      // 更新顶点
       vi = 0;
       for (let r = 0; r <= RINGS; r++) {
         const radius = R_MIN + (r / RINGS) * (R_MAX - R_MIN);
@@ -172,11 +180,11 @@ export default function Visualizer3D({ isPlaying }) {
           if (hasData) {
             const offsetIdx = Math.floor(freqIdx + Math.sin(angle * 2.5) * 1.5);
             value = spectrum[Math.max(0, Math.min(TOTAL - 1, offsetIdx))] || 0;
-            value *= (1.0 - radialRatio * 0.45);
+            value *= (1.0 - radialRatio * 0.4);
           } else {
             const wave = Math.sin(radius * 2.5 + elapsed * 2) * 0.5 + 0.5;
             const wave2 = Math.sin(angle * 2 + elapsed * 1.5) * 0.3 + 0.5;
-            value = wave * wave2 * 0.1 * (1.0 - radialRatio * 0.3);
+            value = wave * wave2 * 0.12 * (1.0 - radialRatio * 0.3);
           }
 
           if (value > smoothHeights[vi]) {
@@ -185,14 +193,14 @@ export default function Visualizer3D({ isPlaying }) {
             smoothHeights[vi] += (value - smoothHeights[vi]) * 0.08;
           }
 
-          const height = Math.max(0.02, smoothHeights[vi] * 2.4);
+          const height = Math.max(0.02, smoothHeights[vi] * 2.3);
           posAttr.array[vi * 3 + 1] = height;
 
-          // 颜色：从底部的深蓝 -> 中部的青色 -> 顶部的亮白
+          // 饱和的颜色渐变
           const t = smoothHeights[vi];
-          const hue = 0.62 - radialRatio * 0.1 + t * 0.05;
-          const sat = 0.55 + t * 0.25;
-          const lit = 0.25 + radialRatio * 0.15 + t * 0.55;
+          const hue = 0.65 - radialRatio * 0.12 + t * 0.08;
+          const sat = 0.7 + t * 0.2;
+          const lit = 0.3 + radialRatio * 0.1 + t * 0.5;
           const color = new THREE.Color().setHSL(hue, sat, lit);
           colors[vi * 3] = color.r;
           colors[vi * 3 + 1] = color.g;
@@ -205,28 +213,28 @@ export default function Visualizer3D({ isPlaying }) {
       terrainGeo.attributes.color.needsUpdate = true;
       terrainGeo.computeVertexNormals();
 
-      // 中心球体
-      const sphereScale = 1 + bass * 0.7;
-      sphere.scale.set(sphereScale, sphereScale, sphereScale);
-      sphere.rotation.y = elapsed * 0.5;
-      sphere.rotation.x = elapsed * 0.3;
-      sphereMat.emissiveIntensity = 0.4 + bass * 1.8;
+      // 核心动画
+      const coreScale = 1 + bass * 0.6;
+      core.scale.set(coreScale, coreScale, coreScale);
+      core.rotation.y = elapsed * 0.5;
+      core.rotation.x = elapsed * 0.3;
+      coreMat.emissiveIntensity = 1.0 + bass * 2.5;
+      glowMat.opacity = 0.12 + bass * 0.35;
+      glow.scale.set(coreScale, coreScale, coreScale);
 
-      // 整体缓慢旋转
+      // 地形旋转
       terrain.rotation.y = elapsed * 0.08;
-      wireframe.rotation.y = elapsed * 0.08;
 
-      // 相机缓慢摆动
+      // 相机
       camera.position.x = Math.sin(elapsed * 0.07) * 0.9;
-      camera.position.z = 8.2 + Math.cos(elapsed * 0.05) * 0.5;
-      camera.position.y = 3.1 + Math.sin(elapsed * 0.09) * 0.25;
+      camera.position.z = 8.0 + Math.cos(elapsed * 0.05) * 0.5;
+      camera.position.y = 2.7 + Math.sin(elapsed * 0.09) * 0.2;
       camera.lookAt(0, 0.4, 0);
 
       // 灯光
-      keyLight.intensity = 1.0 + bass * 3;
-      fillLight.intensity = 0.25 + bass * 1.3;
-      glowRingMat.opacity = 0.12 + bass * 0.35;
-      discMat.opacity = 0.08 + bass * 0.18;
+      keyLight.intensity = 1.2 + bass * 3;
+      fillLight.intensity = 0.5 + bass * 1.5;
+      ringMat.opacity = 0.2 + bass * 0.4;
 
       renderer.render(scene, camera);
       rafRef.current = requestAnimationFrame(animate);
@@ -264,6 +272,7 @@ export default function Visualizer3D({ isPlaying }) {
         width: '100%',
         height: '100%',
         zIndex: 2,
+        background: '#05070a',
       }}
     />
   );
