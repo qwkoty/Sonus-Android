@@ -1,23 +1,121 @@
-import { useState } from 'react';
-import { User, Link as LinkIcon, LogOut, Moon, Settings, HelpCircle, Plus, Trash2, Play, Music, X } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import {
+  User, Link as LinkIcon, LogOut, Moon, Settings, HelpCircle,
+  Plus, Trash2, Play, Music, X, QrCode, AlertCircle
+} from 'lucide-react';
 import { usePlayerStore } from '../store/usePlayerStore';
+import { qqmusicApi } from '../api/qqmusic';
 
 export default function Profile() {
-  const [linked, setLinked] = useState(false);
   const [newName, setNewName] = useState('');
   const [showCreate, setShowCreate] = useState(false);
   const [activePlaylist, setActivePlaylist] = useState(null);
+  const [qrData, setQrData] = useState(null);
+  const [qrPolling, setQrPolling] = useState(false);
+  const [qrError, setQrError] = useState('');
+  const [pollTimer, setPollTimer] = useState(null);
 
   const {
     playlists, createPlaylist, deletePlaylist, removeFromPlaylist,
-    playPlaylist, playTrack,
+    playPlaylist, playTrack, qqAuth, connectedPlatform,
+    setQQAuth, logoutQQ,
   } = usePlayerStore();
+
+  const isQQConnected = connectedPlatform === 'qq' && qqAuth;
 
   const handleCreate = () => {
     if (!newName.trim()) return;
     createPlaylist(newName.trim());
     setNewName('');
     setShowCreate(false);
+  };
+
+  // QQ 音乐扫码登录
+  const startQQLogin = async () => {
+    setQrError('');
+    setQrData(null);
+    try {
+      const res = await qqmusicApi.qrcode();
+      if (res.error) {
+        setQrError(res.error + (res.message ? ` (${res.message})` : ''));
+        return;
+      }
+      if (res.qrurl) {
+        setQrData({ qrurl: res.qrurl, authCode: res.auth_code });
+        startPolling(res.auth_code);
+      } else {
+        setQrError('无法获取二维码，请检查后端是否配置了 APP_ID');
+      }
+    } catch (err) {
+      setQrError('获取二维码失败: ' + (err.message || '未知错误'));
+    }
+  };
+
+  const startPolling = (authCode) => {
+    setQrPolling(true);
+    let attempts = 0;
+    const maxAttempts = 60;
+
+    const timer = setInterval(async () => {
+      attempts++;
+      if (attempts > maxAttempts) {
+        clearInterval(timer);
+        setQrPolling(false);
+        setQrError('二维码已过期，请重新获取');
+        return;
+      }
+
+      try {
+        const poll = await qqmusicApi.poll(authCode);
+        if (poll.status === 'authorized') {
+          clearInterval(timer);
+          setQrPolling(false);
+          // 获取 token
+          try {
+            const tokenRes = await qqmusicApi.token(poll.code);
+            const token = tokenRes.data?.access_token || tokenRes.access_token;
+            const refreshToken = tokenRes.data?.refresh_token || tokenRes.refresh_token;
+            if (token) {
+              // 获取用户信息
+              let userInfo = {};
+              try {
+                const info = await qqmusicApi.userinfo(token);
+                userInfo = info.data || info;
+              } catch (e) {
+                console.log('获取用户信息失败', e);
+              }
+              setQQAuth({ token, refreshToken, userInfo });
+              setQrData(null);
+            }
+          } catch (e) {
+            setQrError('获取 Token 失败: ' + (e.message || ''));
+          }
+          return;
+        }
+        if (poll.status === 'expired') {
+          clearInterval(timer);
+          setQrPolling(false);
+          setQrError('二维码已过期');
+        }
+      } catch (err) {
+        // 轮询中出错，继续
+      }
+    }, 3000);
+
+    setPollTimer(timer);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (pollTimer) clearInterval(pollTimer);
+    };
+  }, [pollTimer]);
+
+  const cancelQR = () => {
+    if (pollTimer) clearInterval(pollTimer);
+    setQrPolling(false);
+    setQrData(null);
+    setQrError('');
   };
 
   return (
@@ -40,43 +138,92 @@ export default function Profile() {
           width: 72,
           height: 72,
           borderRadius: '50%',
-          background: 'linear-gradient(135deg, #333, #666)',
+          background: isQQConnected ? '#fff' : '#333',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           margin: '0 auto 14px',
-          color: '#fff',
+          color: isQQConnected ? '#0A0A0A' : '#fff',
         }}>
           <User size={32} />
         </div>
         <div style={{ fontSize: 18, fontWeight: 700 }}>
-          {linked ? 'QQ 声波用户' : '访客'}
+          {isQQConnected && qqAuth?.userInfo?.nickname
+            ? qqAuth.userInfo.nickname
+            : isQQConnected ? 'QQ 音乐用户' : '访客'}
         </div>
         <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 4 }}>
-          {linked ? '已连接声波源' : '尚未连接声波源'}
+          {isQQConnected ? '已连接 QQ 音乐' : '尚未连接声波源'}
         </div>
 
-        {!linked ? (
-          <button
-            onClick={() => setLinked(true)}
-            style={{
-              marginTop: 16,
-              padding: '10px 28px',
-              borderRadius: 24,
-              background: '#fff',
-              color: '#0A0A0A',
-              fontWeight: 700,
-              fontSize: 14,
-            }}
-          >
-            <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <LinkIcon size={16} />
-              连接声波源
-            </span>
-          </button>
+        {!isQQConnected ? (
+          <div style={{ marginTop: 16 }}>
+            <button
+              onClick={startQQLogin}
+              style={{
+                padding: '10px 28px',
+                borderRadius: 24,
+                background: '#fff',
+                color: '#0A0A0A',
+                fontWeight: 700,
+                fontSize: 14,
+              }}
+            >
+              <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <QrCode size={16} />
+                QQ 扫码登录
+              </span>
+            </button>
+            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 8 }}>
+              登录后仅搜索 QQ 音乐内容
+            </div>
+
+            {/* 二维码展示 */}
+            {qrData && (
+              <div className="animate-scaleIn" style={{
+                marginTop: 16,
+                padding: 16,
+                background: '#fff',
+                borderRadius: 16,
+                display: 'inline-block',
+              }}>
+                <img
+                  src={qrData.qrurl}
+                  alt="QQ 登录二维码"
+                  style={{ width: 180, height: 180, display: 'block' }}
+                />
+                <div style={{ fontSize: 12, color: '#0A0A0A', marginTop: 8, fontWeight: 600 }}>
+                  请使用 QQ 音乐 App 扫码
+                </div>
+                <button
+                  onClick={cancelQR}
+                  style={{ marginTop: 8, fontSize: 11, color: '#666' }}
+                >
+                  取消
+                </button>
+              </div>
+            )}
+
+            {qrError && (
+              <div style={{
+                marginTop: 12,
+                padding: '10px 14px',
+                background: 'var(--surface)',
+                borderRadius: 10,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                fontSize: 12,
+                color: 'var(--text-secondary)',
+              }}>
+                <AlertCircle size={14} />
+                {qrError}
+              </div>
+            )}
+          </div>
         ) : (
           <button
-            onClick={() => setLinked(false)}
+            onClick={logoutQQ}
             style={{
               marginTop: 16,
               padding: '10px 28px',
@@ -89,7 +236,7 @@ export default function Profile() {
           >
             <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               <LogOut size={16} />
-              断开连接
+              退出登录
             </span>
           </button>
         )}
@@ -119,11 +266,7 @@ export default function Profile() {
         </div>
 
         {showCreate && (
-          <div className="animate-slideUp" style={{
-            display: 'flex',
-            gap: 8,
-            marginBottom: 12,
-          }}>
+          <div className="animate-slideUp" style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
             <input
               value={newName}
               onChange={(e) => setNewName(e.target.value)}

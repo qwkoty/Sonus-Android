@@ -16,7 +16,7 @@ function formatTime(s) {
 }
 
 function formatPlatform(p) {
-  const map = { netease: '网易云', qq: 'QQ音乐' };
+  const map = { netease: '网易云', qq: 'QQ音乐', demo: '示例' };
   return map[p] || p;
 }
 
@@ -24,9 +24,9 @@ export default function Player() {
   const store = usePlayerStore();
   const {
     currentTrack, isPlaying, currentTime, duration,
-    volume, playMode, playlist, liked, playlists,
+    volume, playMode, playlist, liked, playlists, connectedPlatform,
     togglePlay, next, prev, seek, setVolume,
-    toggleMode, toggleLike, playTrack, addToPlaylist,
+    toggleMode, toggleLike, playTrack, addToPlaylist, getSearchPlatforms,
   } = store;
 
   const [searchOpen, setSearchOpen] = useState(false);
@@ -44,7 +44,8 @@ export default function Player() {
     if (!kw.trim()) return;
     setSearching(true);
     try {
-      const res = await music.search(kw, 'netease,qq', 15);
+      const platforms = getSearchPlatforms();
+      const res = await music.search(kw, platforms, 15);
       const list = (res.data || []).map((item) => ({
         ...item,
         cover: item.cover || `https://picsum.photos/seed/${item.id}/400/400`,
@@ -140,6 +141,12 @@ export default function Player() {
             )}
           </div>
 
+          {connectedPlatform !== 'none' && (
+            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 10 }}>
+              当前连接平台: {formatPlatform(connectedPlatform)}
+            </div>
+          )}
+
           {searching && (
             <div style={{ textAlign: 'center', padding: 30, color: 'var(--text-muted)', fontSize: 13 }}>
               正在搜寻...
@@ -156,6 +163,7 @@ export default function Player() {
                   gap: 12,
                   padding: '10px 0',
                   borderBottom: '1px solid var(--border)',
+                  position: 'relative',
                 }}
               >
                 <img
@@ -183,11 +191,12 @@ export default function Player() {
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
+                    flexShrink: 0,
                   }}
                 >
                   <Plus size={14} />
                 </button>
-                <button onClick={() => handlePlaySearch(track)} style={{ color: '#fff' }}>
+                <button onClick={() => handlePlaySearch(track)} style={{ color: '#fff', flexShrink: 0 }}>
                   <Play size={18} />
                 </button>
 
@@ -195,7 +204,8 @@ export default function Player() {
                 {addMenuTrack === track.id && playlists.length > 0 && (
                   <div className="animate-scaleIn" style={{
                     position: 'absolute',
-                    right: 50,
+                    right: 8,
+                    top: 44,
                     background: 'var(--bg-elevated)',
                     borderRadius: 12,
                     border: '1px solid var(--border)',

@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { music } from '../api/music';
+import { getAudio, initAudioSystem, readFrequencyData } from '../audio/engine';
 
 const demoPlaylist = [
   { id: 1, title: 'Midnight City', artist: 'M83', cover: 'https://picsum.photos/seed/midnight/400/400', url: '', platform: 'demo' },
@@ -9,25 +10,18 @@ const demoPlaylist = [
   { id: 5, title: 'Space Song', artist: 'Beach House', cover: 'https://picsum.photos/seed/space/400/400', url: '', platform: 'demo' },
 ];
 
-function createAudio() {
-  const audio = new Audio();
-  audio.crossOrigin = 'anonymous';
-  audio.preload = 'auto';
-  return audio;
-}
-
 function loadPlaylists() {
-  try {
-    return JSON.parse(localStorage.getItem('sonus_playlists') || '[]');
-  } catch { return []; }
+  try { return JSON.parse(localStorage.getItem('sonus_playlists') || '[]'); } catch { return []; }
 }
+function savePlaylists(list) { localStorage.setItem('sonus_playlists', JSON.stringify(list)); }
 
-function savePlaylists(list) {
-  localStorage.setItem('sonus_playlists', JSON.stringify(list));
+function loadQQAuth() {
+  try { return JSON.parse(localStorage.getItem('sonus_qq_auth') || 'null'); } catch { return null; }
 }
+function saveQQAuth(auth) { localStorage.setItem('sonus_qq_auth', JSON.stringify(auth)); }
 
 export const usePlayerStore = create((set, get) => {
-  const audio = createAudio();
+  const audio = getAudio();
 
   audio.addEventListener('timeupdate', () => {
     set({ currentTime: audio.currentTime || 0 });
@@ -61,16 +55,18 @@ export const usePlayerStore = create((set, get) => {
     volume: 0.8,
     playlist: demoPlaylist,
     playMode: 'list',
-    fullscreen: false,
     liked: new Set(),
     isLoadingUrl: false,
     playlists: loadPlaylists(),
+    qqAuth: loadQQAuth(),
+    connectedPlatform: loadQQAuth() ? 'qq' : 'none',
 
     audio,
 
     setPlaylist: (list) => set({ playlist: list }),
 
     playTrack: async (track) => {
+      initAudioSystem();
       const { audio } = get();
       set({ currentTrack: track, isPlaying: false, currentTime: 0, duration: 0, isLoadingUrl: true });
 
@@ -105,6 +101,7 @@ export const usePlayerStore = create((set, get) => {
     },
 
     togglePlay: () => {
+      initAudioSystem();
       const { audio, isPlaying, currentTrack } = get();
       if (!currentTrack) return;
 
@@ -112,7 +109,8 @@ export const usePlayerStore = create((set, get) => {
         audio.pause();
         set({ isPlaying: false });
       } else {
-        if (audio.src && !audio.src.includes(window.location.host)) {
+        const hasSrc = audio.src && audio.src !== '' && !audio.src.endsWith('/');
+        if (hasSrc) {
           audio.play().then(() => set({ isPlaying: true })).catch((err) => {
             console.error('播放失败', err);
             set({ isPlaying: false });
@@ -164,8 +162,6 @@ export const usePlayerStore = create((set, get) => {
       }
     },
 
-    setDuration: (d) => set({ duration: d }),
-
     setVolume: (v) => {
       const { audio } = get();
       const vol = Math.max(0, Math.min(1, v));
@@ -179,8 +175,6 @@ export const usePlayerStore = create((set, get) => {
       return { playMode: modes[(i + 1) % modes.length] };
     }),
 
-    toggleFullscreen: () => set((s) => ({ fullscreen: !s.fullscreen })),
-
     toggleLike: (id) => set((s) => {
       const next = new Set(s.liked);
       if (next.has(id)) next.delete(id);
@@ -191,19 +185,9 @@ export const usePlayerStore = create((set, get) => {
     // 歌单系统
     createPlaylist: (name) => {
       const newPlaylist = { id: Date.now().toString(), name, tracks: [], createdAt: Date.now() };
-      set((s) => {
-        const next = [...s.playlists, newPlaylist];
-        savePlaylists(next);
-        return { playlists: next };
-      });
+      set((s) => { const next = [...s.playlists, newPlaylist]; savePlaylists(next); return { playlists: next }; });
     },
-
-    deletePlaylist: (id) => set((s) => {
-      const next = s.playlists.filter((p) => p.id !== id);
-      savePlaylists(next);
-      return { playlists: next };
-    }),
-
+    deletePlaylist: (id) => set((s) => { const next = s.playlists.filter((p) => p.id !== id); savePlaylists(next); return { playlists: next }; }),
     addToPlaylist: (playlistId, track) => {
       set((s) => {
         const next = s.playlists.map((p) => {
@@ -215,7 +199,6 @@ export const usePlayerStore = create((set, get) => {
         return { playlists: next };
       });
     },
-
     removeFromPlaylist: (playlistId, trackId) => {
       set((s) => {
         const next = s.playlists.map((p) => {
@@ -226,7 +209,6 @@ export const usePlayerStore = create((set, get) => {
         return { playlists: next };
       });
     },
-
     playPlaylist: (playlistId) => {
       const { playlists } = get();
       const pl = playlists.find((p) => p.id === playlistId);
@@ -236,6 +218,21 @@ export const usePlayerStore = create((set, get) => {
       }
     },
 
-    tick: () => {},
+    // QQ 音乐登录
+    setQQAuth: (auth) => {
+      saveQQAuth(auth);
+      set({ qqAuth: auth, connectedPlatform: auth ? 'qq' : 'none' });
+    },
+    logoutQQ: () => {
+      saveQQAuth(null);
+      set({ qqAuth: null, connectedPlatform: 'none' });
+    },
+
+    getSearchPlatforms: () => {
+      const { connectedPlatform } = get();
+      if (connectedPlatform === 'qq') return 'qq';
+      if (connectedPlatform === 'netease') return 'netease';
+      return 'netease,qq';
+    },
   };
 });
