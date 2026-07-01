@@ -2,10 +2,9 @@ import { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import { readFrequencyDataLog } from '../audio/engine';
 
-export default function Visualizer3D({ isPlaying, coverRadius = 80 }) {
+export default function Visualizer3D({ isPlaying }) {
   const mountRef = useRef(null);
   const rafRef = useRef(null);
-  const sceneRef = useRef(null);
 
   useEffect(() => {
     const mount = mountRef.current;
@@ -14,155 +13,133 @@ export default function Visualizer3D({ isPlaying, coverRadius = 80 }) {
     const W = mount.offsetWidth;
     const H = mount.offsetHeight;
 
-    // Scene
     const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(50, W / H, 0.1, 100);
-    camera.position.set(0, 2.5, 7);
-    camera.lookAt(0, 0, 0);
+    const camera = new THREE.PerspectiveCamera(45, W / H, 0.1, 100);
+    camera.position.set(0, 4, 7);
+    camera.lookAt(0, 0.5, 0);
 
     const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
     renderer.setSize(W, H);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     mount.appendChild(renderer.domElement);
 
-    sceneRef.current = { scene, camera, renderer };
-
     // 灯光
-    const ambient = new THREE.AmbientLight(0xffffff, 0.4);
-    scene.add(ambient);
-    const pointLight = new THREE.PointLight(0xffffff, 1.2, 20);
-    pointLight.position.set(0, 5, 5);
-    scene.add(pointLight);
+    scene.add(new THREE.AmbientLight(0xffffff, 0.35));
+    const light1 = new THREE.PointLight(0x88ccff, 1.5, 25);
+    light1.position.set(3, 6, 3);
+    scene.add(light1);
+    const light2 = new THREE.PointLight(0xff8866, 0.8, 25);
+    light2.position.set(-3, 4, -3);
+    scene.add(light2);
+    const topLight = new THREE.DirectionalLight(0xffffff, 0.6);
+    topLight.position.set(0, 10, 0);
+    scene.add(topLight);
 
-    // ---- 3D 圆形柱状条 ----
-    const BAR_COUNT = 72;
-    const RADIUS = 2.8;
+    // ---- 同心圆柱状条：内圈高，外圈低 ----
+    const RINGS = [
+      { count: 16, radius: 0.8, maxH: 3.0, freqStart: 0,  freqEnd: 8  },  // 内圈：低频，最高
+      { count: 24, radius: 1.6, maxH: 2.2, freqStart: 8,  freqEnd: 24 },
+      { count: 32, radius: 2.4, maxH: 1.6, freqStart: 24, freqEnd: 48 },
+      { count: 40, radius: 3.2, maxH: 1.1, freqStart: 48, freqEnd: 80 },  // 外圈：高频，最矮
+    ];
+
+    const allBars = [];
     const barGroup = new THREE.Group();
     scene.add(barGroup);
 
-    const bars = [];
-    for (let i = 0; i < BAR_COUNT; i++) {
-      const angle = (i / BAR_COUNT) * Math.PI * 2;
-      const geo = new THREE.BoxGeometry(0.12, 1, 0.12);
-      geo.translate(0, 0.5, 0); // 枢轴在底部，缩放向上生长
+    for (let r = 0; r < RINGS.length; r++) {
+      const ring = RINGS[r];
+      for (let i = 0; i < ring.count; i++) {
+        const angle = (i / ring.count) * Math.PI * 2;
+        const geo = new THREE.BoxGeometry(0.08, 1, 0.08);
+        geo.translate(0, 0.5, 0); // 枢轴在底部
 
-      const mat = new THREE.MeshStandardMaterial({
-        color: 0xffffff,
-        roughness: 0.3,
-        metalness: 0.5,
+        // 颜色渐变：内圈暖白，外圈冷蓝
+        const t = r / (RINGS.length - 1);
+        const hue = 0.55 + t * 0.05; // 蓝到青
+        const sat = 0.3 + t * 0.4;
+        const lit = 0.65 - t * 0.15;
+        const mat = new THREE.MeshStandardMaterial({
+          color: new THREE.Color().setHSL(hue, sat, lit),
+          roughness: 0.25,
+          metalness: 0.6,
+          transparent: true,
+          opacity: 0.85,
+          emissive: new THREE.Color().setHSL(hue, sat, lit * 0.3),
+          emissiveIntensity: 0.5,
+        });
+
+        const bar = new THREE.Mesh(geo, mat);
+        bar.position.set(Math.cos(angle) * ring.radius, 0, Math.sin(angle) * ring.radius);
+        bar.lookAt(0, 0, 0);
+        barGroup.add(bar);
+        allBars.push({ mesh: bar, ring: r, idx: i, smooth: 0, ringData: ring });
+      }
+    }
+
+    // ---- 地面光环 ----
+    for (let i = 0; i < 3; i++) {
+      const r = 0.8 + i * 0.8;
+      const ringGeo = new THREE.RingGeometry(r - 0.02, r + 0.02, 64);
+      const ringMat = new THREE.MeshBasicMaterial({
+        color: 0x4488ff,
         transparent: true,
-        opacity: 0.9,
+        opacity: 0.04 - i * 0.01,
+        side: THREE.DoubleSide,
       });
-      const bar = new THREE.Mesh(geo, mat);
-      bar.position.set(Math.cos(angle) * RADIUS, -0.5, Math.sin(angle) * RADIUS);
-      bar.lookAt(0, bar.position.y, 0);
-      barGroup.add(bar);
-      bars.push({ mesh: bar, smooth: 0 });
+      const ring = new THREE.Mesh(ringGeo, ringMat);
+      ring.rotation.x = -Math.PI / 2;
+      scene.add(ring);
     }
-
-    // ---- 中心粒子球 ----
-    const PARTICLE_COUNT = 800;
-    const particlePositions = new Float32Array(PARTICLE_COUNT * 3);
-    const particleBase = new Float32Array(PARTICLE_COUNT * 3);
-    for (let i = 0; i < PARTICLE_COUNT; i++) {
-      const theta = Math.random() * Math.PI * 2;
-      const phi = Math.acos(2 * Math.random() - 1);
-      const r = 1.2;
-      const x = r * Math.sin(phi) * Math.cos(theta);
-      const y = r * Math.sin(phi) * Math.sin(theta);
-      const z = r * Math.cos(phi);
-      particlePositions[i * 3] = x;
-      particlePositions[i * 3 + 1] = y;
-      particlePositions[i * 3 + 2] = z;
-      particleBase[i * 3] = x;
-      particleBase[i * 3 + 1] = y;
-      particleBase[i * 3 + 2] = z;
-    }
-    const particleGeo = new THREE.BufferGeometry();
-    particleGeo.setAttribute('position', new THREE.BufferAttribute(particlePositions, 3));
-    const particleMat = new THREE.PointsMaterial({
-      size: 0.04,
-      color: 0xffffff,
-      transparent: true,
-      opacity: 0.6,
-      blending: THREE.AdditiveBlending,
-      depthWrite: false,
-    });
-    const particles = new THREE.Points(particleGeo, particleMat);
-    scene.add(particles);
-
-    // ---- 地面网格反射 ----
-    const ringGeo = new THREE.RingGeometry(RADIUS - 0.05, RADIUS + 0.05, 64);
-    const ringMat = new THREE.MeshBasicMaterial({
-      color: 0xffffff,
-      transparent: true,
-      opacity: 0.08,
-      side: THREE.DoubleSide,
-    });
-    const ring = new THREE.Mesh(ringGeo, ringMat);
-    ring.rotation.x = -Math.PI / 2;
-    ring.position.y = -0.5;
-    scene.add(ring);
 
     // 动画
     const clock = new THREE.Clock();
-    const smoothData = new Float32Array(BAR_COUNT);
 
     const animate = () => {
       const elapsed = clock.getElapsedTime();
-      const { data: freqData, hasData } = readFrequencyDataLog(BAR_COUNT);
+      const { data: freqData, hasData } = readFrequencyDataLog(80);
 
-      // 更新柱状条
-      for (let i = 0; i < BAR_COUNT; i++) {
+      let bassEnergy = 0;
+      if (hasData) {
+        for (let i = 0; i < 8; i++) bassEnergy += freqData[i] || 0;
+        bassEnergy /= 8;
+      } else {
+        bassEnergy = (Math.sin(elapsed * 1.5) * 0.5 + 0.5) * 0.12;
+      }
+
+      // 更新每根柱子
+      for (const bar of allBars) {
+        const ring = bar.ringData;
         let value;
         if (hasData) {
-          value = freqData[i] || 0;
+          // 从该环对应的频段范围取值
+          const freqIdx = Math.floor(ring.freqStart + (bar.idx / ring.count) * (ring.freqEnd - ring.freqStart));
+          value = (freqData[freqIdx] || 0);
         } else {
-          const wave = Math.sin(i * 0.25 + elapsed * 2) * 0.5 + 0.5;
-          value = wave * 0.15;
+          const wave = Math.sin(bar.idx * 0.3 + elapsed * (2 + bar.ring * 0.5)) * 0.5 + 0.5;
+          value = wave * 0.15 * (1 - bar.ring * 0.15);
         }
-        smoothData[i] += (value - smoothData[i]) * 0.25;
-        const v = smoothData[i];
 
-        bars[i].mesh.scale.y = Math.max(0.1, v * 3.5);
-        bars[i].mesh.material.opacity = 0.3 + v * 0.7;
+        bar.smooth += (value - bar.smooth) * 0.22;
+        const v = bar.smooth;
+
+        bar.mesh.scale.y = Math.max(0.08, v * ring.maxH);
+        bar.mesh.material.opacity = 0.4 + v * 0.6;
+        bar.mesh.material.emissiveIntensity = 0.2 + v * 1.2;
       }
 
-      // 整体缓慢旋转
-      barGroup.rotation.y = elapsed * 0.12;
+      // 整体旋转
+      barGroup.rotation.y = elapsed * 0.15;
 
-      // 粒子球脉动
-      const bassEnergy = hasData
-        ? freqData.slice(0, 8).reduce((a, b) => a + b, 0) / 8
-        : (Math.sin(elapsed * 1.5) * 0.5 + 0.5) * 0.1;
-      const midEnergy = hasData
-        ? freqData.slice(8, 40).reduce((a, b) => a + b, 0) / 32
-        : 0;
-
-      const posAttr = particles.geometry.attributes.position;
-      const pulseScale = 1 + bassEnergy * 0.5;
-      for (let i = 0; i < PARTICLE_COUNT; i++) {
-        const i3 = i * 3;
-        const bx = particleBase[i3];
-        const by = particleBase[i3 + 1];
-        const bz = particleBase[i3 + 2];
-        const wave = Math.sin(elapsed * 3 + i * 0.1) * midEnergy * 0.15;
-        posAttr.array[i3] = bx * pulseScale + Math.sin(elapsed + i) * wave;
-        posAttr.array[i3 + 1] = by * pulseScale + Math.cos(elapsed + i) * wave;
-        posAttr.array[i3 + 2] = bz * pulseScale;
-      }
-      posAttr.needsUpdate = true;
-      particles.rotation.y = elapsed * 0.2;
-      particles.rotation.x = elapsed * 0.08;
-      particleMat.opacity = 0.3 + bassEnergy * 0.5;
-
-      // 相机微微摆动
-      camera.position.x = Math.sin(elapsed * 0.15) * 0.8;
-      camera.position.y = 2.5 + Math.sin(elapsed * 0.2) * 0.3;
-      camera.lookAt(0, 0, 0);
+      // 相机缓慢摆动
+      camera.position.x = Math.sin(elapsed * 0.12) * 1.2;
+      camera.position.z = 6.5 + Math.cos(elapsed * 0.1) * 0.8;
+      camera.position.y = 3.5 + Math.sin(elapsed * 0.18) * 0.4;
+      camera.lookAt(0, 0.8, 0);
 
       // 灯光脉动
-      pointLight.intensity = 0.8 + bassEnergy * 1.5;
+      light1.intensity = 0.8 + bassEnergy * 2.0;
+      light2.intensity = 0.4 + bassEnergy * 1.2;
 
       renderer.render(scene, camera);
       rafRef.current = requestAnimationFrame(animate);
