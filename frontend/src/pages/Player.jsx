@@ -2,11 +2,12 @@ import { useState, useRef } from 'react';
 import {
   Play, Pause, SkipBack, SkipForward,
   Heart, Shuffle, Repeat, ListMusic, Volume2,
-  Search, X, Plus, Music
+  Search, X, Plus, Music, Box
 } from 'lucide-react';
 import { usePlayerStore } from '../store/usePlayerStore';
 import { music } from '../api/music';
 import Visualizer from '../components/Visualizer';
+import Visualizer3D from '../components/Visualizer3D';
 import FloatingLyrics from '../components/FloatingLyrics';
 
 function formatTime(s) {
@@ -38,6 +39,7 @@ export default function Player() {
   const [searching, setSearching] = useState(false);
   const [showPlaylist, setShowPlaylist] = useState(false);
   const [addMenuTrack, setAddMenuTrack] = useState(null);
+  const [vizMode, setVizMode] = useState('2d'); // '2d' | '3d'
   const progressRef = useRef(null);
 
   const isLiked = currentTrack ? liked.has(currentTrack.id) : false;
@@ -212,31 +214,55 @@ export default function Player() {
           height: 'min(72vw, 280px)',
         }}>
           <FloatingLyrics lyrics={lyrics} isPlaying={isPlaying} />
-          <Visualizer isPlaying={isPlaying} coverRadius={COVER_RADIUS} />
+          {vizMode === '3d'
+            ? <Visualizer3D isPlaying={isPlaying} coverRadius={COVER_RADIUS} />
+            : <Visualizer isPlaying={isPlaying} coverRadius={COVER_RADIUS} />
+          }
 
-          {/* 圆形旋转封面 */}
-          <div style={{
-            position: 'absolute',
-            top: '50%', left: '50%',
-            transform: 'translate(-50%, -50%)',
-            width: 'min(40vw, 160px)',
-            height: 'min(40vw, 160px)',
-            borderRadius: '50%',
-            overflow: 'hidden',
-            zIndex: 3,
-            border: '1px solid rgba(255,255,255,0.08)',
-            boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
-            animation: isPlaying ? 'spin 24s linear infinite' : 'none',
-          }}>
-            {currentTrack ? (
-              <img src={currentTrack.cover} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-            ) : (
-              <div style={{ width: '100%', height: '100%', background: 'var(--bg-elevated)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)' }}>
-                <Music size={36} />
-              </div>
-            )}
-          </div>
+          {/* 圆形旋转封面 - 3D模式下隐藏（3D场景中没有封面） */}
+          {vizMode === '2d' && (
+            <div style={{
+              position: 'absolute',
+              top: '50%', left: '50%',
+              transform: 'translate(-50%, -50%)',
+              width: 'min(40vw, 160px)',
+              height: 'min(40vw, 160px)',
+              borderRadius: '50%',
+              overflow: 'hidden',
+              zIndex: 3,
+              border: '1px solid rgba(255,255,255,0.08)',
+              boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
+              animation: isPlaying ? 'spin 24s linear infinite' : 'none',
+            }}>
+              {currentTrack ? (
+                <img src={currentTrack.cover} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              ) : (
+                <div style={{ width: '100%', height: '100%', background: 'var(--bg-elevated)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)' }}>
+                  <Music size={36} />
+                </div>
+              )}
+            </div>
+          )}
         </div>
+
+        {/* 2D/3D 切换按钮 */}
+        <button
+          onClick={() => setVizMode(vizMode === '2d' ? '3d' : '2d')}
+          style={{
+            position: 'absolute',
+            top: 'calc(12px + env(safe-area-inset-top))',
+            right: 64,
+            zIndex: 200,
+            width: 40, height: 40, borderRadius: '50%',
+            background: vizMode === '3d' ? '#fff' : 'var(--bg-secondary)',
+            border: '1px solid var(--border)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            color: vizMode === '3d' ? '#0A0A0A' : 'var(--text-secondary)',
+            boxShadow: '0 4px 16px rgba(0,0,0,0.3)',
+          }}
+        >
+          <Box size={16} />
+        </button>
 
         {/* 当前歌词 */}
         <div style={{
