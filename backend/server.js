@@ -3,7 +3,6 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 
-const qqmusicRoutes = require('./routes/qqmusic');
 const musicRoutes = require('./routes/music');
 
 const app = express();
@@ -16,7 +15,6 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', time: new Date().toISOString() });
 });
 
-app.use('/api/qqmusic', qqmusicRoutes);
 app.use('/api/music', musicRoutes);
 
 // Serve static frontend in production

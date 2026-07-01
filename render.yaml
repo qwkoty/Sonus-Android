@@ -12,7 +12,3 @@ services:
         value: "22.14.0"
       - key: FRONTEND_URL
         value: https://sonus.onrender.com
-      - key: APP_ID
-        sync: false
-      - key: APP_KEY
-        sync: false
