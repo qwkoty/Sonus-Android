@@ -7,6 +7,7 @@ import {
 import { usePlayerStore } from '../store/usePlayerStore';
 import { music } from '../api/music';
 import Visualizer from '../components/Visualizer';
+import FloatingLyrics from '../components/FloatingLyrics';
 
 function formatTime(s) {
   if (!s || isNaN(s)) return '0:00';
@@ -28,6 +29,7 @@ export default function Player() {
     togglePlay, next, prev, seek, setVolume,
     toggleMode, toggleLike, playTrack, addToPlaylist,
     platform, preloadUrls,
+    lyrics, currentLyric,
   } = store;
 
   const [searchOpen, setSearchOpen] = useState(false);
@@ -241,73 +243,101 @@ export default function Player() {
         </div>
       )}
 
-      {/* 封面区域 */}
+      {/* 封面 + 可视化 + 漂浮歌词 区域 */}
       <div style={{
         flex: 1,
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
-        minHeight: 240,
+        minHeight: 280,
         paddingTop: 'calc(56px + env(safe-area-inset-top))',
-        gap: 20,
+        gap: 12,
       }}>
+        {/* 容器：歌词背景 + 环绕音浪 + 圆形封面 */}
         <div style={{
-          width: 'min(58vw, 260px)',
-          aspectRatio: '1',
-          borderRadius: 24,
-          overflow: 'hidden',
-          border: '1px solid var(--border)',
-          boxShadow: '0 24px 64px rgba(0,0,0,0.6), 0 8px 24px rgba(255,255,255,0.03)',
+          position: 'relative',
+          width: 'min(65vw, 260px)',
+          height: 'min(65vw, 260px)',
         }}>
-          {currentTrack ? (
-            <img
-              src={currentTrack.cover}
-              alt=""
-              style={{
+          <FloatingLyrics lyrics={lyrics} isPlaying={isPlaying} />
+          <Visualizer isPlaying={isPlaying} coverRadius={80} />
+
+          {/* 圆形封面 */}
+          <div style={{
+            position: 'absolute',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            width: 'min(40vw, 160px)',
+            height: 'min(40vw, 160px)',
+            borderRadius: '50%',
+            overflow: 'hidden',
+            zIndex: 3,
+            border: '2px solid rgba(255,255,255,0.1)',
+            boxShadow: '0 8px 32px rgba(0,0,0,0.5), 0 0 20px rgba(255,255,255,0.04)',
+            animation: isPlaying ? 'spin 24s linear infinite' : 'none',
+          }}>
+            {currentTrack ? (
+              <img
+                src={currentTrack.cover}
+                alt=""
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'cover',
+                }}
+              />
+            ) : (
+              <div style={{
                 width: '100%',
                 height: '100%',
-                objectFit: 'cover',
-              }}
-            />
-          ) : (
-            <div style={{
-              width: '100%',
-              height: '100%',
-              background: 'var(--bg-elevated)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: 'var(--text-muted)',
-            }}>
-              <Music size={48} />
-            </div>
-          )}
+                background: 'var(--bg-elevated)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: 'var(--text-muted)',
+              }}>
+                <Music size={36} />
+              </div>
+            )}
+          </div>
         </div>
 
-        {/* 可视化频谱 - 放在封面下方 */}
-        <div style={{ width: 'min(72vw, 320px)', height: 40 }}>
-          <Visualizer isPlaying={isPlaying} />
+        {/* 当前歌词 */}
+        <div style={{
+          minHeight: 28,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '0 28px',
+        }}>
+          <p style={{
+            fontSize: 15,
+            fontWeight: 500,
+            color: '#fff',
+            textAlign: 'center',
+            opacity: currentLyric ? 1 : 0,
+            transition: 'opacity 0.4s ease',
+            textShadow: '0 2px 8px rgba(0,0,0,0.6)',
+          }}>
+            {currentLyric || ' '}
+          </p>
         </div>
       </div>
 
       {/* 歌曲信息 */}
       <div style={{
-        padding: '0 28px 16px',
+        padding: '0 28px 12px',
         textAlign: 'center',
         zIndex: 2,
       }}>
-        <h2 style={{ fontSize: 20, fontWeight: 700, letterSpacing: 0.5 }}>
+        <h2 style={{ fontSize: 18, fontWeight: 700, letterSpacing: 0.5 }}>
           {currentTrack?.title || '未播放'}
         </h2>
-        <p style={{ fontSize: 14, color: 'var(--text-secondary)', marginTop: 4 }}>
+        <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 3 }}>
           {currentTrack?.artist || '选择一首歌开始'}
         </p>
-        {currentTrack?.platform && (
-          <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 3 }}>
-            {formatPlatform(currentTrack.platform)}
-          </p>
-        )}
       </div>
 
       {/* 底部控制区 */}

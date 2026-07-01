@@ -25,11 +25,42 @@ function loadPlatform() {
 }
 function savePlatform(p) { localStorage.setItem('sonus_platform', p); }
 
+function parseLyric(lrcText) {
+  if (!lrcText) return [];
+  const lines = lrcText.split('\n');
+  const result = [];
+  const timeRegex = /\[(\d{2}):(\d{2})\.(\d{2,3})\]/;
+  for (const line of lines) {
+    const match = line.match(timeRegex);
+    if (match) {
+      const min = parseInt(match[1]);
+      const sec = parseInt(match[2]);
+      const ms = parseInt(match[3].padEnd(3, '0'));
+      const time = min * 60 + sec + ms / 1000;
+      const text = line.replace(timeRegex, '').trim();
+      if (text) result.push({ time, text });
+    }
+  }
+  return result.sort((a, b) => a.time - b.time);
+}
+
+function getCurrentLyric(lyrics, time) {
+  if (!lyrics || !lyrics.length) return '';
+  let current = '';
+  for (const line of lyrics) {
+    if (line.time <= time) current = line.text;
+    else break;
+  }
+  return current;
+}
+
 export const usePlayerStore = create((set, get) => {
   const audio = getAudio();
 
   audio.addEventListener('timeupdate', () => {
-    set({ currentTime: audio.currentTime || 0 });
+    const time = audio.currentTime || 0;
+    const { lyrics } = get();
+    set({ currentTime: time, currentLyric: getCurrentLyric(lyrics, time) });
   });
 
   audio.addEventListener('loadedmetadata', () => {
@@ -65,6 +96,8 @@ export const usePlayerStore = create((set, get) => {
     playlists: loadPlaylists(),
     qqAuth: loadQQAuth(),
     platform: loadPlatform(),
+    lyrics: [],
+    currentLyric: '',
 
     audio,
 
@@ -73,7 +106,7 @@ export const usePlayerStore = create((set, get) => {
     playTrack: async (track) => {
       initAudioSystem();
       const { audio } = get();
-      set({ currentTrack: track, isPlaying: false, currentTime: 0, duration: 0, isLoadingUrl: true });
+      set({ currentTrack: track, isPlaying: false, currentTime: 0, duration: 0, isLoadingUrl: true, lyrics: [], currentLyric: '' });
 
       let url = track.url || '';
 
@@ -88,6 +121,17 @@ export const usePlayerStore = create((set, get) => {
 
       if (!url && track.platform === 'demo') {
         url = 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3';
+      }
+
+      // 加载歌词
+      if (track.platform && track.rawId && track.platform !== 'demo') {
+        try {
+          const lyricRes = await music.lyric(track.rawId, track.platform);
+          const parsed = parseLyric(lyricRes?.data?.lyric || '');
+          set({ lyrics: parsed });
+        } catch (e) {
+          // ignore
+        }
       }
 
       if (url) {

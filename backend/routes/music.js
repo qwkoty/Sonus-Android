@@ -64,6 +64,19 @@ async function getNeteaseRealUrl(id) {
   return '';
 }
 
+async function getNeteaseLyric(id) {
+  const url = 'https://music.163.com/api/song/lyric';
+  const { data } = await axios.get(url, {
+    params: { id, lv: 1, kv: 1, tv: -1 },
+    headers: {
+      ...COMMON_HEADERS,
+      Referer: 'https://music.163.com/',
+    },
+    timeout: 10000,
+  });
+  return data?.lrc?.lyric || '';
+}
+
 // ---------- QQ 音乐（musicu.fcg 新接口） ----------
 async function searchQQ(keyword, page = 1, num = 20) {
   const url = 'https://u.y.qq.com/cgi-bin/musicu.fcg';
@@ -204,6 +217,23 @@ router.get('/url', async (req, res) => {
     }
 
     res.status(400).json({ error: 'unsupported platform' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ---------- 获取歌词 ----------
+router.get('/lyric', async (req, res) => {
+  try {
+    const { id, platform } = req.query;
+    if (!id || !platform) return res.status(400).json({ error: 'id and platform required' });
+
+    if (platform === 'netease') {
+      const lyric = await getNeteaseLyric(id);
+      return res.json({ code: 200, data: { lyric, platform } });
+    }
+
+    res.json({ code: 200, data: { lyric: '', platform } });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

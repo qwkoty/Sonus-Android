@@ -11,4 +11,6 @@ export const music = {
     get(`/api/music/search?keyword=${encodeURIComponent(keyword)}&platforms=${platforms}&limit=${limit}`),
   url: (id, platform) =>
     get(`/api/music/url?id=${encodeURIComponent(id)}&platform=${encodeURIComponent(platform)}`),
+  lyric: (id, platform) =>
+    get(`/api/music/lyric?id=${encodeURIComponent(id)}&platform=${encodeURIComponent(platform)}`),
 };

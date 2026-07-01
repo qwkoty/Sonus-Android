@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { readFrequencyData } from '../audio/engine';
 
-export default function Visualizer({ isPlaying }) {
+export default function Visualizer({ isPlaying, coverRadius = 80 }) {
   const canvasRef = useRef(null);
   const rafRef = useRef(null);
 
@@ -9,15 +9,21 @@ export default function Visualizer({ isPlaying }) {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
-    let w, h;
+    let w, h, cx, cy;
 
     const resize = () => {
       const dpr = Math.min(window.devicePixelRatio || 1, 2);
       w = canvas.width = canvas.offsetWidth * dpr;
       h = canvas.height = canvas.offsetHeight * dpr;
+      cx = w / 2;
+      cy = h / 2;
     };
     resize();
     window.addEventListener('resize', resize);
+
+    const BARS = 72;
+    const INNER_R = coverRadius * (window.devicePixelRatio || 1);
+    const MAX_BAR_LEN = Math.min(w, h) * 0.3;
 
     const draw = () => {
       ctx.clearRect(0, 0, w, h);
@@ -26,35 +32,41 @@ export default function Visualizer({ isPlaying }) {
       const hasData = freqData.length > 0 && isPlaying;
 
       if (!hasData) {
-        freqData = new Uint8Array(64).map((_, i) =>
-          Math.max(3, Math.sin(i * 0.25 + Date.now() * 0.002) * 8 + 8)
+        freqData = new Uint8Array(BARS).map((_, i) =>
+          Math.max(4, Math.sin(i * 0.4 + Date.now() * 0.0015) * 10 + 10)
         );
       }
 
-      const bars = 48;
-      const step = Math.floor(freqData.length / bars);
-      const barW = (w / bars) * 0.55;
-      const gap = (w / bars) * 0.45;
-      const maxH = h * 0.9;
+      const step = Math.floor(freqData.length / BARS);
 
-      for (let i = 0; i < bars; i++) {
+      for (let i = 0; i < BARS; i++) {
+        const angle = (i / BARS) * Math.PI * 2 - Math.PI / 2;
         const idx = Math.min(i * step, freqData.length - 1);
-        const raw = freqData[idx] || 0;
-        const normalized = raw / 255;
+        const value = freqData[idx] || 0;
+        const normalized = value / 255;
 
-        // 中间高两边低
-        const centerDist = Math.abs(i - bars / 2) / (bars / 2);
-        const envelope = 1 - centerDist * 0.5;
+        const barLen = Math.max(2, normalized * MAX_BAR_LEN * (hasData ? 1.1 : 0.5));
+        const x1 = cx + Math.cos(angle) * INNER_R;
+        const y1 = cy + Math.sin(angle) * INNER_R;
+        const x2 = cx + Math.cos(angle) * (INNER_R + barLen);
+        const y2 = cy + Math.sin(angle) * (INNER_R + barLen);
 
-        const bh = Math.max(2, normalized * maxH * envelope * (hasData ? 1.2 : 0.7));
-        const x = i * (barW + gap) + (w - bars * (barW + gap)) / 2 + gap / 2;
-        const y = (h - bh) / 2;
-
-        const alpha = 0.15 + normalized * 0.85;
-        ctx.fillStyle = `rgba(255,255,255,${alpha})`;
+        const alpha = 0.2 + normalized * 0.8;
+        ctx.strokeStyle = `rgba(255,255,255,${alpha})`;
+        ctx.lineWidth = 2.5;
+        ctx.lineCap = 'round';
         ctx.beginPath();
-        ctx.roundRect(x, y, barW, bh, barW / 2);
-        ctx.fill();
+        ctx.moveTo(x1, y1);
+        ctx.lineTo(x2, y2);
+        ctx.stroke();
+
+        // 端点微光
+        if (hasData && normalized > 0.3) {
+          ctx.fillStyle = `rgba(255,255,255,${normalized * 0.5})`;
+          ctx.beginPath();
+          ctx.arc(x2, y2, 2, 0, Math.PI * 2);
+          ctx.fill();
+        }
       }
 
       rafRef.current = requestAnimationFrame(draw);
@@ -65,14 +77,17 @@ export default function Visualizer({ isPlaying }) {
       cancelAnimationFrame(rafRef.current);
       window.removeEventListener('resize', resize);
     };
-  }, [isPlaying]);
+  }, [isPlaying, coverRadius]);
 
   return (
     <canvas
       ref={canvasRef}
       style={{
+        position: 'absolute',
+        inset: 0,
         width: '100%',
         height: '100%',
+        zIndex: 2,
       }}
     />
   );
