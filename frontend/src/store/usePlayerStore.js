@@ -20,6 +20,11 @@ function loadQQAuth() {
 }
 function saveQQAuth(auth) { localStorage.setItem('sonus_qq_auth', JSON.stringify(auth)); }
 
+function loadPlatform() {
+  try { return localStorage.getItem('sonus_platform') || 'none'; } catch { return 'none'; }
+}
+function savePlatform(p) { localStorage.setItem('sonus_platform', p); }
+
 export const usePlayerStore = create((set, get) => {
   const audio = getAudio();
 
@@ -59,7 +64,7 @@ export const usePlayerStore = create((set, get) => {
     isLoadingUrl: false,
     playlists: loadPlaylists(),
     qqAuth: loadQQAuth(),
-    connectedPlatform: loadQQAuth() ? 'qq' : 'none',
+    platform: loadPlatform(),
 
     audio,
 
@@ -218,14 +223,10 @@ export const usePlayerStore = create((set, get) => {
       }
     },
 
-    // QQ 音乐登录
-    setQQAuth: (auth) => {
-      saveQQAuth(auth);
-      set({ qqAuth: auth, connectedPlatform: auth ? 'qq' : 'none' });
-    },
-    logoutQQ: () => {
-      saveQQAuth(null);
-      set({ qqAuth: null, connectedPlatform: 'none' });
+    // 平台选择
+    setPlatform: (p) => {
+      savePlatform(p);
+      set({ platform: p });
     },
 
 

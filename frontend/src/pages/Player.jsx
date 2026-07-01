@@ -27,6 +27,7 @@ export default function Player() {
     volume, playMode, playlist, liked, playlists,
     togglePlay, next, prev, seek, setVolume,
     toggleMode, toggleLike, playTrack, addToPlaylist,
+    platform,
   } = store;
 
   const [searchOpen, setSearchOpen] = useState(false);
@@ -44,7 +45,8 @@ export default function Player() {
     if (!kw.trim()) return;
     setSearching(true);
     try {
-      const res = await music.search(kw, 'netease,qq', 15);
+      const searchPlatforms = platform === 'none' ? 'netease,qq' : platform;
+      const res = await music.search(kw, searchPlatforms, 15);
       const list = (res.data || []).map((item) => ({
         ...item,
         cover: item.cover || `https://picsum.photos/seed/${item.id}/400/400`,

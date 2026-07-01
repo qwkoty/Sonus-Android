@@ -1,19 +1,18 @@
 import { useState } from 'react';
 import {
   User, Link as LinkIcon, LogOut, Moon, Settings, HelpCircle,
-  Plus, Trash2, Play, Music, X
+  Plus, Trash2, Play, Music, X, Check
 } from 'lucide-react';
 import { usePlayerStore } from '../store/usePlayerStore';
 
 export default function Profile() {
-  const [linked, setLinked] = useState(false);
   const [newName, setNewName] = useState('');
   const [showCreate, setShowCreate] = useState(false);
   const [activePlaylist, setActivePlaylist] = useState(null);
 
   const {
     playlists, createPlaylist, deletePlaylist, removeFromPlaylist,
-    playPlaylist, playTrack,
+    playPlaylist, playTrack, platform, setPlatform,
   } = usePlayerStore();
 
   const handleCreate = () => {
@@ -53,49 +52,48 @@ export default function Profile() {
           <User size={32} />
         </div>
         <div style={{ fontSize: 18, fontWeight: 700 }}>
-          {linked ? '声波用户' : '访客'}
+          {platform === 'netease' ? '网易云音乐' : platform === 'qq' ? 'QQ音乐' : '访客'}
         </div>
         <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 4 }}>
-          {linked ? '已连接声波源' : '尚未连接声波源'}
+          {platform === 'none' ? '选择下方平台以连接声波源' : '已连接声波源'}
         </div>
 
-        {!linked ? (
+        <div style={{ display: 'flex', gap: 10, justifyContent: 'center', marginTop: 16 }}>
           <button
-            onClick={() => setLinked(true)}
+            onClick={() => setPlatform(platform === 'netease' ? 'none' : 'netease')}
             style={{
-              marginTop: 16,
-              padding: '10px 28px',
+              padding: '10px 20px',
               borderRadius: 24,
-              background: '#fff',
-              color: '#0A0A0A',
+              background: platform === 'netease' ? '#fff' : 'var(--surface)',
+              color: platform === 'netease' ? '#0A0A0A' : 'var(--text-secondary)',
               fontWeight: 700,
-              fontSize: 14,
+              fontSize: 13,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
             }}
           >
-            <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <LinkIcon size={16} />
-              连接声波源
-            </span>
+            {platform === 'netease' && <Check size={14} />}
+            网易云音乐
           </button>
-        ) : (
           <button
-            onClick={() => setLinked(false)}
+            onClick={() => setPlatform(platform === 'qq' ? 'none' : 'qq')}
             style={{
-              marginTop: 16,
-              padding: '10px 28px',
+              padding: '10px 20px',
               borderRadius: 24,
-              background: 'var(--surface)',
-              color: 'var(--text-secondary)',
-              fontWeight: 600,
-              fontSize: 14,
+              background: platform === 'qq' ? '#fff' : 'var(--surface)',
+              color: platform === 'qq' ? '#0A0A0A' : 'var(--text-secondary)',
+              fontWeight: 700,
+              fontSize: 13,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
             }}
           >
-            <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <LogOut size={16} />
-              断开连接
-            </span>
+            {platform === 'qq' && <Check size={14} />}
+            QQ音乐
           </button>
-        )}
+        </div>
       </div>
 
       {/* 歌单系统 */}

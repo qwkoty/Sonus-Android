@@ -181,22 +181,9 @@ router.get('/url', async (req, res) => {
     if (!id || !platform) return res.status(400).json({ error: 'id and platform required' });
 
     if (platform === 'netease') {
+      // 直接返回预重定向链接，让浏览器每次跟随302获取最新的签名CDN地址
       const redirectUrl = getNeteaseUrl(id);
-      try {
-        const headRes = await axios.head(redirectUrl, {
-          maxRedirects: 5,
-          timeout: 10000,
-          headers: {
-            ...COMMON_HEADERS,
-            Referer: 'https://music.163.com/',
-          },
-        });
-        let finalUrl = headRes.request?.res?.responseUrl || headRes.headers?.location || redirectUrl;
-        if (finalUrl && finalUrl.startsWith('http:')) finalUrl = finalUrl.replace('http:', 'https:');
-        return res.json({ code: 200, data: { url: finalUrl, platform } });
-      } catch {
-        return res.json({ code: 200, data: { url: redirectUrl, platform } });
-      }
+      return res.json({ code: 200, data: { url: redirectUrl, platform } });
     }
 
     if (platform === 'qq') {
