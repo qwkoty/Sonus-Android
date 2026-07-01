@@ -118,37 +118,63 @@ export default function Visualizer({ isPlaying, coverRadius = 80, mode = 'ring' 
       ctx.globalAlpha = 1;
     };
 
-    // ---- 模式：粒子流场 ----
+    // ---- 模式：粒子脉动 ----
+    // 两层效果：1) 围绕封面的脉动粒子环（大小随频谱实时变化）
+    //          2) 高频段发射飞散粒子（慢衰减 + 辉光）
     const drawParticles = (spectrum, hasData) => {
       const data = spectrum;
-      const INNER_R = coverRadius * dpr * 0.8;
+      const INNER_R = coverRadius * dpr;
 
-      // 生成新粒子
+      // ===== 第 1 层：脉动粒子环（核心音频反馈） =====
+      // 每个频段对应一个固定粒子，大小 = 基础大小 * (1 + 频谱值 * 5)
+      for (let i = 0; i < NUM_BARS; i++) {
+        const angle = (i / NUM_BARS) * Math.PI * 2 - Math.PI / 2;
+        const value = hasData ? data[i] : 0.05;
+        const hue = 200 - (i / NUM_BARS) * 170;
+
+        const px = cx + Math.cos(angle) * INNER_R;
+        const py = cy + Math.sin(angle) * INNER_R;
+
+        // 粒子大小直接由频谱值驱动 — 这是音频波动的直接体现
+        const baseSize = 2 * dpr;
+        const pulseSize = baseSize + value * 14 * dpr;
+
+        // 辉光
+        ctx.shadowBlur = 12 * dpr;
+        ctx.shadowColor = `hsla(${hue}, 90%, 60%, 0.8)`;
+        ctx.fillStyle = `hsla(${hue}, 90%, 70%, ${0.4 + value * 0.6})`;
+        ctx.beginPath();
+        ctx.arc(px, py, pulseSize, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+      }
+
+      // ===== 第 2 层：飞散粒子（高频段触发） =====
       if (isPlaying) {
-        const spawnCount = hasData ? 3 : 1;
-        for (let s = 0; s < spawnCount; s++) {
-          const barIdx = Math.floor(Math.random() * NUM_BARS);
-          const value = data[barIdx] || 0.1;
-          const angle = (barIdx / NUM_BARS) * Math.PI * 2 - Math.PI / 2;
-          const speed = (0.5 + value * 4) * dpr;
-          const hue = 200 - (barIdx / NUM_BARS) * 170;
+        for (let i = 0; i < NUM_BARS; i++) {
+          const value = hasData ? data[i] : 0;
+          if (value < 0.25) continue; // 只有能量足够的频段才发射
+
+          const angle = (i / NUM_BARS) * Math.PI * 2 - Math.PI / 2;
+          const hue = 200 - (i / NUM_BARS) * 170;
+          const speed = (1 + value * 5) * dpr;
 
           particlesRef.current.push({
             x: cx + Math.cos(angle) * INNER_R,
             y: cy + Math.sin(angle) * INNER_R,
-            vx: Math.cos(angle) * speed,
-            vy: Math.sin(angle) * speed,
+            vx: Math.cos(angle) * speed + (Math.random() - 0.5) * 0.5,
+            vy: Math.sin(angle) * speed + (Math.random() - 0.5) * 0.5,
             life: 1,
-            decay: 0.008 + Math.random() * 0.012,
-            size: (1.5 + value * 3) * dpr,
+            decay: 0.004 + Math.random() * 0.006, // 慢衰减
+            size: (2 + value * 4) * dpr,
             hue,
           });
         }
       }
 
       // 限制粒子数
-      if (particlesRef.current.length > 500) {
-        particlesRef.current.splice(0, particlesRef.current.length - 500);
+      if (particlesRef.current.length > 600) {
+        particlesRef.current.splice(0, particlesRef.current.length - 600);
       }
 
       const particles = particlesRef.current;
@@ -156,8 +182,8 @@ export default function Visualizer({ isPlaying, coverRadius = 80, mode = 'ring' 
         const p = particles[i];
         p.x += p.vx;
         p.y += p.vy;
-        p.vx *= 0.99;
-        p.vy *= 0.99;
+        p.vx *= 0.98;
+        p.vy *= 0.98;
         p.life -= p.decay;
 
         if (p.life <= 0) {
@@ -165,73 +191,76 @@ export default function Visualizer({ isPlaying, coverRadius = 80, mode = 'ring' 
           continue;
         }
 
-        ctx.fillStyle = `hsla(${p.hue}, 80%, 65%, ${p.life * 0.7})`;
+        ctx.shadowBlur = 6 * dpr;
+        ctx.shadowColor = `hsla(${p.hue}, 90%, 60%, ${p.life * 0.6})`;
+        ctx.fillStyle = `hsla(${p.hue}, 90%, 70%, ${p.life * 0.9})`;
         ctx.beginPath();
         ctx.arc(p.x, p.y, p.size * p.life, 0, Math.PI * 2);
         ctx.fill();
       }
+      ctx.shadowBlur = 0;
     };
 
-    // ---- 模式：频谱瀑布图（居中镜像 + 渐变 + 辉光） ----
+    // ---- 模式：频谱瀑布图（底部上滚 + 高饱和渐变） ----
+    // 每帧频谱从底部出现，向上滚动逐渐淡出，形成"声波瀑布"效果
     const drawWaterfall = (spectrum, hasData) => {
       const data = spectrum;
       const colWidth = w / NUM_BARS;
-      const midY = cy;
 
-      // 保存当前帧
+      // 保存当前帧（最新的在数组末尾）
       waterfallRef.current.push(Array.from(data));
-      const MAX_HISTORY = 120;
+      const MAX_HISTORY = 100;
       if (waterfallRef.current.length > MAX_HISTORY) waterfallRef.current.shift();
 
       const history = waterfallRef.current;
-      const rowH = (h * 0.42) / MAX_HISTORY; // 上下各占 42%
+      const rowH = h / MAX_HISTORY;
 
+      // 从底部（最新）向上（最旧）绘制
       for (let row = 0; row < history.length; row++) {
-        const rowData = history[row];
-        // 越新的帧越靠近中心，越旧的越远（向外扩散）
-        const ageRatio = row / history.length;
-        const ageAlpha = Math.pow(1 - ageRatio, 0.6); // 缓慢衰减
+        const rowData = history[history.length - 1 - row]; // row=0 是最新帧
+        const y = h - (row + 1) * rowH; // 从底部开始
+
+        // 越旧越淡
+        const ageAlpha = Math.pow(1 - row / history.length, 0.8);
 
         for (let i = 0; i < NUM_BARS; i++) {
           const value = rowData[i] || 0;
-          if (value < 0.015) continue;
+          if (value < 0.01) continue;
 
-          const hue = 200 - (i / NUM_BARS) * 170;
+          // 高饱和渐变：低频品红 → 中频青绿 → 高频明黄
+          const hue = 320 - (i / NUM_BARS) * 200; // 320(品红) → 120(绿)
           const x = i * colWidth;
-          const barH = value * h * 0.38;
 
-          // 上半部分（向上延伸）
-          const yTop = midY - row * rowH - barH;
-          // 下半部分（向下延伸，镜像）
-          const yBot = midY + row * rowH;
+          // 颜色亮度直接由频谱值驱动 — 能量越高越亮
+          const lightness = 45 + value * 30; // 45% → 75%
+          const alpha = Math.min(1, value * 1.5) * ageAlpha;
 
-          const alpha = value * ageAlpha;
+          ctx.fillStyle = `hsla(${hue}, 95%, ${lightness}%, ${alpha})`;
+          ctx.fillRect(x, y, colWidth + 1, rowH + 1);
 
-          // 渐变填充 - 上半
-          const gradTop = ctx.createLinearGradient(x, yTop, x, yTop + barH);
-          gradTop.addColorStop(0, `hsla(${hue}, 90%, 70%, 0)`);
-          gradTop.addColorStop(0.5, `hsla(${hue}, 85%, 60%, ${alpha * 0.7})`);
-          gradTop.addColorStop(1, `hsla(${hue}, 90%, 65%, ${alpha})`);
-          ctx.fillStyle = gradTop;
-          ctx.fillRect(x, yTop, colWidth + 1, barH);
-
-          // 渐变填充 - 下半（镜像）
-          const gradBot = ctx.createLinearGradient(x, yBot, x, yBot + barH);
-          gradBot.addColorStop(0, `hsla(${hue}, 90%, 65%, ${alpha})`);
-          gradBot.addColorStop(0.5, `hsla(${hue}, 85%, 60%, ${alpha * 0.7})`);
-          gradBot.addColorStop(1, `hsla(${hue}, 90%, 70%, 0)`);
-          ctx.fillStyle = gradBot;
-          ctx.fillRect(x, yBot, colWidth + 1, barH);
+          // 高能量格子的辉光
+          if (value > 0.4) {
+            ctx.shadowBlur = 8 * dpr;
+            ctx.shadowColor = `hsla(${hue}, 95%, 65%, ${alpha * 0.8})`;
+            ctx.fillStyle = `hsla(${hue}, 100%, 80%, ${alpha * 0.5})`;
+            ctx.fillRect(x, y, colWidth + 1, rowH + 1);
+            ctx.shadowBlur = 0;
+          }
         }
       }
 
-      // 中心辉光线
-      const centerGrad = ctx.createLinearGradient(0, midY - 2, 0, midY + 2);
-      centerGrad.addColorStop(0, 'rgba(255,255,255,0)');
-      centerGrad.addColorStop(0.5, 'rgba(255,255,255,0.15)');
-      centerGrad.addColorStop(1, 'rgba(255,255,255,0)');
-      ctx.fillStyle = centerGrad;
-      ctx.fillRect(0, midY - 2, w, 4);
+      // 底部当前帧的亮线（强调"正在播放"的瞬态）
+      if (hasData && history.length > 0) {
+        const latest = history[history.length - 1];
+        for (let i = 0; i < NUM_BARS; i++) {
+          const value = latest[i] || 0;
+          if (value < 0.01) continue;
+          const hue = 320 - (i / NUM_BARS) * 200;
+          const x = i * colWidth;
+          ctx.fillStyle = `hsla(${hue}, 100%, 85%, ${value * 0.9})`;
+          ctx.fillRect(x, h - rowH - 1, colWidth + 1, 2 * dpr);
+        }
+      }
     };
 
     // ---- 主循环 ----
