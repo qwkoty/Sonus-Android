@@ -47,8 +47,21 @@ async function searchNetease(keyword, limit = 20) {
   }));
 }
 
-function getNeteaseUrl(id) {
-  return `https://music.163.com/song/media/outer/url?id=${id}.mp3`;
+async function getNeteaseRealUrl(id) {
+  const url = 'https://music.163.com/api/song/enhance/player/url';
+  const { data } = await axios.post(url, `ids=[${id}]&br=320000`, {
+    headers: {
+      ...COMMON_HEADERS,
+      'Content-Type': 'application/x-www-form-urlencoded',
+      Referer: 'https://music.163.com/',
+    },
+    timeout: 10000,
+  });
+  const song = data?.data?.[0];
+  if (song?.code === 200 && song?.url) {
+    return song.url.replace('http:', 'https:');
+  }
+  return '';
 }
 
 // ---------- QQ 音乐（musicu.fcg 新接口） ----------
@@ -181,9 +194,8 @@ router.get('/url', async (req, res) => {
     if (!id || !platform) return res.status(400).json({ error: 'id and platform required' });
 
     if (platform === 'netease') {
-      // 直接返回预重定向链接，让浏览器每次跟随302获取最新的签名CDN地址
-      const redirectUrl = getNeteaseUrl(id);
-      return res.json({ code: 200, data: { url: redirectUrl, platform } });
+      const realUrl = await getNeteaseRealUrl(id);
+      return res.json({ code: 200, data: { url: realUrl, platform } });
     }
 
     if (platform === 'qq') {
