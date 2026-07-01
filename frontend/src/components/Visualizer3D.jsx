@@ -1,6 +1,7 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { getSpectrumBars } from '../audio/engine';
+import Visualizer from './Visualizer';
 
 function isWebGLAvailable() {
   try {
@@ -14,32 +15,31 @@ function isWebGLAvailable() {
   }
 }
 
-const Fallback = `
-  <div style="
-    width:100%;height:100%;
-    display:flex;align-items:center;justify-content:center;
-    color:rgba(255,255,255,0.55);
-    font-size:13px;letter-spacing:0.5px;
-    text-align:center;padding:20px;
-  ">
-    3D 可视化需要 WebGL 支持
-  </div>
-`;
-
 export default function Visualizer3D({ isPlaying }) {
+  const [webglReady] = useState(() => isWebGLAvailable());
   const mountRef = useRef(null);
   const rafRef = useRef(null);
+
+  if (!webglReady) {
+    return (
+      <div
+        style={{
+          position: 'absolute',
+          inset: 0,
+          width: '100%',
+          height: '100%',
+          zIndex: 2,
+          background: '#05070a',
+        }}
+      >
+        <Visualizer isPlaying={isPlaying} coverRadius={0} />
+      </div>
+    );
+  }
 
   useEffect(() => {
     const mount = mountRef.current;
     if (!mount) return;
-
-    if (!isWebGLAvailable()) {
-      mount.innerHTML = Fallback;
-      return () => {
-        mount.innerHTML = '';
-      };
-    }
 
     const W = mount.offsetWidth;
     const H = mount.offsetHeight;
@@ -61,7 +61,7 @@ export default function Visualizer3D({ isPlaying }) {
       renderer.toneMapping = THREE.ACESFilmicToneMapping;
       renderer.toneMappingExposure = 1.25;
     } catch (err) {
-      mount.innerHTML = Fallback;
+      mount.innerHTML = '<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,0.5);font-size:13px;">3D 加载失败</div>';
       return () => {
         mount.innerHTML = '';
       };

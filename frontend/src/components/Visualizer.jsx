@@ -40,10 +40,11 @@ export default function Visualizer({ isPlaying, coverRadius = 80 }) {
       const dpr = Math.min(window.devicePixelRatio || 1, 2);
       const INNER_R = coverRadius * dpr;
       const MAX_BAR_LEN = Math.min(w, h) / 2 - INNER_R - 4 * dpr;
-      if (MAX_BAR_LEN < 4) {
+      if (MAX_BAR_LEN < 16) {
         rafRef.current = requestAnimationFrame(draw);
         return;
       }
+      const BASE_RING = 10 * dpr;
 
       const { data: spectrum, hasData } = getSpectrumBars(72);
       const t = Date.now() * 0.001;
@@ -61,7 +62,7 @@ export default function Visualizer({ isPlaying, coverRadius = 80 }) {
         } else {
           const wave1 = Math.sin(i * 0.15 + t * 1.6) * 0.5 + 0.5;
           const wave2 = Math.sin(i * 0.08 + t * 0.85) * 0.3 + 0.5;
-          rawVal = wave1 * wave2 * 0.35;
+          rawVal = wave1 * wave2 * 0.38;
         }
         if (rawVal > smooth[i]) {
           smooth[i] += (rawVal - smooth[i]) * 0.5;
@@ -77,7 +78,7 @@ export default function Visualizer({ isPlaying, coverRadius = 80 }) {
       for (let i = 0; i < BARS; i++) {
         const angle = (i / BARS) * Math.PI * 2 - Math.PI / 2;
         const v = values[i];
-        const outerR = INNER_R + Math.max(1 * dpr, v * MAX_BAR_LEN);
+        const outerR = INNER_R + BASE_RING + v * Math.max(0, MAX_BAR_LEN - BASE_RING);
         outerPts.push({
           x: cx + Math.cos(angle) * outerR,
           y: cy + Math.sin(angle) * outerR,
@@ -87,6 +88,18 @@ export default function Visualizer({ isPlaying, coverRadius = 80 }) {
           y: cy + Math.sin(angle) * INNER_R,
         });
       }
+
+      // ---- 底层音浪圆盘 ----
+      ctx.save();
+      const baseGrad = ctx.createRadialGradient(cx, cy, INNER_R, cx, cy, INNER_R + BASE_RING + Math.max(0, MAX_BAR_LEN - BASE_RING) * 0.6);
+      baseGrad.addColorStop(0, 'rgba(10,40,100,0.18)');
+      baseGrad.addColorStop(0.5, 'rgba(25,80,180,0.28)');
+      baseGrad.addColorStop(1, 'rgba(60,130,235,0.08)');
+      ctx.fillStyle = baseGrad;
+      ctx.beginPath();
+      ctx.arc(cx, cy, INNER_R + BASE_RING, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
 
       // ---- 绘制外层光晕 ----
       ctx.save();
