@@ -22,14 +22,15 @@ export default function FloatingLyrics({ lyrics, isPlaying }) {
     const spawnParticle = () => {
       if (!lyrics.length) return;
       const line = lyrics[Math.floor(Math.random() * lyrics.length)];
+      if (!line.text || line.text.length < 2) return;
       particlesRef.current.push({
         text: line.text,
         x: Math.random() * w,
         y: h + 20,
-        speed: 0.3 + Math.random() * 0.6,
-        opacity: 0.05 + Math.random() * 0.12,
-        size: 10 + Math.random() * 14,
-        drift: (Math.random() - 0.5) * 0.2,
+        speed: 0.15 + Math.random() * 0.3,
+        opacity: 0.02 + Math.random() * 0.05,
+        size: 9 + Math.random() * 11,
+        drift: (Math.random() - 0.5) * 0.1,
       });
     };
 
@@ -37,10 +38,8 @@ export default function FloatingLyrics({ lyrics, isPlaying }) {
     const draw = () => {
       ctx.clearRect(0, 0, w, h);
 
-      // 偶尔生成新粒子
-      if (isPlaying && frameCount % 40 === 0) {
+      if (isPlaying && frameCount % 80 === 0) {
         spawnParticle();
-        if (Math.random() > 0.5) spawnParticle();
       }
       frameCount++;
 
@@ -50,7 +49,8 @@ export default function FloatingLyrics({ lyrics, isPlaying }) {
         p.y -= p.speed;
         p.x += p.drift;
 
-        ctx.font = `${p.size * (window.devicePixelRatio || 1)}px Inter, sans-serif`;
+        const dpr = Math.min(window.devicePixelRatio || 1, 2);
+        ctx.font = `${p.size * dpr}px Inter, sans-serif`;
         ctx.fillStyle = `rgba(255,255,255,${p.opacity})`;
         ctx.textAlign = 'center';
         ctx.fillText(p.text, p.x, p.y);
