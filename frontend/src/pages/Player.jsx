@@ -2,7 +2,7 @@ import { useState, useRef } from 'react';
 import {
   Play, Pause, SkipBack, SkipForward,
   Heart, Shuffle, Repeat, ListMusic, Volume2,
-  Search, X, Plus
+  Search, X, Plus, Music
 } from 'lucide-react';
 import { usePlayerStore } from '../store/usePlayerStore';
 import { music } from '../api/music';
@@ -27,7 +27,7 @@ export default function Player() {
     volume, playMode, playlist, liked, playlists,
     togglePlay, next, prev, seek, setVolume,
     toggleMode, toggleLike, playTrack, addToPlaylist,
-    platform,
+    platform, preloadUrls,
   } = store;
 
   const [searchOpen, setSearchOpen] = useState(false);
@@ -52,6 +52,7 @@ export default function Player() {
         cover: item.cover || `https://picsum.photos/seed/${item.id}/400/400`,
       }));
       setResults(list);
+      preloadUrls(list);
     } catch (err) {
       console.error(err);
     } finally {
@@ -71,9 +72,10 @@ export default function Player() {
       height: '100%',
       display: 'flex',
       flexDirection: 'column',
-      background: 'linear-gradient(180deg, #111 0%, #0A0A0A 100%)',
+      background: 'var(--bg-primary)',
       overflowY: 'auto',
       overflowX: 'hidden',
+      position: 'relative',
     }}>
       {/* 右上角悬浮搜索按钮 */}
       <div style={{
@@ -106,7 +108,7 @@ export default function Player() {
           position: 'fixed',
           inset: 0,
           zIndex: 150,
-          background: 'rgba(10,10,10,0.97)',
+          background: 'rgba(10,10,10,0.98)',
           backdropFilter: 'blur(20px)',
           display: 'flex',
           flexDirection: 'column',
@@ -143,8 +145,6 @@ export default function Player() {
               </button>
             )}
           </div>
-
-
 
           {searching && (
             <div style={{ textAlign: 'center', padding: 30, color: 'var(--text-muted)', fontSize: 13 }}>
@@ -241,86 +241,90 @@ export default function Player() {
         </div>
       )}
 
-      {/* 播放器主体 */}
+      {/* 可视化区域 - 占满上半部分 */}
       <div style={{
         flex: 1,
+        position: 'relative',
         display: 'flex',
-        flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
-        padding: '0 28px',
-        gap: 20,
-        paddingTop: 'calc(56px + env(safe-area-inset-top))',
+        minHeight: 280,
       }}>
-        {/* 封面 */}
-        <div style={{ position: 'relative', width: 'min(65vw, 280px)', aspectRatio: '1' }}>
+        <div style={{
+          position: 'absolute',
+          inset: 0,
+          zIndex: 1,
+        }}>
+          <Visualizer isPlaying={isPlaying} />
+        </div>
+
+        {/* 封面叠加在可视化中心 */}
+        <div style={{
+          position: 'relative',
+          zIndex: 2,
+          width: 'min(42vw, 180px)',
+          aspectRatio: '1',
+          borderRadius: '50%',
+          overflow: 'hidden',
+          border: '2px solid rgba(255,255,255,0.1)',
+          boxShadow: '0 20px 60px rgba(0,0,0,0.6), 0 0 40px rgba(255,255,255,0.04)',
+        }}>
           {currentTrack ? (
-            <>
-              <img
-                src={currentTrack.cover}
-                alt=""
-                className="cover-shadow"
-                style={{
-                  width: '100%',
-                  height: '100%',
-                  borderRadius: '24px',
-                  objectFit: 'cover',
-                  animation: isPlaying ? 'spin 20s linear infinite' : 'none',
-                }}
-              />
-              <div style={{
-                position: 'absolute',
-                inset: -20,
-                zIndex: -1,
-                opacity: 0.25,
-                filter: 'blur(40px)',
-                background: `url(${currentTrack.cover}) center/cover`,
-              }} />
-            </>
+            <img
+              src={currentTrack.cover}
+              alt=""
+              style={{
+                width: '100%',
+                height: '100%',
+                objectFit: 'cover',
+                animation: isPlaying ? 'spin 20s linear infinite' : 'none',
+              }}
+            />
           ) : (
             <div style={{
               width: '100%',
               height: '100%',
-              borderRadius: '24px',
               background: 'var(--bg-elevated)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               color: 'var(--text-muted)',
             }}>
-              <Music size={48} />
+              <Music size={36} />
             </div>
-          )}
-        </div>
-
-        <Visualizer isPlaying={isPlaying} />
-
-        {/* 歌曲信息 */}
-        <div style={{ width: '100%', textAlign: 'center' }}>
-          <h2 style={{ fontSize: 22, fontWeight: 700 }}>
-            {currentTrack?.title || '未播放'}
-          </h2>
-          <p style={{ fontSize: 15, color: 'var(--text-secondary)', marginTop: 6 }}>
-            {currentTrack?.artist || '选择一首歌开始'}
-          </p>
-          {currentTrack?.platform && (
-            <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
-              来源: {formatPlatform(currentTrack.platform)}
-            </p>
           )}
         </div>
       </div>
 
+      {/* 歌曲信息 */}
+      <div style={{
+        padding: '0 28px 16px',
+        textAlign: 'center',
+        zIndex: 2,
+      }}>
+        <h2 style={{ fontSize: 20, fontWeight: 700, letterSpacing: 0.5 }}>
+          {currentTrack?.title || '未播放'}
+        </h2>
+        <p style={{ fontSize: 14, color: 'var(--text-secondary)', marginTop: 4 }}>
+          {currentTrack?.artist || '选择一首歌开始'}
+        </p>
+        {currentTrack?.platform && (
+          <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 3 }}>
+            {formatPlatform(currentTrack.platform)}
+          </p>
+        )}
+      </div>
+
       {/* 底部控制区 */}
-      <div style={{ padding: '0 28px 24px' }}>
+      <div style={{ padding: '0 28px calc(20px + var(--safe-bottom))' }}>
         {/* 进度 */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 18 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
           <span style={{ fontSize: 11, color: 'var(--text-muted)', width: 36, textAlign: 'right' }}>
             {formatTime(currentTime)}
           </span>
           <div
             ref={progressRef}
-            style={{ flex: 1, height: 4, background: 'var(--surface)', borderRadius: 4, cursor: 'pointer' }}
+            style={{ flex: 1, height: 3, background: 'var(--surface)', borderRadius: 4, cursor: 'pointer' }}
             onClick={(e) => {
               const rect = progressRef.current.getBoundingClientRect();
               const ratio = (e.clientX - rect.left) / rect.width;
@@ -344,58 +348,70 @@ export default function Player() {
         <div style={{
           display: 'flex',
           alignItems: 'center',
-          justifyContent: 'space-between',
-          marginBottom: 16,
+          justifyContent: 'center',
+          gap: 32,
+          marginBottom: 14,
         }}>
-          <button onClick={() => currentTrack && toggleLike(currentTrack.id)} style={{ color: isLiked ? '#fff' : 'var(--text-secondary)' }}>
-            <Heart size={22} fill={isLiked ? 'currentColor' : 'none'} />
-          </button>
           <button onClick={prev} style={{ color: 'var(--text-primary)' }}>
-            <SkipBack size={28} fill="currentColor" />
+            <SkipBack size={26} fill="currentColor" />
           </button>
+
           <button
             onClick={togglePlay}
             style={{
-              width: 68,
-              height: 68,
+              width: 64,
+              height: 64,
               borderRadius: '50%',
               background: '#fff',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               color: '#0A0A0A',
-              boxShadow: '0 8px 24px rgba(255,255,255,0.15)',
+              boxShadow: '0 8px 24px rgba(255,255,255,0.12)',
             }}
           >
             {isPlaying
-              ? <Pause size={32} fill="currentColor" />
-              : <Play size={32} fill="currentColor" style={{ marginLeft: 4 }} />}
+              ? <Pause size={28} fill="currentColor" />
+              : <Play size={28} fill="currentColor" style={{ marginLeft: 3 }} />}
           </button>
+
           <button onClick={next} style={{ color: 'var(--text-primary)' }}>
-            <SkipForward size={28} fill="currentColor" />
-          </button>
-          <button onClick={toggleMode} style={{ color: playMode !== 'list' ? '#fff' : 'var(--text-secondary)' }}>
-            {playMode === 'random' ? <Shuffle size={22} /> : playMode === 'single' ? <Repeat size={22} /> : <ListMusic size={22} />}
+            <SkipForward size={26} fill="currentColor" />
           </button>
         </div>
 
-        {/* 音量 + 播放列表切换 */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <Volume2 size={16} color="var(--text-muted)" />
-          <input
-            type="range"
-            min={0}
-            max={1}
-            step={0.01}
-            value={volume}
-            onChange={(e) => setVolume(parseFloat(e.target.value))}
-            style={{ flex: 1, accentColor: '#fff', height: 3 }}
-          />
+        {/* 副控制行 */}
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+        }}>
+          <button onClick={() => currentTrack && toggleLike(currentTrack.id)} style={{ color: isLiked ? '#fff' : 'var(--text-secondary)' }}>
+            <Heart size={18} fill={isLiked ? 'currentColor' : 'none'} />
+          </button>
+
+          <button onClick={toggleMode} style={{ color: playMode !== 'list' ? '#fff' : 'var(--text-secondary)' }}>
+            {playMode === 'random' ? <Shuffle size={18} /> : playMode === 'single' ? <Repeat size={18} /> : <ListMusic size={18} />}
+          </button>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, margin: '0 16px' }}>
+            <Volume2 size={14} color="var(--text-muted)" />
+            <input
+              type="range"
+              min={0}
+              max={1}
+              step={0.01}
+              value={volume}
+              onChange={(e) => setVolume(parseFloat(e.target.value))}
+              style={{ flex: 1, accentColor: '#fff', height: 2 }}
+            />
+          </div>
+
           <button
             onClick={() => setShowPlaylist(!showPlaylist)}
             style={{ color: showPlaylist ? '#fff' : 'var(--text-muted)', fontSize: 12 }}
           >
-            列表 ({playlist.length})
+            列表
           </button>
         </div>
 
@@ -403,7 +419,7 @@ export default function Player() {
         {showPlaylist && (
           <div className="animate-slideUp" style={{
             marginTop: 12,
-            maxHeight: 180,
+            maxHeight: 160,
             overflowY: 'auto',
             background: 'var(--bg-secondary)',
             borderRadius: 12,
@@ -423,12 +439,12 @@ export default function Player() {
                   color: currentTrack?.id === track.id ? '#fff' : 'var(--text-primary)',
                 }}
               >
-                <img src={track.cover} alt="" style={{ width: 36, height: 36, borderRadius: 6, objectFit: 'cover' }} />
+                <img src={track.cover} alt="" style={{ width: 32, height: 32, borderRadius: 6, objectFit: 'cover' }} />
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 13, fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  <div style={{ fontSize: 12, fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                     {track.title}
                   </div>
-                  <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>
+                  <div style={{ fontSize: 10, color: 'var(--text-secondary)' }}>
                     {track.artist}
                   </div>
                 </div>

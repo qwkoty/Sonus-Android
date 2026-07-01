@@ -49,7 +49,7 @@ async function searchNetease(keyword, limit = 20) {
 
 async function getNeteaseRealUrl(id) {
   const url = 'https://music.163.com/api/song/enhance/player/url';
-  const { data } = await axios.post(url, `ids=[${id}]&br=320000`, {
+  const { data } = await axios.post(url, `ids=[${id}]&br=128000`, {
     headers: {
       ...COMMON_HEADERS,
       'Content-Type': 'application/x-www-form-urlencoded',

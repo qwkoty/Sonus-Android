@@ -93,6 +93,7 @@ export const usePlayerStore = create((set, get) => {
       if (url) {
         audio.src = url;
         audio.volume = get().volume;
+        audio.load();
         try {
           await audio.play();
           set({ isPlaying: true, isLoadingUrl: false, currentTrack: { ...track, url } });
@@ -103,6 +104,22 @@ export const usePlayerStore = create((set, get) => {
       } else {
         set({ isLoadingUrl: false });
       }
+    },
+
+    // 预加载搜索结果的URL
+    preloadUrls: async (tracks) => {
+      const toFetch = tracks.filter((t) => t.platform && t.rawId && !t.url).slice(0, 5);
+      await Promise.all(
+        toFetch.map(async (t) => {
+          try {
+            const res = await music.url(t.rawId, t.platform);
+            const url = res?.data?.url || '';
+            if (url) t.url = url;
+          } catch (e) {
+            // ignore
+          }
+        })
+      );
     },
 
     togglePlay: () => {
