@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { music } from '../api/music';
+import { useAuthStore } from './useAuthStore';
 import { getAudio, initAudioSystem } from '../audio/engine';
 
 function parseLyric(lrcText) {
@@ -29,6 +30,12 @@ function getCurrentLyric(lyrics, time) {
     else break;
   }
   return current;
+}
+
+// 从 auth store 取登录态（用于解锁 VIP 音源）
+function authCreds() {
+  const { cookie, uin } = useAuthStore.getState();
+  return { cookie: cookie || '', uin: uin || '0' };
 }
 
 export const usePlayerStore = create((set, get) => {
@@ -72,7 +79,6 @@ export const usePlayerStore = create((set, get) => {
     volume: 0.8,
     playlist: [],
     playMode: 'list',
-    liked: new Set(),
     isLoadingUrl: false,
     error: null,
     lyrics: [],
@@ -80,6 +86,12 @@ export const usePlayerStore = create((set, get) => {
     audio,
 
     setPlaylist: (list) => set({ playlist: list }),
+
+    // 替换播放队列并播放指定曲目（用于歌单/搜索点击）
+    playTrackFromList: (track, list) => {
+      if (list && list.length) set({ playlist: list });
+      get().playTrack(track);
+    },
 
     playTrack: async (track) => {
       initAudioSystem();
@@ -91,16 +103,19 @@ export const usePlayerStore = create((set, get) => {
         set({ playlist: [...playlist, track] });
       }
 
+      // 取登录态，解锁 VIP
+      const { cookie, uin } = authCreds();
+
       let url = track.url || '';
-      if (!url && track.platform && track.rawId) {
-        url = music.stream(track.rawId, track.platform);
+      if (!url && track.rawId) {
+        url = music.stream(track.rawId, cookie, uin);
       }
 
       // 加载歌词
-      if (track.platform && track.rawId) {
+      if (track.rawId) {
         try {
-          const lyricRes = await music.lyric(track.rawId, track.platform);
-          const parsed = parseLyric(lyricRes?.data?.lyric || '');
+          const lyricRes = await music.lyric(track.rawId);
+          const parsed = parseLyric(lyricRes?.lyric || '');
           set({ lyrics: parsed });
         } catch (e) {}
       }
@@ -123,7 +138,6 @@ export const usePlayerStore = create((set, get) => {
 
     clearError: () => set({ error: null }),
     setError: (msg) => set({ error: msg }),
-    preloadUrls: async () => {},
 
     togglePlay: () => {
       initAudioSystem();
@@ -197,13 +211,6 @@ export const usePlayerStore = create((set, get) => {
       const modes = ['list', 'random', 'single'];
       const i = modes.indexOf(s.playMode);
       return { playMode: modes[(i + 1) % modes.length] };
-    }),
-
-    toggleLike: (id) => set((s) => {
-      const next = new Set(s.liked);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return { liked: next };
     }),
   };
 });
