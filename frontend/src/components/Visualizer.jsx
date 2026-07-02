@@ -54,24 +54,17 @@ export default function Visualizer({ isPlaying, mode = 'ring' }) {
       bassSmoothRef.current += (bass - bassSmoothRef.current) * 0.2;
       const bassSmooth = bassSmoothRef.current;
 
-      // ---- 中心填充：径向渐变辉光 ----
-      const centerGlowR = INNER_R * (1.2 + bassSmooth * 0.4);
+      // ---- 中心填充：蓝色圆心向外渐变到白色 ----
+      const centerGlowR = INNER_R * (1.3 + bassSmooth * 0.3);
       const centerGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, centerGlowR);
-      const baseAlpha = 0.08 + bassSmooth * 0.12;
-      centerGrad.addColorStop(0, `hsla(30, 90%, 55%, ${baseAlpha})`);
-      centerGrad.addColorStop(0.4, `hsla(200, 80%, 45%, ${baseAlpha * 0.6})`);
-      centerGrad.addColorStop(1, 'hsla(280, 80%, 40%, 0)');
+      centerGrad.addColorStop(0, `rgba(60, 140, 255, ${0.35 + bassSmooth * 0.15})`);
+      centerGrad.addColorStop(0.5, `rgba(100, 170, 255, ${0.18 + bassSmooth * 0.08})`);
+      centerGrad.addColorStop(0.85, `rgba(200, 220, 255, ${0.06})`);
+      centerGrad.addColorStop(1, 'rgba(255, 255, 255, 0)');
       ctx.fillStyle = centerGrad;
       ctx.beginPath();
       ctx.arc(cx, cy, centerGlowR, 0, Math.PI * 2);
       ctx.fill();
-
-      // ---- 中心内圈描边（细微的圆环线） ----
-      ctx.strokeStyle = `hsla(200, 90%, 65%, ${0.06 + bassSmooth * 0.08})`;
-      ctx.lineWidth = minDim * 0.001;
-      ctx.beginPath();
-      ctx.arc(cx, cy, INNER_R, 0, Math.PI * 2);
-      ctx.stroke();
 
       // ---- 计算频谱曲线点 ----
       const outerPts = [];
