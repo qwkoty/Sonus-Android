@@ -272,6 +272,52 @@ async function qqQrCheck(qrsig) {
   }
 }
 
+// ==================== QQ 音乐 Cookie 登录（免扫码） ====================
+// 用户从浏览器复制 QQ 音乐的 Cookie 粘贴进来，后端验证并补全 qqmusic_key
+async function qqCookieLogin(rawCookie) {
+  if (!rawCookie) return { code: 800, msg: 'Cookie 不能为空' };
+
+  // 解析出 uin
+  const cookies = {};
+  for (const pair of rawCookie.split(';')) {
+    const eq = pair.indexOf('=');
+    if (eq > 0) cookies[pair.slice(0, eq).trim()] = pair.slice(eq + 1).trim();
+  }
+  let uin = (cookies.uin || cookies.wxuin || '').toString().replace(/^o0*/, '');
+  if (!uin) return { code: 800, msg: 'Cookie 中未找到 uin，请确认复制的是已登录的 QQ 音乐 Cookie' };
+
+  // 用该 cookie 访问 QQ 音乐主页，补全 qqmusic_key
+  let jar = { ...cookies };
+  try {
+    const homeResp = await axios.get('https://y.qq.com/', {
+      headers: { 'User-Agent': UA, Cookie: cookieToString(jar) },
+      timeout: 8000,
+      maxRedirects: 5,
+      validateStatus: () => true,
+    });
+    Object.assign(jar, parseSetCookies(homeResp.headers?.['set-cookie']));
+  } catch (e) {}
+
+  const key = jar.qqmusic_key || jar.p_skey || jar.skey || '';
+  const fullCookie = cookieToString(jar);
+
+  // 用用户信息接口验证 cookie 是否有效
+  try {
+    const info = await qqUserInfo(fullCookie, uin);
+    if (!info || !info.uin) return { code: 800, msg: 'Cookie 无效或已过期' };
+    return {
+      code: 0,
+      msg: '登录成功',
+      cookie: fullCookie,
+      uin: String(uin),
+      key,
+      nickname: info.nickname || 'QQ音乐用户',
+    };
+  } catch (e) {
+    return { code: 800, msg: 'Cookie 验证失败：' + e.message };
+  }
+}
+
 // ==================== QQ 音乐用户信息 ====================
 
 async function qqUserInfo(cookie, uin) {
