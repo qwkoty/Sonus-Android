@@ -368,17 +368,59 @@ async function qqUserInfo(uin, key) {
       param: { hostUin: Number(uin), size: 1, dirId: 0, from: 1 },
     },
   };
-  const { data } = await axios.get(url, {
-    params: { data: JSON.stringify(payload) },
-    headers: {
-      ...COMMON_HEADERS,
-      Cookie: `uin=o0${uin}; qqmusic_key=${key};`,
-      Referer: 'https://y.qq.com/',
-    },
-    timeout: 10000,
-  });
+  let data;
+  try {
+    const resp = await axios.get(url, {
+      params: { data: JSON.stringify(payload) },
+      headers: {
+        ...COMMON_HEADERS,
+        Cookie: `uin=o0${uin}; qqmusic_key=${key};`,
+        Referer: 'https://y.qq.com/',
+      },
+      timeout: 10000,
+    });
+    data = resp.data;
+  } catch (e) {
+    console.error('[qqUserInfo] request failed:', e.message);
+    // 即使请求失败，也返回基本信息（不再返回 null）
+    return {
+      nickname: 'QQ音乐用户',
+      avatar: '',
+      userId: uin,
+      vipLevel: 0,
+      follow: 0,
+      fans: 0,
+    };
+  }
+
+  console.log('[qqUserInfo] uin:', uin, 'response keys:', Object.keys(data || {}));
+  console.log('[qqUserInfo] req_0:', JSON.stringify(data?.req_0)?.slice(0, 500));
+
   const info = data?.req_0?.data;
-  if (!info) return null;
+  if (!info) {
+    // 尝试从其他字段获取
+    const altInfo = data?.req_0?.data?.userInfo || data?.req_0?.data?.baseInfo || data?.data;
+    if (altInfo) {
+      return {
+        nickname: altInfo.nickname || altInfo.name || altInfo.nick || 'QQ音乐用户',
+        avatar: altInfo.headpic || altInfo.avatar || altInfo.pic || '',
+        userId: uin,
+        vipLevel: altInfo.vipLevel || altInfo.diamondLevel || altInfo.vip_level || 0,
+        follow: altInfo.follow || altInfo.followNum || 0,
+        fans: altInfo.fans || altInfo.fansNum || 0,
+      };
+    }
+    // 完全失败，返回基本信息（不再返回 null）
+    console.warn('[qqUserInfo] no user info found, returning fallback');
+    return {
+      nickname: 'QQ音乐用户',
+      avatar: '',
+      userId: uin,
+      vipLevel: 0,
+      follow: 0,
+      fans: 0,
+    };
+  }
   return {
     nickname: info.nickname || info.name || 'QQ音乐用户',
     avatar: info.headpic || info.avatar || '',
@@ -400,15 +442,22 @@ async function qqUserPlaylists(uin, key) {
       param: { hostUin: Number(uin), size: 100, dirId: 0, from: 1 },
     },
   };
-  const { data } = await axios.get(url, {
-    params: { data: JSON.stringify(payload) },
-    headers: {
-      ...COMMON_HEADERS,
-      Cookie: `uin=o0${uin}; qqmusic_key=${key};`,
-      Referer: 'https://y.qq.com/',
-    },
-    timeout: 10000,
-  });
+  let data;
+  try {
+    const resp = await axios.get(url, {
+      params: { data: JSON.stringify(payload) },
+      headers: {
+        ...COMMON_HEADERS,
+        Cookie: `uin=o0${uin}; qqmusic_key=${key};`,
+        Referer: 'https://y.qq.com/',
+      },
+      timeout: 10000,
+    });
+    data = resp.data;
+  } catch (e) {
+    console.error('[qqUserPlaylists] request failed:', e.message);
+    return [];
+  }
   const vlist = data?.req_0?.data?.v_playlist || [];
   return vlist.map((p) => ({
     id: String(p.tid),
