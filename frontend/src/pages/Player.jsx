@@ -747,41 +747,48 @@ export default function Player({ onNavigate }) {
         {/* 扩展控制（点击列表按钮展开） */}
         {showExtra && (
           <div className="animate-slideUp" style={{
-            display: 'flex', alignItems: 'center', gap: 12,
-            background: 'rgba(20,20,24,0.8)',
+            display: 'flex', alignItems: 'center', gap: 10,
+            background: 'var(--glass-2)',
             backdropFilter: 'blur(20px)',
             WebkitBackdropFilter: 'blur(20px)',
             borderRadius: 20,
             border: '1px solid var(--border)',
-            padding: '8px 16px',
+            padding: '8px 14px',
             boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
           }}>
             <button
               onClick={() => currentTrack && toggleLike(currentTrack.id)}
+              aria-label={isLiked ? '取消收藏' : '收藏'}
               style={{
-                color: isLiked ? '#fff' : 'var(--text-muted)',
-                display: 'flex', alignItems: 'center',
-                cursor: 'pointer',
+                width: 34, height: 34, borderRadius: '50%',
+                background: isLiked ? `${accentColor}22` : 'transparent',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                color: isLiked ? accentColor : 'var(--text-muted)',
                 transition: 'all 0.2s ease',
+                cursor: 'pointer',
               }}
             >
-              <Heart size={16} fill={isLiked ? 'currentColor' : 'none'} />
+              <Heart size={15} fill={isLiked ? 'currentColor' : 'none'} />
             </button>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, width: 100 }}>
-              <Volume2 size={13} color="var(--text-muted)" />
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, width: 120 }}>
+              <Volume2 size={14} color="var(--text-muted)" />
               <input type="range" min={0} max={1} step={0.01} value={volume}
                 onChange={(e) => setVolume(parseFloat(e.target.value))}
-                style={{ flex: 1, height: 2, cursor: 'pointer' }} />
+                style={{ flex: 1, cursor: 'pointer' }} />
             </div>
             <button
               onClick={() => setShowPlaylist(!showPlaylist)}
+              aria-label="播放列表"
               style={{
-                color: showPlaylist ? '#fff' : 'var(--text-muted)',
-                fontSize: 11, fontWeight: 600,
+                width: 34, height: 34, borderRadius: '50%',
+                background: showPlaylist ? `${accentColor}22` : 'transparent',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                color: showPlaylist ? accentColor : 'var(--text-muted)',
+                transition: 'all 0.2s ease',
                 cursor: 'pointer',
               }}
             >
-              列表
+              <ListMusic size={15} />
             </button>
           </div>
         )}

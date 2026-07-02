@@ -130,7 +130,7 @@ export default function Visualizer3D({ accent = '#4FC3F7', cover = '', onReady }
     geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
 
     const material = new THREE.PointsMaterial({
-      size: planeSize * 2 / GRID * 0.7, // 粒子小于网格间距，分散有间隙
+      size: planeSize * 2 / GRID * 1.05, // 粒子略大于网格间距，紧密贴合形成清晰封面
       vertexColors: true,
       transparent: true,
       opacity: 1.0,
@@ -244,7 +244,7 @@ export default function Visualizer3D({ accent = '#4FC3F7', cover = '', onReady }
       computeLayout();
       buildGrid();
       posAttr.needsUpdate = true;
-      material.size = planeSize * 2 / GRID * 1.1;
+      material.size = planeSize * 2 / GRID * 1.05;
       renderer.setSize(W, H);
     };
     window.addEventListener('resize', handleResize);
