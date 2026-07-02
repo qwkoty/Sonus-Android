@@ -271,12 +271,12 @@ export default function Player({ onNavigate }) {
         }
       </div>
 
-      {/* ====== 封面缩略图（左下角，不挡视野） ====== */}
+      {/* ====== 封面缩略图（右上角搜索下方，不挡底部进度条） ====== */}
       {vizMode !== '3d' && currentTrack && (
         <div style={{
           position: 'absolute',
-          bottom: 'calc(90px + var(--safe-bottom))',
-          left: 16,
+          top: 'calc(64px + env(safe-area-inset-top))',
+          right: 16,
           zIndex: 50,
           width: 48, height: 48,
           borderRadius: 10,
@@ -285,7 +285,7 @@ export default function Player({ onNavigate }) {
           boxShadow: '0 4px 16px rgba(0,0,0,0.5)',
           flexShrink: 0,
         }}>
-          <img src={currentTrack.cover} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          <img src={currentTrack.cover} alt={currentTrack.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
         </div>
       )}
 
