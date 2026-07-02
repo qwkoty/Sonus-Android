@@ -73,7 +73,7 @@ export default function Visualizer({ isPlaying, mode = 'ring', accent = '#4FC3F7
       };
     };
 
-    // ---- 模式：辐射波浪（从中心向外多层圆环波浪扩散 · 自适应） ----
+    // ---- 模式：辐射波浪（从中心向外多层圆环波浪扩散 · 紧凑高强度 · 自适应） ----
     const drawRadialWave = (spectrum, hasData) => {
       const C = palette();
       const data = spectrum;
@@ -95,59 +95,58 @@ export default function Visualizer({ isPlaying, mode = 'ring', accent = '#4FC3F7
       bassSmoothRef.current += (bass - bassSmoothRef.current) * 0.2;
       const bassSmooth = bassSmoothRef.current;
 
-      const INNER_R = minDim * 0.04;
-      const MAX_R = minDim * 0.5 * 0.88;
       const tNow = Date.now() * 0.001;
+      const MAX_R = minDim * 0.5 * 0.9;
 
-      // ---- 中心核心：发光圆盘随低频脉动 ----
-      const coreR = INNER_R * (4 + bassSmooth * 2);
+      // ---- 中心核心：发光圆盘随低频脉动（紧凑，不撑大） ----
+      const coreR = minDim * 0.05 * (1.4 + bassSmooth * 0.8);
       const coreGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, coreR);
-      coreGrad.addColorStop(0, C.coreBright(0.9 + bassSmooth * 0.1));
-      coreGrad.addColorStop(0.35, C.coreMain(0.55 + bassSmooth * 0.2));
-      coreGrad.addColorStop(0.75, C.halo(0.22));
+      coreGrad.addColorStop(0, C.coreBright(0.95));
+      coreGrad.addColorStop(0.3, C.coreMain(0.6 + bassSmooth * 0.25));
+      coreGrad.addColorStop(0.75, C.halo(0.28));
       coreGrad.addColorStop(1, C.halo(0));
       ctx.fillStyle = coreGrad;
       ctx.beginPath();
       ctx.arc(cx, cy, coreR, 0, Math.PI * 2);
       ctx.fill();
 
-      // ---- 多层辐射波浪环（从核心边缘向外，无空隙，间隙小） ----
-      // 每层是一个圆环，半径上叠加频谱波形 + 时间动画（向外扩散）
-      const NUM_RINGS = 8;
-      const halfBars = NUM_BARS / 2;
-      // 第一层起始半径 = 核心半径，确保无空隙
-      const ringStart = coreR;
+      // ---- 多层辐射波浪环（紧贴核心，无空隙，高强度跳动） ----
+      const NUM_RINGS = 7;
+      // 每环间距：紧凑等分，第一环紧贴核心
+      const ringStep = (MAX_R - coreR) / NUM_RINGS;
 
       for (let ring = 0; ring < NUM_RINGS; ring++) {
-        // 每层的基础半径（从核心边缘向外，无空隙）
-        const baseR = ringStart + (MAX_R - ringStart) * ((ring + 1) / NUM_RINGS);
-        // 每层的扩散相位（错开，制造向外流动感）
-        const phase = ring * 0.8;
+        // 每环基础半径：第一环 = coreR + ringStep，紧贴核心，无空隙
+        const baseR = coreR + ringStep * (ring + 1);
+        // 每环扩散相位（错开，制造向外流动感）
+        const phase = ring * 0.9;
         // 透明度从内到外递减
-        const alpha = 0.75 - ring * 0.12;
+        const alpha = 0.82 - ring * 0.1;
         // 频段映射：内层环=低频，外层环=高频（中心低频，周围高频）
         const freqIdx = Math.min(NUM_BARS - 1, Math.floor((ring / (NUM_RINGS - 1)) * NUM_BARS));
-        const ringFreq = smooth[freqIdx];
+        const ringFreq = hasData ? smooth[freqIdx] : 0.04;
 
         ctx.save();
-        ctx.strokeStyle = `hsla(${hexToHsl(accentRef.current)[0] + ring * 8}, 80%, ${68 - ring * 4}%, ${alpha})`;
-        ctx.lineWidth = Math.max(1.2, minDim * (0.0024 - ring * 0.0003));
+        ctx.strokeStyle = `hsla(${hexToHsl(accentRef.current)[0] + ring * 10}, 82%, ${70 - ring * 4}%, ${alpha})`;
+        // 线宽稍粗，增强强度感
+        ctx.lineWidth = Math.max(1.5, minDim * (0.003 - ring * 0.00025));
         ctx.shadowColor = C.glow;
-        ctx.shadowBlur = minDim * (0.02 - ring * 0.003);
+        ctx.shadowBlur = minDim * (0.025 - ring * 0.0025);
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
 
         ctx.beginPath();
-        const STEPS = 180;
+        const STEPS = 200;
         for (let s = 0; s <= STEPS; s++) {
           const angle = (s / STEPS) * Math.PI * 2;
-          // 波浪振幅：本环频段值 + 呼吸 + 向外扩散的行波
-          const breathe = (Math.sin(tNow * 1.4 + angle * 3 + phase) * 0.5 + 0.5) * 0.06;
+          // 基础呼吸波动：保证即使频谱为0也起伏
+          const breathe = (Math.sin(tNow * 1.5 + angle * 3 + phase) * 0.5 + 0.5) * 0.08;
           const value = hasData ? Math.max(ringFreq, breathe) : 0.04 + breathe;
-          // 行波：让波形随时间向外传播
-          const wave = Math.sin(tNow * 2.2 - ring * 0.6 + angle * 5) * 0.15;
-          const amp = value * (MAX_R - ringStart) * 0.16 * (hasData ? 1 : 0.4);
-          const r = baseR + amp + wave * minDim * 0.006;
+          // 行波：让波形随时间向外传播，增强流动感
+          const wave = Math.sin(tNow * 2.4 - ring * 0.7 + angle * 6) * 0.18;
+          // 振幅加大，强度更强
+          const amp = value * ringStep * 1.1 * (hasData ? 1 : 0.45);
+          const r = baseR + amp + wave * minDim * 0.007;
           const x = cx + Math.cos(angle) * r;
           const y = cy + Math.sin(angle) * r;
           if (s === 0) ctx.moveTo(x, y);
@@ -159,20 +158,20 @@ export default function Visualizer({ isPlaying, mode = 'ring', accent = '#4FC3F7
       }
 
       // ---- 外层柔光填充（最外圈淡淡的渐变环，增加层次） ----
-      const outerGrad = ctx.createRadialGradient(cx, cy, MAX_R * 0.7, cx, cy, MAX_R);
+      const outerGrad = ctx.createRadialGradient(cx, cy, MAX_R * 0.65, cx, cy, MAX_R);
       outerGrad.addColorStop(0, C.halo(0));
-      outerGrad.addColorStop(0.7, C.halo(0.04 + bassSmooth * 0.03));
+      outerGrad.addColorStop(0.7, C.halo(0.05 + bassSmooth * 0.04));
       outerGrad.addColorStop(1, C.halo(0));
       ctx.fillStyle = outerGrad;
       ctx.beginPath();
       ctx.arc(cx, cy, MAX_R, 0, Math.PI * 2);
       ctx.fill();
 
-      // ---- 中心亮点（最内核高光） ----
-      const sparkR = coreR * (0.35 + bassSmooth * 0.2);
+      // ---- 中心亮点（最内核高光，随低频闪烁） ----
+      const sparkR = coreR * (0.4 + bassSmooth * 0.3);
       const sparkGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, sparkR);
-      sparkGrad.addColorStop(0, 'rgba(255,255,255,0.9)');
-      sparkGrad.addColorStop(0.5, C.coreBright(0.5));
+      sparkGrad.addColorStop(0, 'rgba(255,255,255,0.95)');
+      sparkGrad.addColorStop(0.5, C.coreBright(0.55));
       sparkGrad.addColorStop(1, C.coreBright(0));
       ctx.fillStyle = sparkGrad;
       ctx.beginPath();
