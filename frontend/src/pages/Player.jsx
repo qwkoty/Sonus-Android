@@ -294,8 +294,8 @@ export default function Player({ onNavigate }) {
         left: '50%',
         transform: 'translateX(-50%)',
         textAlign: 'center',
-        zIndex: 10,
-        maxWidth: '50vw',
+        zIndex: 9,
+        maxWidth: 'calc(100vw - 200px)',
         pointerEvents: 'none',
       }}>
         <div style={{

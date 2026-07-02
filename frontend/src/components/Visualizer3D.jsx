@@ -161,8 +161,7 @@ export default function Visualizer3D({ accent = '#4FC3F7', cover = '', onReady }
     const animate = () => {
       const { data, hasData } = getSpectrumBars(64);
 
-      // ---- 整体能量：所有粒子一起跳 ----
-      // bass（低频）驱动主跳动，treble（高频）驱动细节微抖
+      // 频段分组：treble 高频居中，向外依次 mid、bass，形成中心高频向外递减的同心圆
       let bass = 0, mid = 0, treble = 0;
       if (hasData) {
         for (let i = 0; i < 8; i++) bass += data[i];
@@ -176,32 +175,40 @@ export default function Visualizer3D({ accent = '#4FC3F7', cover = '', onReady }
         mid = 0.05;
         treble = 0.03;
       }
-      const energy = (bass * 1.0 + mid * 0.5 + treble * 0.3) / 1.8; // 0..1 综合能量
-      const breathe = 1 + Math.min(bass, 1) * 0.08;
-      const zAmp = planeSize * MAX_Z * (0.5 + Math.min(energy, 1) * 0.8);
+      const breathe = 1 + Math.min(bass, 1) * 0.06;
+      const zAmp = planeSize * MAX_Z;
       const time = Date.now() * 0.001;
-
       const hasCover = hasCoverRef.current;
 
+      // 中心高频、向外递减：能量随距中心距离衰减，起伏集中在中央而非一坨
       for (let i = 0; i < COUNT; i++) {
         const u = origXY[i * 2];
         const v = origXY[i * 2 + 1];
-        const dc = distFromCenter[i];
+        const dc = distFromCenter[i]; // 0 中心 ~ 1 边角
 
-        // 所有粒子同步跳动（基于整体能量），叠加从中心向外扩散的环形微涟漪
-        const ripple = Math.sin(dc * 10 - time * 4) * 0.08 * (0.4 + treble);
-        const z = (energy * 0.85 + ripple * 0.15) * zAmp * breathe;
+        // 距离衰减：中心 1，边缘 ~0.2，使起伏集中在中央
+        const falloff = Math.pow(1 - dc, 1.6) * 0.85 + 0.15;
+        // 频段分配：中心用 treble，中圈用 mid，外圈用 bass，平滑过渡
+        const tFreq = Math.max(0, 1 - dc * 1.8);              // 中心 1 → 外 0
+        const mFreq = Math.max(0, 1 - Math.abs(dc - 0.4) * 2.5); // 中圈峰值
+        const bFreq = Math.max(0, 1 - Math.abs(dc - 0.85) * 3);  // 外圈峰值
+        const localEnergy = treble * tFreq + mid * mFreq * 0.7 + bass * bFreq * 0.5;
+
+        // 缓慢外扩波纹（增加流动感，不抢主起伏）
+        const ripple = Math.sin(dc * 14 - time * 3) * 0.05 * (0.3 + mid);
+
+        const z = (localEnergy * 0.9 + ripple) * zAmp * falloff * breathe;
         posAttr.array[i * 3 + 2] = z;
 
-        // 颜色：封面像素，整体能量越高越亮
+        // 颜色：封面像素，中心更亮（高频驱动）
         if (hasCover) {
           const s = sampleCover(u, v);
-          const boost = 0.65 + energy * 0.55;
+          const boost = 0.55 + localEnergy * 0.7;
           colorAttr.array[i * 3]     = Math.min(1, s[0] * boost);
           colorAttr.array[i * 3 + 1] = Math.min(1, s[1] * boost);
           colorAttr.array[i * 3 + 2] = Math.min(1, s[2] * boost);
         } else {
-          const intensity = 0.4 + energy * 0.6;
+          const intensity = 0.35 + localEnergy * 0.65;
           colorAttr.array[i * 3]     = 0.3 * intensity;
           colorAttr.array[i * 3 + 1] = 0.6 * intensity;
           colorAttr.array[i * 3 + 2] = 1.0 * intensity;
@@ -211,8 +218,8 @@ export default function Visualizer3D({ accent = '#4FC3F7', cover = '', onReady }
       posAttr.needsUpdate = true;
       colorAttr.needsUpdate = true;
 
-      points.rotation.y = Math.sin(time * 0.3) * 0.35;
-      points.rotation.x = -0.18 + Math.sin(time * 0.4) * 0.08;
+      points.rotation.y = Math.sin(time * 0.3) * 0.32;
+      points.rotation.x = -0.18 + Math.sin(time * 0.4) * 0.06;
       const sc = breathe;
       points.scale.set(sc, sc, 1);
 

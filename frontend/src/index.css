@@ -37,7 +37,32 @@ body::before {
   padding: 0;
   box-sizing: border-box;
   -webkit-tap-highlight-color: transparent;
+  outline: none;
 }
+
+/* 彻底清除所有原生聚焦轮廓（用自定义主色光晕替代） */
+*:focus { outline: none !important; }
+button::-moz-focus-inner,
+input::-moz-focus-inner { border: 0; padding: 0; }
+
+/* select 美化 */
+select {
+  -webkit-appearance: none;
+  appearance: none;
+  -moz-appearance: none;
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 8px 28px 8px 12px;
+  font-family: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'><path fill='%23999' d='M0 0l5 6 5-6z'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+}
+select::-ms-expand { display: none; }
 
 html, body, #root {
   height: 100%;
