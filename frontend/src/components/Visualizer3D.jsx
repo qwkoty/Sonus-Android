@@ -59,10 +59,6 @@ export default function Visualizer3D({ accent = '#4FC3F7', cover = '', onReady }
     let H = container.offsetHeight;
 
     const scene = new THREE.Scene();
-    // 雾效：远端粒子变暗，增强 3D 纵深感
-    scene.fog = new THREE.Fog(0x050505, 0, 0);
-    scene.fog.near = 1;
-    scene.fog.far = 0; // 后面根据相机距离动态设置
     const camera = new THREE.PerspectiveCamera(FOV, W / H, 0.1, 3000);
 
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
@@ -92,11 +88,6 @@ export default function Visualizer3D({ accent = '#4FC3F7', cover = '', onReady }
       camera.aspect = aspect;
       camera.position.z = cameraZ;
       camera.updateProjectionMatrix();
-      // 雾效：近端清晰，远端淡化，增强纵深
-      if (scene.fog) {
-        scene.fog.near = cameraZ * 0.6;
-        scene.fog.far = cameraZ * 1.3;
-      }
     };
     computeLayout();
 
@@ -139,12 +130,13 @@ export default function Visualizer3D({ accent = '#4FC3F7', cover = '', onReady }
     geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
 
     const material = new THREE.PointsMaterial({
-      size: planeSize * 2 / GRID * 0.6, // 粒子小于网格间距，分散有间隙
+      size: planeSize * 2 / GRID * 0.7, // 粒子小于网格间距，分散有间隙
       vertexColors: true,
       transparent: true,
-      opacity: 0.95,
+      opacity: 1.0,
       depthWrite: false,
       sizeAttenuation: true,
+      blending: THREE.AdditiveBlending, // 加色混合，封面颜色更亮更通透
     });
 
     const points = new THREE.Points(geometry, material);
@@ -214,10 +206,10 @@ export default function Visualizer3D({ accent = '#4FC3F7', cover = '', onReady }
         const z = (localEnergy * 0.85 + ripple) * zAmp * falloff * breathe;
         posAttr.array[i * 3 + 2] = z;
 
-        // 颜色：封面像素，能量越高越亮
+        // 颜色：封面像素，提亮 + 能量增强，保证清晰可见
         if (hasCover) {
           const s = sampleCover(u, v);
-          const boost = 0.5 + localEnergy * 0.8;
+          const boost = 0.75 + localEnergy * 0.6;
           colorAttr.array[i * 3]     = Math.min(1, s[0] * boost);
           colorAttr.array[i * 3 + 1] = Math.min(1, s[1] * boost);
           colorAttr.array[i * 3 + 2] = Math.min(1, s[2] * boost);

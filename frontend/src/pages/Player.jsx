@@ -25,9 +25,9 @@ function formatPlatform(p) {
 }
 
 const VIZ_MODES = [
-  { key: 'ring', label: '环' },
-  { key: 'wave', label: '波' },
-  { key: '3d', label: '3D' },
+  { key: 'ring', label: '环', icon: '◯' },
+  { key: 'wave', label: '波', icon: '〜' },
+  { key: '3d', label: '3D', icon: '◆' },
 ];
 
 // DIY 颜色预设
@@ -409,97 +409,114 @@ export default function Player({ onNavigate }) {
         {/* 展开面板：可视化模式 + 调色盘 */}
         {showVizPanel && (
           <div className="animate-slideUp" style={{
-            background: 'rgba(20,20,24,0.88)',
-            backdropFilter: 'blur(24px)',
-            WebkitBackdropFilter: 'blur(24px)',
-            borderRadius: 16,
-            border: '1px solid var(--border)',
-            padding: 10,
-            boxShadow: '0 8px 32px rgba(0,0,0,0.45)',
+            background: 'rgba(18,18,22,0.92)',
+            backdropFilter: 'blur(28px) saturate(140%)',
+            WebkitBackdropFilter: 'blur(28px) saturate(140%)',
+            borderRadius: 18,
+            border: '1px solid rgba(255,255,255,0.1)',
+            padding: 12,
+            boxShadow: '0 12px 40px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.06)',
             display: 'flex',
             flexDirection: 'column',
-            gap: 8,
-            width: 168,
+            gap: 10,
+            width: 196,
           }}>
-            {/* 可视化模式切换（横排） */}
+            {/* 可视化模式切换（横排，图标+文字） */}
             <div style={{ display: 'flex', gap: 6 }}>
-              {VIZ_MODES.map((m) => (
-                <button
-                  key={m.key}
-                  onClick={() => changeVizMode(m.key)}
-                  style={{
-                    flex: 1, height: 34, borderRadius: 10,
-                    background: vizMode === m.key ? '#fff' : 'rgba(40,40,46,0.7)',
-                    border: '1px solid var(--border)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    color: vizMode === m.key ? '#0A0A0A' : 'var(--text-muted)',
-                    fontSize: 12, fontWeight: 700,
-                    transition: 'all 0.18s ease',
-                    cursor: 'pointer',
-                  }}
-                >
-                  {m.label}
-                </button>
-              ))}
+              {VIZ_MODES.map((m) => {
+                const active = vizMode === m.key;
+                return (
+                  <button
+                    key={m.key}
+                    onClick={() => changeVizMode(m.key)}
+                    style={{
+                      flex: 1, height: 44, borderRadius: 12,
+                      background: active
+                        ? `linear-gradient(135deg, ${accentColor}, ${accentColor}cc)`
+                        : 'rgba(40,40,48,0.6)',
+                      border: active ? 'none' : '1px solid rgba(255,255,255,0.08)',
+                      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                      gap: 2,
+                      color: active ? '#0A0A0A' : 'var(--text-muted)',
+                      fontSize: 11, fontWeight: 700,
+                      boxShadow: active ? `0 4px 14px ${accentColor}55` : 'none',
+                      transition: 'all 0.2s ease',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <span style={{ fontSize: 15, lineHeight: 1 }}>{m.icon}</span>
+                    <span>{m.label}</span>
+                  </button>
+                );
+              })}
             </div>
 
-            <div style={{ height: 1, background: 'var(--border)' }} />
+            <div style={{ height: 1, background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent)' }} />
 
             {/* 调色盘标题行 */}
             <div style={{
               display: 'flex', alignItems: 'center', justifyContent: 'space-between',
               padding: '0 2px',
             }}>
-              <span style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 600, letterSpacing: 0.5 }}>
+              <span style={{ fontSize: 11, color: 'var(--text-secondary)', fontWeight: 600, letterSpacing: 0.4 }}>
                 主题色
               </span>
               <span style={{
-                width: 12, height: 12, borderRadius: '50%',
+                width: 14, height: 14, borderRadius: '50%',
                 background: accentColor,
-                boxShadow: `0 0 6px ${accentColor}`,
+                boxShadow: `0 0 8px ${accentColor}, inset 0 0 0 1px rgba(255,255,255,0.3)`,
               }} />
             </div>
 
-            {/* 预设色（4列网格） */}
+            {/* 预设色（4列网格，选中态环形高亮） */}
             <div style={{
               display: 'grid',
               gridTemplateColumns: 'repeat(4, 1fr)',
-              gap: 6,
+              gap: 8,
+              padding: '2px 0',
             }}>
-              {ACCENT_PRESETS.map((c) => (
-                <button
-                  key={c}
-                  onClick={() => changeAccent(c)}
-                  style={{
-                    width: '100%', aspectRatio: '1', borderRadius: '50%',
-                    background: c,
-                    border: accentColor.toLowerCase() === c.toLowerCase()
-                      ? '2px solid #fff'
-                      : '1px solid rgba(255,255,255,0.15)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    cursor: 'pointer',
-                    boxShadow: accentColor.toLowerCase() === c.toLowerCase()
-                      ? `0 0 10px ${c}`
-                      : 'none',
-                    transition: 'all 0.15s ease',
-                  }}
-                >
-                  {accentColor.toLowerCase() === c.toLowerCase() && (
-                    <Check size={12} color={c === '#FFFFFF' || c === '#4ADE80' || c === '#FB923C' ? '#000' : '#fff'} />
-                  )}
-                </button>
-              ))}
+              {ACCENT_PRESETS.map((c) => {
+                const active = accentColor.toLowerCase() === c.toLowerCase();
+                // 判断颜色明度决定 Check 颜色
+                const rgb = c.match(/\w\w/g).map(x => parseInt(x, 16));
+                const lum = (0.299 * rgb[0] + 0.587 * rgb[1] + 0.114 * rgb[2]) / 255;
+                const checkColor = lum > 0.6 ? '#000' : '#fff';
+                return (
+                  <button
+                    key={c}
+                    onClick={() => changeAccent(c)}
+                    aria-label={`选择颜色 ${c}`}
+                    style={{
+                      width: '100%', aspectRatio: '1', borderRadius: '50%',
+                      background: c,
+                      border: active
+                        ? `2px solid ${accentColor}`
+                        : '1px solid rgba(255,255,255,0.12)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      cursor: 'pointer',
+                      boxShadow: active
+                        ? `0 0 0 2px rgba(0,0,0,0.4), 0 0 12px ${c}88`
+                        : 'none',
+                      transition: 'all 0.18s ease',
+                      transform: active ? 'scale(1.08)' : 'scale(1)',
+                    }}
+                  >
+                    {active && <Check size={13} color={checkColor} strokeWidth={3} />}
+                  </button>
+                );
+              })}
             </div>
 
             {/* 自定义拾色器 */}
             <label style={{
-              height: 30, borderRadius: 10,
-              background: 'conic-gradient(from 0deg, #ff0000, #ffff00, #00ff00, #00ffff, #0000ff, #ff00ff, #ff0000)',
-              border: '1px solid rgba(255,255,255,0.2)',
+              height: 34, borderRadius: 12,
+              background: 'linear-gradient(90deg, #ff0080, #ff8c00, #ffd700, #00ff7f, #00bfff, #8a2be2, #ff0080)',
+              border: '1px solid rgba(255,255,255,0.15)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               cursor: 'pointer',
               position: 'relative',
               overflow: 'hidden',
+              boxShadow: 'inset 0 1px 2px rgba(255,255,255,0.2)',
             }} title="自定义颜色">
               <input
                 type="color"
@@ -511,8 +528,12 @@ export default function Player({ onNavigate }) {
                   opacity: 0, cursor: 'pointer', border: 'none',
                 }}
               />
-              <span style={{ fontSize: 10, color: '#fff', fontWeight: 700, textShadow: '0 1px 3px rgba(0,0,0,0.6)' }}>
-                自定义
+              <span style={{
+                fontSize: 11, color: '#fff', fontWeight: 700,
+                textShadow: '0 1px 3px rgba(0,0,0,0.7)',
+                letterSpacing: 0.3,
+              }}>
+                自定义颜色
               </span>
             </label>
           </div>
