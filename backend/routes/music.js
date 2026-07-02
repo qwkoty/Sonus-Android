@@ -613,14 +613,23 @@ async function searchQQ(keyword, page = 1, num = 20) {
       method: 'DoSearchForQQMusicDesktop',
       param: { num_per_page: num, page_num: page, query: keyword, search_type: 0 },
     },
-    comm: { g_tk: 5381, uin: 0, format: 'json', platform: 'h5' },
+    comm: { g_tk: 5381, uin: 0, format: 'json', ct: 24, cv: 0, platform: 'h5' },
   };
 
-  const { data } = await axios.get(url, {
-    params: { data: JSON.stringify(payload) },
-    headers: { ...COMMON_HEADERS, Referer: 'https://y.qq.com/' },
-    timeout: 15000,
-  });
+  let data;
+  try {
+    const resp = await axios.get(url, {
+      params: { data: JSON.stringify(payload) },
+      headers: { ...COMMON_HEADERS, Referer: 'https://y.qq.com/' },
+      timeout: 15000,
+    });
+    data = resp.data;
+  } catch (e) {
+    console.error('[searchQQ] request failed:', e.message);
+    return [];
+  }
+
+  console.log('[searchQQ] keyword:', keyword, 'req_0 code:', data?.req_0?.code, 'list len:', data?.req_0?.data?.body?.song?.list?.length);
 
   const list = data?.req_0?.data?.body?.song?.list || [];
   return list.map((s) => ({
