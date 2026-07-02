@@ -73,22 +73,18 @@ export default function Visualizer({ isPlaying, mode = 'ring', accent = '#4FC3F7
       };
     };
 
-    // ---- 模式：环形频谱（柱子粘在一起的实心环带 · 自适应） ----
-    const drawRing = (spectrum, hasData) => {
-      const data = spectrum;
+    // ---- 模式：辐射波浪（从中心向外多层圆环波浪扩散 · 自适应） ----
+    const drawRadialWave = (spectrum, hasData) => {
       const C = palette();
+      const data = spectrum;
 
-      const INNER_R = minDim * 0.15;
-      const MAX_OUTER = minDim * 0.5 * 0.85;
-      const MAX_BAR = MAX_OUTER - INNER_R;
-      const safeBarScale = MAX_BAR / 1.2;
-
+      // 平滑
       const smooth = smoothRef.current;
-      const smoothFactor = 0.35;
       for (let i = 0; i < NUM_BARS; i++) {
-        smooth[i] += (data[i] - smooth[i]) * smoothFactor;
+        smooth[i] += (data[i] - smooth[i]) * 0.32;
       }
 
+      // 低频能量（中心脉动）
       let bass = 0;
       if (hasData) {
         for (let i = 0; i < 8; i++) bass += smooth[i];
@@ -99,142 +95,88 @@ export default function Visualizer({ isPlaying, mode = 'ring', accent = '#4FC3F7
       bassSmoothRef.current += (bass - bassSmoothRef.current) * 0.2;
       const bassSmooth = bassSmoothRef.current;
 
-      // ---- 中心双层辉光 ----
-      const haloR = INNER_R * (1.8 + bassSmooth * 0.3);
-      const haloGrad = ctx.createRadialGradient(cx, cy, INNER_R * 0.4, cx, cy, haloR);
-      haloGrad.addColorStop(0, C.halo(0.14 + bassSmooth * 0.08));
-      haloGrad.addColorStop(0.6, C.halo(0.05));
-      haloGrad.addColorStop(1, C.halo(0));
-      ctx.fillStyle = haloGrad;
-      ctx.beginPath();
-      ctx.arc(cx, cy, haloR, 0, Math.PI * 2);
-      ctx.fill();
+      const INNER_R = minDim * 0.08;
+      const MAX_R = minDim * 0.5 * 0.88;
+      const tNow = Date.now() * 0.001;
 
-      const coreR = INNER_R * (0.95 + bassSmooth * 0.15);
+      // ---- 中心核心：发光圆盘随低频脉动 ----
+      const coreR = INNER_R * (2.2 + bassSmooth * 1.2);
       const coreGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, coreR);
-      coreGrad.addColorStop(0, C.coreBright(0.55 + bassSmooth * 0.2));
-      coreGrad.addColorStop(0.45, C.coreMain(0.3));
-      coreGrad.addColorStop(1, C.coreMain(0));
+      coreGrad.addColorStop(0, C.coreBright(0.85 + bassSmooth * 0.15));
+      coreGrad.addColorStop(0.3, C.coreMain(0.5 + bassSmooth * 0.2));
+      coreGrad.addColorStop(0.7, C.halo(0.2));
+      coreGrad.addColorStop(1, C.halo(0));
       ctx.fillStyle = coreGrad;
       ctx.beginPath();
       ctx.arc(cx, cy, coreR, 0, Math.PI * 2);
       ctx.fill();
 
-      // ---- 柱子粘在一起的环带 ----
-      // 频段映射：顶部（i=0）= 高频中心，向两侧递减到低频
-      // 频谱数组 smooth[0]=低频 .. smooth[NUM_BARS-1]=高频
-      // 柱子 i 距顶部的角度步数 d（0..numBars/2），d 越小取越高频段
-      const numBars = NUM_BARS;
-      const angleStep = (Math.PI * 2) / numBars;
-      const angleAt = (i) => i * angleStep - Math.PI / 2;
-      const radPos = (a, r) => ({ x: cx + Math.cos(a) * r, y: cy + Math.sin(a) * r });
-      const halfBars = numBars / 2;
+      // ---- 多层辐射波浪环 ----
+      // 每层是一个圆环，半径上叠加频谱波形 + 时间动画（向外扩散）
+      const NUM_RINGS = 5;
+      const halfBars = NUM_BARS / 2;
 
-      const barLen = [];
-      const tNow = Date.now() * 0.001;
-      for (let i = 0; i < numBars; i++) {
-        // 距顶部的步数（0..halfBars）
-        const d = i <= halfBars ? i : numBars - i;
-        // 映射到频段索引：d=0 → 最低频(0)，d=halfBars → 最高频(NUM_BARS-1)
-        const freqIdx = Math.round((d / halfBars) * (NUM_BARS - 1));
-        // 基础呼吸波动：即使频谱为 0 也有起伏，保证所有柱子都会跳
-        const breathe = (Math.sin(tNow * 1.6 + i * 0.18) * 0.5 + 0.5) * 0.08;
-        const value = hasData ? Math.max(smooth[freqIdx], breathe) : 0.04 + breathe;
-        barLen.push(Math.max(2, value * safeBarScale * (hasData ? 1.0 : 0.4)));
-      }
+      for (let ring = 0; ring < NUM_RINGS; ring++) {
+        // 每层的基础半径（从内到外）
+        const baseR = INNER_R + (MAX_R - INNER_R) * ((ring + 1) / NUM_RINGS);
+        // 每层的扩散相位（错开，制造向外流动感）
+        const phase = ring * 0.8;
+        // 透明度从内到外递减
+        const alpha = 0.75 - ring * 0.12;
 
-      // 等宽梯形柱子：每根柱子占 angleStep*BAR_RATIO 宽度，间隙 BAR_GAP
-      const BAR_RATIO = 0.82; // 柱子占角度比例，剩余为间隙
-      const barHalfSpan = angleStep * BAR_RATIO / 2;
+        ctx.save();
+        ctx.strokeStyle = `hsla(${hexToHsl(accentRef.current)[0] + ring * 8}, 80%, ${68 - ring * 4}%, ${alpha})`;
+        ctx.lineWidth = Math.max(1.2, minDim * (0.0024 - ring * 0.0003));
+        ctx.shadowColor = C.glow;
+        ctx.shadowBlur = minDim * (0.02 - ring * 0.003);
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
 
-      const fillGrad = ctx.createRadialGradient(cx, cy, INNER_R, cx, cy, MAX_OUTER);
-      fillGrad.addColorStop(0, C.inner);
-      fillGrad.addColorStop(0.45, C.mid);
-      fillGrad.addColorStop(0.8, C.outer);
-      fillGrad.addColorStop(1, C.tip);
-
-      ctx.save();
-      ctx.shadowColor = C.glow;
-      ctx.shadowBlur = minDim * 0.025;
-      ctx.fillStyle = fillGrad;
-      // 逐根绘制等宽梯形柱子（内圆弧 + 外圆弧 + 两条径向边）
-      for (let i = 0; i < numBars; i++) {
-        const a = angleAt(i);
-        const rOut = INNER_R + barLen[i];
-        const aL = a - barHalfSpan;
-        const aR = a + barHalfSpan;
-        const steps = 4; // 圆弧细分
         ctx.beginPath();
-        // 内圆弧（顺时针 aL→aR）
-        for (let s = 0; s <= steps; s++) {
-          const aa = aL + (aR - aL) * (s / steps);
-          const p = radPos(aa, INNER_R);
-          if (s === 0) ctx.moveTo(p.x, p.y);
-          else ctx.lineTo(p.x, p.y);
-        }
-        // 外圆弧（aR→aL）
-        for (let s = 0; s <= steps; s++) {
-          const aa = aR - (aR - aL) * (s / steps);
-          const p = radPos(aa, rOut);
-          ctx.lineTo(p.x, p.y);
+        const STEPS = 180;
+        for (let s = 0; s <= STEPS; s++) {
+          const angle = (s / STEPS) * Math.PI * 2;
+          // 距顶部的步数（用于频段映射：中心低频，外层高频）
+          const dNorm = Math.abs(Math.sin(angle)); // 0~1，正弦让顶部底部为高点
+          // 映射到频段：dNorm 小 → 低频，大 → 高频
+          const freqIdx = Math.min(NUM_BARS - 1, Math.floor(dNorm * NUM_BARS));
+          // 波浪振幅：频谱值 + 呼吸 + 向外扩散的行波
+          const breathe = (Math.sin(tNow * 1.4 + angle * 3 + phase) * 0.5 + 0.5) * 0.06;
+          const value = hasData ? Math.max(smooth[freqIdx], breathe) : 0.04 + breathe;
+          // 行波：让波形随时间向外传播
+          const wave = Math.sin(tNow * 2.2 - ring * 0.6 + angle * 5) * 0.15;
+          const amp = value * (MAX_R - INNER_R) * 0.18 * (hasData ? 1 : 0.4);
+          const r = baseR + amp + wave * minDim * 0.008;
+          const x = cx + Math.cos(angle) * r;
+          const y = cy + Math.sin(angle) * r;
+          if (s === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
         }
         ctx.closePath();
-        ctx.fill();
-      }
-      ctx.restore();
-
-      // 柱子顶部亮芯描边（每根独立，等宽）
-      ctx.save();
-      ctx.strokeStyle = C.tip;
-      ctx.globalAlpha = 0.55;
-      ctx.lineWidth = Math.max(1, minDim * 0.0012);
-      ctx.lineCap = 'round';
-      for (let i = 0; i < numBars; i++) {
-        const a = angleAt(i);
-        const rOut = INNER_R + barLen[i];
-        const aL = a - barHalfSpan;
-        const aR = a + barHalfSpan;
-        const pL = radPos(aL, rOut);
-        const pR = radPos(aR, rOut);
-        ctx.beginPath();
-        ctx.moveTo(pL.x, pL.y);
-        // 顶部用圆弧连接
-        for (let s = 0; s <= 4; s++) {
-          const aa = aL + (aR - aL) * (s / 4);
-          const p = radPos(aa, rOut);
-          ctx.lineTo(p.x, p.y);
-        }
         ctx.stroke();
+        ctx.restore();
       }
-      ctx.restore();
 
-      // 内圈玻璃高光环
-      ctx.save();
-      ctx.strokeStyle = C.glass;
-      ctx.lineWidth = Math.max(1, minDim * 0.0018);
-      ctx.shadowColor = C.glow;
-      ctx.shadowBlur = minDim * 0.018;
+      // ---- 外层柔光填充（最外圈淡淡的渐变环，增加层次） ----
+      const outerGrad = ctx.createRadialGradient(cx, cy, MAX_R * 0.7, cx, cy, MAX_R);
+      outerGrad.addColorStop(0, C.halo(0));
+      outerGrad.addColorStop(0.7, C.halo(0.04 + bassSmooth * 0.03));
+      outerGrad.addColorStop(1, C.halo(0));
+      ctx.fillStyle = outerGrad;
       ctx.beginPath();
-      ctx.arc(cx, cy, INNER_R, 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.restore();
+      ctx.arc(cx, cy, MAX_R, 0, Math.PI * 2);
+      ctx.fill();
 
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.18)';
-      ctx.lineWidth = Math.max(0.5, minDim * 0.0007);
+      // ---- 中心亮点（最内核高光） ----
+      const sparkR = INNER_R * (0.6 + bassSmooth * 0.5);
+      const sparkGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, sparkR);
+      sparkGrad.addColorStop(0, 'rgba(255,255,255,0.9)');
+      sparkGrad.addColorStop(0.5, C.coreBright(0.5));
+      sparkGrad.addColorStop(1, C.coreBright(0));
+      ctx.fillStyle = sparkGrad;
       ctx.beginPath();
-      ctx.arc(cx, cy, INNER_R - minDim * 0.005, 0, Math.PI * 2);
-      ctx.stroke();
-
-      // 外圈引导环（极淡，框定最大范围，增强现代结构感）
-      ctx.save();
-      ctx.strokeStyle = C.glass;
-      ctx.globalAlpha = 0.25;
-      ctx.lineWidth = Math.max(0.5, minDim * 0.0006);
-      ctx.setLineDash([minDim * 0.004, minDim * 0.008]);
-      ctx.beginPath();
-      ctx.arc(cx, cy, MAX_OUTER, 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.restore();
+      ctx.arc(cx, cy, sparkR, 0, Math.PI * 2);
+      ctx.fill();
     };
 
     // ---- 模式：波形（频谱柱镜像 + 渐变填充 + 中心线 · 自适应） ----
@@ -371,7 +313,7 @@ export default function Visualizer({ isPlaying, mode = 'ring', accent = '#4FC3F7
       if (mode === 'wave') {
         drawWave(data, hasData);
       } else {
-        drawRing(data, hasData);
+        drawRadialWave(data, hasData);
       }
       rafRef.current = requestAnimationFrame(draw);
     };
