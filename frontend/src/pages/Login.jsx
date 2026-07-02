@@ -166,6 +166,8 @@ export default function Login({ onBack }) {
             <img src={qrcode} alt="QQ 登录二维码"
               style={{
                 width: '100%', height: '100%', objectFit: 'contain', borderRadius: 14,
+                // QQ 原始二维码仅 ~111px，用 pixelated 放大保持像素清晰
+                imageRendering: 'pixelated',
                 filter: done ? 'blur(6px) brightness(1.3)' : 'none',
                 transition: 'filter 0.4s ease',
               }} />

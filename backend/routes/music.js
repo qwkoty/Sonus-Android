@@ -1,9 +1,6 @@
 const axios = require('axios');
 const express = require('express');
 const router = express.Router();
-const { PNG } = require('pngjs');
-const jsQR = require('jsqr');
-const QRCode = require('qrcode');
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
 const HEADERS = { 'User-Agent': UA, Referer: 'https://y.qq.com/' };
@@ -134,7 +131,7 @@ const loginResults = new Map();
 const processing = new Set();
 
 async function qqQrCreate() {
-  // 用稳定域名 ssl.ptlogin2.qq.com（ssl.pt.qq.com 在部分服务器 TLS 握手失败）
+  // ssl.pt.qq.com 在本服务器 DNS 返回 NXDOMAIN，只能用 ssl.ptlogin2.qq.com
   // 参数沿用上一代风格：l=L / da=25 / pt_3rd_aid=0
   const resp = await axios.get('https://ssl.ptlogin2.qq.com/ptqrshow', {
     params: {
@@ -156,27 +153,11 @@ async function qqQrCreate() {
   });
   const qrsig = parseSetCookies(resp.headers?.['set-cookie'])?.qrsig;
   if (!qrsig) throw new Error('获取二维码失败');
-
-  // 原始二维码只有 ~111px，手机上放大模糊导致 QQ 无法长按识别。
-  // 这里解码出二维码 URL，再用 qrcode 库重新生成 480px 高清二维码，
-  // 这样 QQ App 长按图片即可识别并一键登录（不用再拿另一台手机扫）。
-  let qrcode = '';
-  try {
-    const png = PNG.sync.read(Buffer.from(resp.data));
-    const decoded = jsQR(png.data, png.width, png.height);
-    if (decoded?.data) {
-      const hiResBuf = await QRCode.toBuffer(decoded.data, {
-        type: 'png', margin: 2, width: 480, errorCorrectionLevel: 'H',
-      });
-      qrcode = 'data:image/png;base64,' + hiResBuf.toString('base64');
-    }
-  } catch (e) {}
-
-  // 解码失败时回退到原始二维码
-  if (!qrcode) {
-    qrcode = 'data:image/png;base64,' + Buffer.from(resp.data).toString('base64');
-  }
-  return { qrsig, qrcode };
+  // 直接返回 QQ 原始二维码图片，不做任何二次加工
+  // （重新生成会触发 QQ 风控：提示"不能用长按识别只能用摄像头"）
+  // 前端用 CSS image-rendering: pixelated 放大显示保持清晰
+  const base64 = Buffer.from(resp.data).toString('base64');
+  return { qrsig, qrcode: `data:image/png;base64,${base64}` };
 }
 
 async function qqQrCheck(qrsig) {
