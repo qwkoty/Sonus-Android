@@ -131,10 +131,20 @@ const loginResults = new Map();
 const processing = new Set();
 
 async function qqQrCreate() {
-  const t = Math.random();
-  const url = `https://ssl.ptlogin2.qq.com/ptqrshow?appid=716027609&e=2&l=M&s=3&d=72&v=4&t=${t}`;
-  const resp = await axios.get(url, {
-    headers: { 'User-Agent': UA },
+  // 上一代登录方式：ssl.pt.qq.com / l=L / da=25 / pt_3rd_aid=0
+  const resp = await axios.get('https://ssl.pt.qq.com/ptqrshow', {
+    params: {
+      appid: '716027609',
+      e: '2',
+      l: 'L',
+      s: '3',
+      d: '72',
+      v: '4',
+      t: String(Math.random()),
+      da: '25',
+      pt_3rd_aid: '0',
+    },
+    headers: { 'User-Agent': UA, Referer: 'https://y.qq.com/' },
     responseType: 'arraybuffer',
     timeout: 10000,
     maxRedirects: 0,
@@ -157,12 +167,26 @@ async function qqQrCheck(qrsig) {
   }
 
   const ptqrtoken = hash33(qrsig);
-  const u1 = encodeURIComponent('https://y.qq.com/');
-  const t = Date.now();
-  const url = `https://ssl.ptlogin2.qq.com/ptqrlogin?u1=${u1}&ptqrtoken=${ptqrtoken}&ptredirect=0&h=1&t=1&g=1&from_ui=1&ptlang=2052&action=0-0-${t}&js_ver=10275&js_type=1&login_sig=&pt_uistyle=40&aid=716027609&daid=383`;
-
-  const resp = await axios.get(url, {
-    headers: { 'User-Agent': UA, Cookie: `qrsig=${qrsig}` },
+  const resp = await axios.get('https://ssl.pt.qq.com/ptqrlogin', {
+    params: {
+      u1: 'https://y.qq.com/',
+      ptqrtoken,
+      ptredirect: '0',
+      h: '1',
+      t: '1',
+      g: '1',
+      from_ui: '1',
+      ptlang: '2052',
+      action: '0-0-' + Date.now(),
+      js_ver: '24042410',
+      js_type: '1',
+      login_sig: '',
+      pt_uistyle: '40',
+      aid: '716027609',
+      daid: '383',
+      pt_3rd_aid: '0',
+    },
+    headers: { 'User-Agent': UA, Referer: 'https://y.qq.com/', Cookie: `qrsig=${qrsig}` },
     timeout: 30000,
     maxRedirects: 0,
     validateStatus: () => true,
