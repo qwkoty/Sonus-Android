@@ -2,13 +2,8 @@ import { create } from 'zustand';
 import { music } from '../api/music';
 import { getAudio, initAudioSystem, readFrequencyData } from '../audio/engine';
 
-const demoPlaylist = [
-  { id: 1, title: 'Midnight City', artist: 'M83', cover: 'https://picsum.photos/seed/midnight/400/400', url: '', platform: 'demo' },
-  { id: 2, title: 'Nightcall', artist: 'Kavinsky', cover: 'https://picsum.photos/seed/nightcall/400/400', url: '', platform: 'demo' },
-  { id: 3, title: 'Instant Crush', artist: 'Daft Punk', cover: 'https://picsum.photos/seed/instant/400/400', url: '', platform: 'demo' },
-  { id: 4, title: 'The Less I Know', artist: 'Tame Impala', cover: 'https://picsum.photos/seed/less/400/400', url: '', platform: 'demo' },
-  { id: 5, title: 'Space Song', artist: 'Beach House', cover: 'https://picsum.photos/seed/space/400/400', url: '', platform: 'demo' },
-];
+// 初始播放列表为空，用户搜索播放后自动加入
+const demoPlaylist = [];
 
 function loadPlaylists() {
   try { return JSON.parse(localStorage.getItem('sonus_playlists') || '[]'); } catch { return []; }
@@ -24,6 +19,25 @@ function loadPlatform() {
   try { return localStorage.getItem('sonus_platform') || 'none'; } catch { return 'none'; }
 }
 function savePlatform(p) { localStorage.setItem('sonus_platform', p); }
+
+// 读取登录态 cookie（网易云 MUSIC_U / QQ 的 uin+key）
+function loadNeteaseCookie() {
+  try { return localStorage.getItem('sonus_netease_cookie') || ''; } catch { return ''; }
+}
+function saveNeteaseCookie(c) { localStorage.setItem('sonus_netease_cookie', c); }
+function loadNeteaseUser() {
+  try { return JSON.parse(localStorage.getItem('sonus_netease_user') || 'null'); } catch { return null; }
+}
+function saveNeteaseUser(u) { localStorage.setItem('sonus_netease_user', JSON.stringify(u)); }
+
+function loadQQCookie() {
+  try { return JSON.parse(localStorage.getItem('sonus_qq_cookie') || 'null'); } catch { return null; }
+}
+function saveQQCookie(c) { localStorage.setItem('sonus_qq_cookie', JSON.stringify(c)); }
+function loadQQUser() {
+  try { return JSON.parse(localStorage.getItem('sonus_qq_user') || 'null'); } catch { return null; }
+}
+function saveQQUser(u) { localStorage.setItem('sonus_qq_user', JSON.stringify(u)); }
 
 function parseLyric(lrcText) {
   if (!lrcText) return [];
@@ -68,8 +82,13 @@ export const usePlayerStore = create((set, get) => {
   });
 
   audio.addEventListener('ended', () => {
-    const { playMode } = get();
+    const { playMode, playlist } = get();
     if (playMode === 'single') {
+      audio.currentTime = 0;
+      audio.play().catch(() => {});
+      set({ isPlaying: true });
+    } else if (playlist.length <= 1) {
+      // 列表只有一首时自动循环播放
       audio.currentTime = 0;
       audio.play().catch(() => {});
       set({ isPlaying: true });
@@ -91,7 +110,7 @@ export const usePlayerStore = create((set, get) => {
   });
 
   return {
-    currentTrack: demoPlaylist[0],
+    currentTrack: null,
     isPlaying: false,
     currentTime: 0,
     duration: 0,
@@ -106,6 +125,11 @@ export const usePlayerStore = create((set, get) => {
     platform: loadPlatform(),
     lyrics: [],
     currentLyric: '',
+    // 登录态
+    neteaseCookie: loadNeteaseCookie(),
+    neteaseUser: loadNeteaseUser(),
+    qqCookie: loadQQCookie(),
+    qqUser: loadQQUser(),
 
     audio,
 
@@ -116,15 +140,27 @@ export const usePlayerStore = create((set, get) => {
       const { audio } = get();
       set({ currentTrack: track, isPlaying: false, currentTime: 0, duration: 0, isLoadingUrl: true, lyrics: [], currentLyric: '', error: null });
 
-      let url = track.url || '';
-
-      // 对于有 rawId 的非 demo 歌曲，使用同源流代理解决 CORS
-      if (!url && track.platform && track.rawId && track.platform !== 'demo') {
-        url = music.stream(track.rawId, track.platform);
+      // 自动加入播放列表（若未存在），保证列表非空、可循环/切歌
+      const { playlist } = get();
+      if (!playlist.some((t) => t.id === track.id)) {
+        set({ playlist: [...playlist, track] });
       }
 
-      if (!url && track.platform === 'demo') {
-        url = 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3';
+      let url = track.url || '';
+
+      // 对于有 rawId 的非 demo 歌曲，使用同源流代理解决 CORS（登录后带 cookie 解锁 VIP）
+      if (!url && track.platform && track.rawId && track.platform !== 'demo') {
+        if (track.platform === 'netease') {
+          const { neteaseCookie } = get();
+          url = music.stream(track.rawId, track.platform, neteaseCookie || '');
+        } else if (track.platform === 'qq') {
+          const { qqCookie } = get();
+          // QQ cookie 存为对象 { uin, key, raw }
+          const cookieStr = qqCookie?.raw || '';
+          url = music.stream(track.rawId, track.platform, cookieStr);
+        } else {
+          url = music.stream(track.rawId, track.platform);
+        }
       }
 
       // 加载歌词
@@ -188,8 +224,13 @@ export const usePlayerStore = create((set, get) => {
     },
 
     next: () => {
-      const { playlist, currentTrack, playMode } = get();
+      const { playlist, currentTrack, playMode, audio } = get();
       if (!playlist.length) return;
+      // 只有一首时重播当前，不切歌
+      if (playlist.length === 1) {
+        if (audio) { audio.currentTime = 0; audio.play().catch(() => {}); set({ isPlaying: true }); }
+        return;
+      }
       let idx = playlist.findIndex((t) => t.id === currentTrack?.id);
       if (idx === -1) idx = 0;
 
@@ -206,8 +247,13 @@ export const usePlayerStore = create((set, get) => {
     },
 
     prev: () => {
-      const { playlist, currentTrack } = get();
+      const { playlist, currentTrack, audio } = get();
       if (!playlist.length) return;
+      // 只有一首时重播当前
+      if (playlist.length === 1) {
+        if (audio) { audio.currentTime = 0; audio.play().catch(() => {}); set({ isPlaying: true }); }
+        return;
+      }
       let idx = playlist.findIndex((t) => t.id === currentTrack?.id);
       if (idx === -1) idx = 0;
       idx = (idx - 1 + playlist.length) % playlist.length;
@@ -284,6 +330,27 @@ export const usePlayerStore = create((set, get) => {
       set({ platform: p });
     },
 
-
+    // ---- 登录态管理 ----
+    setNeteaseAuth: (cookie, user) => {
+      saveNeteaseCookie(cookie);
+      saveNeteaseUser(user);
+      set({ neteaseCookie: cookie, neteaseUser: user });
+    },
+    clearNeteaseAuth: () => {
+      saveNeteaseCookie('');
+      saveNeteaseUser(null);
+      set({ neteaseCookie: '', neteaseUser: null });
+    },
+    setQQAuth: (cookieObj, user) => {
+      // cookieObj: { uin, key, raw }
+      saveQQCookie(cookieObj);
+      saveQQUser(user);
+      set({ qqCookie: cookieObj, qqUser: user });
+    },
+    clearQQAuth: () => {
+      saveQQCookie(null);
+      saveQQUser(null);
+      set({ qqCookie: null, qqUser: null });
+    },
   };
 });

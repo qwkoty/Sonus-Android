@@ -19,6 +19,268 @@ function withCache(key, ttl, fn) {
   return fn().then((v) => { cache.set(key, { v, t: now }); return v; });
 }
 
+// ---------- 扫码登录：网易云 ----------
+// 生成 unikey
+async function neteaseQrUnikey() {
+  const url = 'https://music.163.com/api/login/qrcode/unikey';
+  const { data } = await axios.post(url, 'type=1', {
+    headers: {
+      ...COMMON_HEADERS,
+      'Content-Type': 'application/x-www-form-urlencoded',
+      Referer: 'https://music.163.com/',
+    },
+    timeout: 10000,
+  });
+  return data?.unikey || '';
+}
+
+// 生成二维码（返回 base64 图片）
+async function neteaseQrCreate(unikey) {
+  const url = 'https://music.163.com/api/login/qrcode/client/login';
+  const { data } = await axios.get(url, {
+    params: { key: unikey, qrimg: 'true', type: 1 },
+    headers: { ...COMMON_HEADERS, Referer: 'https://music.163.com/' },
+    timeout: 10000,
+  });
+  return data; // { code, qrurl, qrimg }
+}
+
+// 轮询登录状态，成功时从 set-cookie 提取 MUSIC_U
+async function neteaseQrCheck(unikey, res) {
+  const url = 'https://music.163.com/api/login/qrcode/client/login';
+  const resp = await axios.get(url, {
+    params: { key: unikey, type: 1 },
+    headers: { ...COMMON_HEADERS, Referer: 'https://music.163.com/' },
+    timeout: 10000,
+  });
+  const data = resp.data || {};
+  // code: 800 过期/未扫描, 801 等待扫码, 802 已扫码待确认, 803 登录成功
+  let cookie = '';
+  if (data.code === 803) {
+    const setCookies = resp.headers?.['set-cookie'] || [];
+    const mu = setCookies.find((c) => c.startsWith('MUSIC_U='));
+    if (mu) cookie = mu.split(';')[0]; // MUSIC_U=xxx
+  }
+  // 拉取用户信息（已登录时）
+  let user = null;
+  if (cookie) {
+    try {
+      user = await neteaseUserInfo(cookie);
+    } catch (e) { /* ignore */ }
+  }
+  return { code: data.code, cookie, user };
+}
+
+// 网易云用户信息
+async function neteaseUserInfo(cookie) {
+  const url = 'https://music.163.com/api/w/nuser/account/get';
+  const { data } = await axios.get(url, {
+    headers: {
+      ...COMMON_HEADERS,
+      Cookie: cookie,
+      Referer: 'https://music.163.com/',
+    },
+    timeout: 10000,
+  });
+  const acc = data?.account || data?.profile;
+  if (!acc) return null;
+  return {
+    nickname: data?.profile?.nickname || acc.nickname || '网易云用户',
+    avatar: data?.profile?.avatarUrl || '',
+    userId: acc.userId || data?.profile?.userId || '',
+  };
+}
+
+// 网易云用户歌单列表
+async function neteaseUserPlaylists(cookie, uid) {
+  const url = 'https://music.163.com/api/user/playlist';
+  const { data } = await axios.get(url, {
+    params: { uid, limit: 100, offset: 0 },
+    headers: { ...COMMON_HEADERS, Cookie: cookie, Referer: 'https://music.163.com/' },
+    timeout: 10000,
+  });
+  const list = data?.playlist || [];
+  return list.map((p) => ({
+    id: String(p.id),
+    name: p.name,
+    cover: p.coverImgUrl || '',
+    trackCount: p.trackCount || 0,
+    creator: p.creator?.nickname || '',
+  }));
+}
+
+// ---------- 扫码登录：QQ 音乐 ----------
+// 生成 QQ 二维码扫码 token (ptqrshow + ptqrlogin 流程)
+async function qqQrCreate() {
+  // 1. 请求 ptqrshow 获取 qrsig（同时拿到验证图片）
+  const showUrl = 'https://ssl.pt.qq.com/ptqrshow';
+  const showResp = await axios.get(showUrl, {
+    params: {
+      appid: '716027609',
+      e: '2',
+      l: 'M',
+      s: '3',
+      d: '72',
+      v: '4',
+      t: String(Math.random()),
+      da: '25',
+      pt_3rd_aid: '0',
+    },
+    headers: { ...COMMON_HEADERS, Referer: 'https://y.qq.com/' },
+    timeout: 10000,
+    responseType: 'arraybuffer',
+  });
+  const setCookies = showResp.headers?.['set-cookie'] || [];
+  let qrsig = '';
+  for (const c of setCookies) {
+    const m = c.match(/qrsig=([^;]+)/);
+    if (m) { qrsig = m[1]; break; }
+  }
+  const qrimg = 'data:image/png;base64,' + Buffer.from(showResp.data).toString('base64');
+  return { qrsig, qrimg };
+}
+
+// 计算 ptqrlogin 所需的 qrcode index（gd 版 hash）
+function hash33(s) {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) {
+    h += (h << 5) + s.charCodeAt(i);
+  }
+  return 2147483647 & h;
+}
+
+// 轮询 QQ 登录状态
+async function qqQrCheck(qrsig) {
+  const ptqrtoken = hash33(qrsig);
+  const loginUrl = 'https://ssl.pt.qq.com/ptqrlogin';
+  const resp = await axios.get(loginUrl, {
+    params: {
+      u1: 'https://y.qq.com/',
+      ptqrtoken,
+      ptredirect: '0',
+      h: '1',
+      t: '1',
+      g: '1',
+      from_ui: '1',
+      ptlang: '2052',
+      action: '0-0-' + Date.now(),
+      js_ver: '24042410',
+      js_type: '1',
+      login_sig: '',
+      pt_uistyle: '40',
+      aid: '716027609',
+      daid: '383',
+      pt_3rd_aid: '0',
+    },
+    headers: {
+      ...COMMON_HEADERS,
+      Cookie: `qrsig=${qrsig}`,
+      Referer: 'https://y.qq.com/',
+    },
+    timeout: 10000,
+    maxRedirects: 0,
+    validateStatus: () => true,
+  });
+  const body = typeof resp.data === 'string' ? resp.data : '';
+  // 返回内容类似: ptuiCB('66','0','','0','二维码未失效。(2059131352)', '');
+  // code: 66 未扫描, 67 已扫码待确认, 0 登录成功(第四个参数为跳转url)
+  const m = body.match(/ptuiCB\('(\d+)','(\d+)','([^']*)','(\d+)','([^']*)'/);
+  if (!m) return { code: 0, msg: '解析失败', cookie: '' };
+  const [, code, , redirectUrl, , msg] = m;
+  // 登录成功，跟随重定向拿 cookie
+  if (code === '0' && redirectUrl) {
+    try {
+      const cookieResp = await axios.get(redirectUrl, {
+        headers: { ...COMMON_HEADERS, Referer: 'https://y.qq.com/' },
+        timeout: 10000,
+        maxRedirects: 5,
+        validateStatus: () => true,
+      });
+      const sc = cookieResp.headers?.['set-cookie'] || [];
+      const cookies = {};
+      for (const c of sc) {
+        const eq = c.indexOf('=');
+        const k = c.slice(0, eq);
+        const v = c.slice(eq + 1).split(';')[0];
+        cookies[k] = v;
+      }
+      const uin = (cookies.uin || '').replace(/^o0*/, '');
+      const key = cookies.ptvpnmusic || cookies.qqmusic_key || cookies.p_skey || '';
+      const cookieStr = Object.entries(cookies).map(([k, v]) => `${k}=${v}`).join('; ');
+      // 拉取用户信息
+      let user = null;
+      if (uin && key) {
+        try { user = await qqUserInfo(uin, key); } catch (e) {}
+      }
+      return { code: '0', msg, cookie: cookieStr, uin, key, user };
+    } catch (e) {
+      return { code: '0', msg: '登录成功但获取cookie失败', cookie: '' };
+    }
+  }
+  // 映射状态码到网易云一致风格
+  const statusMap = { '66': 801, '67': 802, '65': 800 };
+  return { code: statusMap[code] || 800, msg, cookie: '' };
+}
+
+// QQ 音乐用户信息
+async function qqUserInfo(uin, key) {
+  const url = 'https://u.y.qq.com/cgi-bin/musicu.fcg';
+  const payload = {
+    comm: { uin: Number(uin), format: 'json', ct: 24, cv: 0 },
+    req_0: {
+      module: 'music.UserInfo.userInfoServer',
+      method: 'GetLoginUserInfo',
+      param: {},
+    },
+  };
+  const { data } = await axios.get(url, {
+    params: { data: JSON.stringify(payload) },
+    headers: {
+      ...COMMON_HEADERS,
+      Cookie: `uin=o0${uin}; qqmusic_key=${key};`,
+      Referer: 'https://y.qq.com/',
+    },
+    timeout: 10000,
+  });
+  const info = data?.req_0?.data;
+  if (!info) return null;
+  return {
+    nickname: info.nickname || info.name || 'QQ音乐用户',
+    avatar: info.headpic || info.avatar || '',
+    userId: uin,
+  };
+}
+
+// QQ 音乐用户歌单
+async function qqUserPlaylists(uin, key) {
+  const url = 'https://u.y.qq.com/cgi-bin/musicu.fcg';
+  const payload = {
+    comm: { uin: Number(uin), format: 'json', ct: 24, cv: 0 },
+    req_0: {
+      module: 'music.musicasset.PlaylistBaseRead',
+      method: 'GetPlaylistByUin',
+      param: { hostUin: Number(uin), size: 100, dirId: 0, from: 1 },
+    },
+  };
+  const { data } = await axios.get(url, {
+    params: { data: JSON.stringify(payload) },
+    headers: {
+      ...COMMON_HEADERS,
+      Cookie: `uin=o0${uin}; qqmusic_key=${key};`,
+      Referer: 'https://y.qq.com/',
+    },
+    timeout: 10000,
+  });
+  const vlist = data?.req_0?.data?.v_playlist || [];
+  return vlist.map((p) => ({
+    id: String(p.tid),
+    name: p.diss_name || p.title || '',
+    cover: p.diss_cover || p.picurl || '',
+    trackCount: p.song_cnt || 0,
+    creator: p.creator?.name || '',
+  }));
+}
+
 // ---------- 网易云音乐 ----------
 async function searchNetease(keyword, limit = 20) {
   const url = 'https://music.163.com/api/search/get/web';
@@ -46,14 +308,16 @@ async function searchNetease(keyword, limit = 20) {
   }));
 }
 
-// 网易云播放链接：多级 fallback
-async function getNeteaseRealUrl(id) {
+// 网易云播放链接：多级 fallback，cookie 可选（登录后解锁 VIP）
+async function getNeteaseRealUrl(id, cookie = '') {
+  const cookieHeader = cookie ? { Cookie: cookie } : {};
   // 1. 标准 enhance/player/url，提升到 320k
   try {
     const url = 'https://music.163.com/api/song/enhance/player/url';
     const { data } = await axios.post(url, `ids=[${id}]&br=320000`, {
       headers: {
         ...COMMON_HEADERS,
+        ...cookieHeader,
         'Content-Type': 'application/x-www-form-urlencoded',
         Referer: 'https://music.163.com/',
       },
@@ -71,7 +335,7 @@ async function getNeteaseRealUrl(id) {
   try {
     const outerUrl = `https://music.163.com/song/media/outer/url?id=${id}.mp3`;
     const resp = await axios.get(outerUrl, {
-      headers: COMMON_HEADERS,
+      headers: { ...COMMON_HEADERS, ...cookieHeader },
       timeout: 8000,
       maxRedirects: 0,
       validateStatus: () => true,
@@ -187,8 +451,9 @@ async function searchQQ(keyword, page = 1, num = 20) {
   }));
 }
 
-// QQ 播放链接：多级 fallback
-async function getQQUrl(songmid) {
+// QQ 播放链接：多级 fallback，cookie 可选（登录后解锁 VIP）
+async function getQQUrl(songmid, cookie = '') {
+  const cookieHeader = cookie ? { Cookie: cookie } : {};
   // 1. vkey.GetVkeyServer
   try {
     const url = 'https://u.y.qq.com/cgi-bin/musicu.fcg';
@@ -205,7 +470,7 @@ async function getQQUrl(songmid) {
 
     const { data } = await axios.get(url, {
       params: { data: JSON.stringify(payload) },
-      headers: { ...COMMON_HEADERS, Referer: 'https://y.qq.com/' },
+      headers: { ...COMMON_HEADERS, ...cookieHeader, Referer: 'https://y.qq.com/' },
       timeout: 10000,
     });
 
@@ -228,7 +493,7 @@ async function getQQUrl(songmid) {
         cid: 205361747, uin: 0, songmid,
         filename: `C400${songmid}.m4a`, guid: 0,
       },
-      headers: { ...COMMON_HEADERS, Referer: 'https://y.qq.com/' },
+      headers: { ...COMMON_HEADERS, ...cookieHeader, Referer: 'https://y.qq.com/' },
       timeout: 10000,
     });
     const info = data?.data?.items?.[0];
@@ -414,16 +679,16 @@ router.get('/search', async (req, res) => {
 // ---------- 获取播放链接 ----------
 router.get('/url', async (req, res) => {
   try {
-    const { id, platform } = req.query;
+    const { id, platform, cookie = '' } = req.query;
     if (!id || !platform) return res.status(400).json({ error: 'id and platform required' });
 
     if (platform === 'netease') {
-      const realUrl = await getNeteaseRealUrl(id);
+      const realUrl = await getNeteaseRealUrl(id, cookie);
       return res.json({ code: 200, data: { url: realUrl, platform } });
     }
 
     if (platform === 'qq') {
-      const url = await getQQUrl(id);
+      const url = await getQQUrl(id, cookie);
       return res.json({ code: 200, data: { url, platform } });
     }
 
@@ -436,14 +701,14 @@ router.get('/url', async (req, res) => {
 // ---------- 音频流代理（解决 CORS） ----------
 router.get('/stream', async (req, res) => {
   try {
-    const { id, platform } = req.query;
+    const { id, platform, cookie = '' } = req.query;
     if (!id || !platform) return res.status(400).json({ error: 'id and platform required' });
 
     let targetUrl = '';
     if (platform === 'netease') {
-      targetUrl = await getNeteaseRealUrl(id);
+      targetUrl = await getNeteaseRealUrl(id, cookie);
     } else if (platform === 'qq') {
-      targetUrl = await getQQUrl(id);
+      targetUrl = await getQQUrl(id, cookie);
     } else {
       return res.status(400).json({ error: 'unsupported platform' });
     }
@@ -595,6 +860,88 @@ router.get('/rank/songs', async (req, res) => {
       return res.json({ code: 200, data: detail });
     }
     res.status(400).json({ error: 'unsupported platform' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ---------- 扫码登录：网易云 ----------
+// 1. 生成 unikey
+router.get('/login/netease/unikey', async (req, res) => {
+  try {
+    const unikey = await neteaseQrUnikey();
+    res.json({ code: 200, data: { unikey } });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 2. 生成二维码图片
+router.get('/login/netease/qrcode', async (req, res) => {
+  try {
+    const { unikey } = req.query;
+    if (!unikey) return res.status(400).json({ error: 'unikey required' });
+    const data = await neteaseQrCreate(unikey);
+    res.json({ code: 200, data });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 3. 轮询登录状态
+router.get('/login/netease/check', async (req, res) => {
+  try {
+    const { unikey } = req.query;
+    if (!unikey) return res.status(400).json({ error: 'unikey required' });
+    const result = await neteaseQrCheck(unikey);
+    res.json({ code: 200, data: result });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 网易云用户歌单
+router.get('/user/netease/playlists', async (req, res) => {
+  try {
+    const { cookie, uid } = req.query;
+    if (!cookie || !uid) return res.status(400).json({ error: 'cookie and uid required' });
+    const list = await neteaseUserPlaylists(cookie, uid);
+    res.json({ code: 200, data: { list } });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ---------- 扫码登录：QQ 音乐 ----------
+// 1+2. 生成二维码图片 + qrsig
+router.get('/login/qq/qrcode', async (req, res) => {
+  try {
+    const data = await qqQrCreate();
+    res.json({ code: 200, data });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 3. 轮询登录状态
+router.get('/login/qq/check', async (req, res) => {
+  try {
+    const { qrsig } = req.query;
+    if (!qrsig) return res.status(400).json({ error: 'qrsig required' });
+    const result = await qqQrCheck(qrsig);
+    res.json({ code: 200, data: result });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// QQ 用户歌单
+router.get('/user/qq/playlists', async (req, res) => {
+  try {
+    const { uin, key } = req.query;
+    if (!uin || !key) return res.status(400).json({ error: 'uin and key required' });
+    const list = await qqUserPlaylists(uin, key);
+    res.json({ code: 200, data: { list } });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
