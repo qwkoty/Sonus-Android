@@ -293,6 +293,12 @@ export const usePlayerStore = create((set, get) => {
       const newPlaylist = { id: Date.now().toString(), name, tracks: [], createdAt: Date.now() };
       set((s) => { const next = [...s.playlists, newPlaylist]; savePlaylists(next); return { playlists: next }; });
     },
+    // 一键导入云歌单到本地（含完整歌曲）
+    importPlaylist: (name, tracks, cover = '') => {
+      const newPlaylist = { id: Date.now().toString(), name, tracks, cover, createdAt: Date.now() };
+      set((s) => { const next = [...s.playlists, newPlaylist]; savePlaylists(next); return { playlists: next }; });
+      return newPlaylist.id;
+    },
     deletePlaylist: (id) => set((s) => { const next = s.playlists.filter((p) => p.id !== id); savePlaylists(next); return { playlists: next }; }),
     addToPlaylist: (playlistId, track) => {
       set((s) => {

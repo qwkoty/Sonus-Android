@@ -25,9 +25,14 @@ export const music = {
   neteaseQrcode: (unikey) => get(`/api/music/login/netease/qrcode?unikey=${encodeURIComponent(unikey)}`),
   neteaseCheck: (unikey) => get(`/api/music/login/netease/check?unikey=${encodeURIComponent(unikey)}`),
   neteasePlaylists: (cookie, uid) => get(`/api/music/user/netease/playlists?cookie=${encodeURIComponent(cookie)}&uid=${encodeURIComponent(uid)}`),
+  neteaseLikedSongs: (cookie, uid) => get(`/api/music/user/netease/likedsongs?cookie=${encodeURIComponent(cookie)}&uid=${encodeURIComponent(uid)}`),
 
   // ---- 扫码登录：QQ 音乐 ----
   qqQrcode: () => get('/api/music/login/qq/qrcode'),
   qqCheck: (qrsig) => get(`/api/music/login/qq/check?qrsig=${encodeURIComponent(qrsig)}`),
   qqPlaylists: (uin, key) => get(`/api/music/user/qq/playlists?uin=${encodeURIComponent(uin)}&key=${encodeURIComponent(key)}`),
+  qqLikedSongs: (uin, key) => get(`/api/music/user/qq/likedsongs?uin=${encodeURIComponent(uin)}&key=${encodeURIComponent(key)}`),
+
+  // ---- 歌单详情（加载云歌单歌曲） ----
+  playlist: (id, platform) => get(`/api/music/playlist?id=${encodeURIComponent(id)}&platform=${encodeURIComponent(platform)}`),
 };

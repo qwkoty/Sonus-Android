@@ -947,4 +947,36 @@ router.get('/user/qq/playlists', async (req, res) => {
   }
 });
 
+// ---------- 同步我喜欢 ----------
+// 网易云：取用户歌单第一个（我喜欢的音乐）的完整歌曲
+router.get('/user/netease/likedsongs', async (req, res) => {
+  try {
+    const { cookie, uid } = req.query;
+    if (!cookie || !uid) return res.status(400).json({ error: 'cookie and uid required' });
+    // 第一个歌单即"我喜欢的音乐"
+    const list = await neteaseUserPlaylists(cookie, uid);
+    if (!list.length) return res.json({ code: 200, data: { tracks: [], name: '我喜欢的音乐' } });
+    const likedId = list[0].id;
+    const detail = await getNeteasePlaylist(likedId);
+    res.json({ code: 200, data: { tracks: detail.tracks, name: detail.name, cover: detail.cover } });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// QQ 音乐：取用户歌单第一个（我喜欢）的完整歌曲
+router.get('/user/qq/likedsongs', async (req, res) => {
+  try {
+    const { uin, key } = req.query;
+    if (!uin || !key) return res.status(400).json({ error: 'uin and key required' });
+    const list = await qqUserPlaylists(uin, key);
+    if (!list.length) return res.json({ code: 200, data: { tracks: [], name: '我喜欢' } });
+    const likedId = list[0].id;
+    const detail = await getQQPlaylist(likedId);
+    res.json({ code: 200, data: { tracks: detail.tracks, name: detail.name, cover: detail.cover } });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;

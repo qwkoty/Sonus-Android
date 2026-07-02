@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import {
   User, LogOut, Moon, Settings, HelpCircle,
   Plus, Trash2, Play, Music, X, Check, RefreshCw, Loader2,
+  Download, Heart,
 } from 'lucide-react';
 import { usePlayerStore } from '../store/usePlayerStore';
 import { music } from '../api/music';
@@ -25,7 +26,7 @@ export default function Profile() {
 
   const {
     playlists, createPlaylist, deletePlaylist, removeFromPlaylist,
-    playPlaylist, playTrack,
+    playPlaylist, playTrack, importPlaylist,
     neteaseCookie, neteaseUser, qqCookie, qqUser,
     setNeteaseAuth, clearNeteaseAuth, setQQAuth, clearQQAuth,
     setPlaylist, setError,
@@ -176,19 +177,54 @@ export default function Profile() {
   // 加载云歌单歌曲到播放列表
   const loadRemotePlaylist = async (platform, id) => {
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_BASE || ''}/api/music/playlist?id=${encodeURIComponent(id)}&platform=${platform}`);
-      const json = await res.json();
-      const tracks = json?.data?.tracks || [];
+      setLoadingRemote(true);
+      const res = await music.playlist(id, platform);
+      const tracks = res?.data?.tracks || [];
       if (tracks.length) {
         setPlaylist(tracks);
         playTrack(tracks[0]);
-        setError(`已加载歌单「${json.data.name}」共 ${tracks.length} 首`);
+        setError(`已加载歌单「${res.data.name}」共 ${tracks.length} 首`);
       } else {
         setError('歌单为空');
       }
     } catch (e) {
       setError('加载歌单失败');
-    }
+    } finally { setLoadingRemote(false); }
+  };
+
+  // 一键同步"我喜欢"到播放列表
+  const [syncingLiked, setSyncingLiked] = useState(false);
+  const syncLiked = async () => {
+    setSyncingLiked(true);
+    try {
+      let res;
+      if (isLoggedInNetease) res = await music.neteaseLikedSongs(neteaseCookie, neteaseUser?.userId);
+      else if (isLoggedInQQ) res = await music.qqLikedSongs(qqCookie.uin, qqCookie.key);
+      const tracks = res?.data?.tracks || [];
+      if (tracks.length) {
+        setPlaylist(tracks);
+        playTrack(tracks[0]);
+        setError(`已同步「我喜欢」共 ${tracks.length} 首`);
+      } else {
+        setError('我喜欢列表为空');
+      }
+    } catch (e) {
+      setError('同步我喜欢失败');
+    } finally { setSyncingLiked(false); }
+  };
+
+  // 导入云歌单到本地（持久化）
+  const [importingId, setImportingId] = useState(null);
+  const importRemotePlaylist = async (platform, pl) => {
+    setImportingId(pl.id);
+    try {
+      const res = await music.playlist(pl.id, platform);
+      const tracks = res?.data?.tracks || [];
+      importPlaylist(pl.name, tracks, pl.cover);
+      setError(`已导入「${pl.name}」到本地，共 ${tracks.length} 首`);
+    } catch (e) {
+      setError('导入失败');
+    } finally { setImportingId(null); }
   };
 
   const isLoggedInNetease = !!neteaseCookie;
@@ -268,16 +304,33 @@ export default function Profile() {
             <h2 style={{ fontSize: 17, fontWeight: 700 }}>
               云歌单 {neteaseUser ? '·网易云' : qqUser ? '·QQ音乐' : ''}
             </h2>
-            <button
-              onClick={() => {
-                if (isLoggedInNetease) fetchNeteasePlaylists(neteaseCookie, neteaseUser?.userId);
-                else if (isLoggedInQQ) fetchQQPlaylists(qqCookie.uin, qqCookie.key);
-              }}
-              style={{ width: 30, height: 30, borderRadius: 8, background: 'var(--surface)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
-              aria-label="刷新"
-            >
-              <RefreshCw size={14} color="var(--text-secondary)" />
-            </button>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button
+                onClick={syncLiked}
+                disabled={syncingLiked}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 5,
+                  padding: '6px 12px', borderRadius: 8,
+                  background: syncingLiked ? 'var(--surface)' : 'var(--accent-dynamic, #4FC3F7)',
+                  color: '#fff', fontSize: 12, fontWeight: 700,
+                  border: 'none', cursor: syncingLiked ? 'not-allowed' : 'pointer',
+                  opacity: syncingLiked ? 0.6 : 1,
+                }}
+              >
+                {syncingLiked ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <Heart size={13} fill="currentColor" />}
+                同步我喜欢
+              </button>
+              <button
+                onClick={() => {
+                  if (isLoggedInNetease) fetchNeteasePlaylists(neteaseCookie, neteaseUser?.userId);
+                  else if (isLoggedInQQ) fetchQQPlaylists(qqCookie.uin, qqCookie.key);
+                }}
+                style={{ width: 30, height: 30, borderRadius: 8, background: 'var(--surface)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', border: 'none' }}
+                aria-label="刷新"
+              >
+                <RefreshCw size={14} color="var(--text-secondary)" />
+              </button>
+            </div>
           </div>
           {loadingRemote ? (
             <div style={{ textAlign: 'center', padding: 20, color: 'var(--text-muted)', fontSize: 13 }}>
@@ -289,14 +342,30 @@ export default function Profile() {
             <div key={pl.id} style={{
               background: 'var(--bg-secondary)', borderRadius: 14, padding: '12px 14px',
               marginBottom: 10, border: '1px solid var(--border)',
-              display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer',
-            }} onClick={() => loadRemotePlaylist(isLoggedInNetease ? 'netease' : 'qq', pl.id)}>
-              <img src={pl.cover} alt="" style={{ width: 44, height: 44, borderRadius: 10, objectFit: 'cover' }} />
-              <div style={{ flex: 1, minWidth: 0 }}>
+              display: 'flex', alignItems: 'center', gap: 12,
+            }}>
+              <img src={pl.cover} alt="" style={{ width: 44, height: 44, borderRadius: 10, objectFit: 'cover', cursor: 'pointer' }} onClick={() => loadRemotePlaylist(isLoggedInNetease ? 'netease' : 'qq', pl.id)} />
+              <div style={{ flex: 1, minWidth: 0, cursor: 'pointer' }} onClick={() => loadRemotePlaylist(isLoggedInNetease ? 'netease' : 'qq', pl.id)}>
                 <div style={{ fontSize: 14, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{pl.name}</div>
                 <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 2 }}>{pl.trackCount} 首 {pl.creator ? `· ${pl.creator}` : ''}</div>
               </div>
-              <Play size={16} fill="currentColor" color="var(--text-secondary)" />
+              <button
+                onClick={() => importRemotePlaylist(isLoggedInNetease ? 'netease' : 'qq', pl)}
+                disabled={importingId === pl.id}
+                style={{ width: 30, height: 30, borderRadius: 8, background: 'var(--surface)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', border: 'none', opacity: importingId === pl.id ? 0.5 : 1 }}
+                title="导入到本地歌单"
+              >
+                {importingId === pl.id
+                  ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} color="var(--text-secondary)" />
+                  : <Download size={14} color="var(--text-secondary)" />}
+              </button>
+              <button
+                onClick={() => loadRemotePlaylist(isLoggedInNetease ? 'netease' : 'qq', pl.id)}
+                style={{ width: 30, height: 30, borderRadius: 8, background: 'var(--surface)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', border: 'none' }}
+                title="播放"
+              >
+                <Play size={14} fill="currentColor" color="var(--text-secondary)" />
+              </button>
             </div>
           ))}
         </div>
