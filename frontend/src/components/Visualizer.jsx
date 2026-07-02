@@ -86,11 +86,12 @@ export default function Visualizer({ isPlaying, mode = 'ring', accent = '#4FC3F7
       bassSmoothRef.current += (bass - bassSmoothRef.current) * 0.2;
       const bassSmooth = bassSmoothRef.current;
 
-      const INNER_R = minDim * 0.08;
+      const INNER_R = minDim * 0.06;
       const MAX_R = minDim * 0.5 * 0.88;
       const tNow = Date.now() * 0.001;
 
-      const coreR = INNER_R * (2.2 + bassSmooth * 1.2);
+      // 中心发光核心（跟随低频脉动）
+      const coreR = INNER_R * (2.5 + bassSmooth * 2.0);
       const coreGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, coreR);
       coreGrad.addColorStop(0, C.coreBright(0.85 + bassSmooth * 0.15));
       coreGrad.addColorStop(0.3, C.coreMain(0.5 + bassSmooth * 0.2));
@@ -101,33 +102,42 @@ export default function Visualizer({ isPlaying, mode = 'ring', accent = '#4FC3F7
       ctx.arc(cx, cy, coreR, 0, Math.PI * 2);
       ctx.fill();
 
-      const NUM_RINGS = 5;
-      const halfBars = NUM_BARS / 2;
-
+      // 辐射波浪：内圈=低频，外圈=高频，中间逐渐过渡
+      const NUM_RINGS = 6;
       for (let ring = 0; ring < NUM_RINGS; ring++) {
-        const baseR = INNER_R + (MAX_R - INNER_R) * ((ring + 1) / NUM_RINGS);
+        const ringProgress = (ring + 1) / NUM_RINGS; // 0~1，内到外
+        const baseR = INNER_R + (MAX_R - INNER_R) * ringProgress;
         const phase = ring * 0.8;
-        const alpha = 0.75 - ring * 0.12;
+        const alpha = 0.8 - ring * 0.1;
+
+        // 频率映射：内圈用低频段，外圈用高频段
+        const freqStart = Math.floor(ringProgress * NUM_BARS * 0.7);
+        const freqEnd = Math.min(NUM_BARS, Math.floor((ringProgress * 0.7 + 0.3) * NUM_BARS));
+        const freqRange = Math.max(1, freqEnd - freqStart);
 
         ctx.save();
-        ctx.strokeStyle = `hsla(${hexToHsl(accentRef.current)[0] + ring * 8}, 80%, ${68 - ring * 4}%, ${alpha})`;
-        ctx.lineWidth = Math.max(1.2, minDim * (0.0024 - ring * 0.0003));
+        ctx.strokeStyle = `hsla(${hexToHsl(accentRef.current)[0] + ring * 10}, 80%, ${70 - ring * 5}%, ${alpha})`;
+        ctx.lineWidth = Math.max(1.0, minDim * (0.0028 - ring * 0.0003));
         ctx.shadowColor = C.glow;
-        ctx.shadowBlur = minDim * (0.02 - ring * 0.003);
+        ctx.shadowBlur = minDim * (0.018 - ring * 0.002);
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
 
         ctx.beginPath();
-        const STEPS = 180;
+        const STEPS = 200;
         for (let s = 0; s <= STEPS; s++) {
           const angle = (s / STEPS) * Math.PI * 2;
-          const dNorm = Math.abs(Math.sin(angle));
-          const freqIdx = Math.min(NUM_BARS - 1, Math.floor(dNorm * NUM_BARS));
+          // 角度方向也产生频率变化，让波形更有层次
+          const angleFreq = Math.abs(Math.sin(angle)) * freqRange;
+          const freqIdx = Math.min(NUM_BARS - 1, freqStart + Math.floor(angleFreq));
           const breathe = (Math.sin(tNow * 1.4 + angle * 3 + phase) * 0.5 + 0.5) * 0.06;
           const value = hasData ? Math.max(smooth[freqIdx], breathe) : 0.04 + breathe;
-          const wave = Math.sin(tNow * 2.2 - ring * 0.6 + angle * 5) * 0.15;
-          const amp = value * (MAX_R - INNER_R) * 0.18 * (hasData ? 1 : 0.4);
-          const r = baseR + amp + wave * minDim * 0.008;
+          // 行波：从中心向外扩散
+          const wave = Math.sin(tNow * 2.5 - ring * 0.8 + angle * 4) * 0.12;
+          // 内圈振幅大（低频能量强），外圈振幅逐渐减小
+          const ampScale = (1 - ringProgress * 0.4);
+          const amp = value * (MAX_R - INNER_R) * 0.16 * ampScale * (hasData ? 1 : 0.4);
+          const r = baseR + amp + wave * minDim * 0.006;
           const x = cx + Math.cos(angle) * r;
           const y = cy + Math.sin(angle) * r;
           if (s === 0) ctx.moveTo(x, y);
@@ -138,6 +148,7 @@ export default function Visualizer({ isPlaying, mode = 'ring', accent = '#4FC3F7
         ctx.restore();
       }
 
+      // 外圈光晕
       const outerGrad = ctx.createRadialGradient(cx, cy, MAX_R * 0.7, cx, cy, MAX_R);
       outerGrad.addColorStop(0, C.halo(0));
       outerGrad.addColorStop(0.7, C.halo(0.04 + bassSmooth * 0.03));
@@ -147,7 +158,8 @@ export default function Visualizer({ isPlaying, mode = 'ring', accent = '#4FC3F7
       ctx.arc(cx, cy, MAX_R, 0, Math.PI * 2);
       ctx.fill();
 
-      const sparkR = INNER_R * (0.6 + bassSmooth * 0.5);
+      // 中心亮点
+      const sparkR = INNER_R * (0.6 + bassSmooth * 0.8);
       const sparkGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, sparkR);
       sparkGrad.addColorStop(0, 'rgba(255,255,255,0.9)');
       sparkGrad.addColorStop(0.5, C.coreBright(0.5));

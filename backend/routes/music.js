@@ -362,6 +362,11 @@ async function qqUserInfo(uin, key) {
       method: 'GetLoginUserInfo',
       param: {},
     },
+    req_1: {
+      module: 'music.musicasset.PlaylistBaseRead',
+      method: 'GetPlaylistByUin',
+      param: { hostUin: Number(uin), size: 1, dirId: 0, from: 1 },
+    },
   };
   const { data } = await axios.get(url, {
     params: { data: JSON.stringify(payload) },
@@ -378,6 +383,9 @@ async function qqUserInfo(uin, key) {
     nickname: info.nickname || info.name || 'QQ音乐用户',
     avatar: info.headpic || info.avatar || '',
     userId: uin,
+    vipLevel: info.vipLevel || info.diamondLevel || 0,
+    follow: info.follow || 0,
+    fans: info.fans || 0,
   };
 }
 
@@ -584,7 +592,17 @@ async function searchQQ(keyword, page = 1, num = 20) {
 // QQ 播放链接：多级 fallback，cookie 可选（登录后解锁 VIP）
 async function getQQUrl(songmid, cookie = '') {
   const cookieHeader = cookie ? { Cookie: cookie } : {};
-  // 1. vkey.GetVkeyServer
+  // 从 cookie 中提取 uin 和 qqmusic_key
+  let uin = '0';
+  let key = '';
+  if (cookie) {
+    const uinMatch = cookie.match(/(?:^|;\s*)uin=o?(\d+)/i);
+    if (uinMatch) uin = uinMatch[1];
+    const keyMatch = cookie.match(/qqmusic_key=([^;]+)/i);
+    if (keyMatch) key = keyMatch[1];
+  }
+
+  // 1. vkey.GetVkeyServer（传入登录用户 uin 解锁 VIP 歌曲）
   try {
     const url = 'https://u.y.qq.com/cgi-bin/musicu.fcg';
     const payload = {
@@ -592,10 +610,10 @@ async function getQQUrl(songmid, cookie = '') {
         module: 'vkey.GetVkeyServer',
         method: 'CgiGetVkey',
         param: {
-          guid: '0', songmid: [songmid], songtype: [0], uin: '0', loginflag: 1, platform: '20',
+          guid: '0', songmid: [songmid], songtype: [0], uin, loginflag: key ? 1 : 0, platform: '20',
         },
       },
-      comm: { uin: 0, format: 'json', ct: 24, cv: 0 },
+      comm: { uin: Number(uin) || 0, format: 'json', ct: 24, cv: 0 },
     };
 
     const { data } = await axios.get(url, {
@@ -618,9 +636,9 @@ async function getQQUrl(songmid, cookie = '') {
     const url = 'https://c.y.qq.com/base/fcgi-bin/fcg_music_express_mobile3.fcg';
     const { data } = await axios.get(url, {
       params: {
-        g_tk: 5381, loginUin: 0, hostUin: 0, format: 'json', inCharset: 'utf8',
+        g_tk: 5381, loginUin: uin, hostUin: 0, format: 'json', inCharset: 'utf8',
         outCharset: 'utf-8', notice: 0, platform: 'yqq', needNewCode: 0,
-        cid: 205361747, uin: 0, songmid,
+        cid: 205361747, uin, songmid,
         filename: `C400${songmid}.m4a`, guid: 0,
       },
       headers: { ...COMMON_HEADERS, ...cookieHeader, Referer: 'https://y.qq.com/' },

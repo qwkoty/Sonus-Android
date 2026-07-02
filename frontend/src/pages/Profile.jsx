@@ -314,6 +314,26 @@ export default function Profile() {
           {isLoggedInNetease || isLoggedInQQ ? '已登录' : '扫码登录以同步你的歌单'}
         </div>
 
+        {/* QQ音乐用户详情 */}
+        {isLoggedInQQ && qqUser && (
+          <div style={{ display: 'flex', gap: 16, justifyContent: 'center', marginTop: 10, fontSize: 12, color: 'var(--text-secondary)' }}>
+            {qqUser.vipLevel > 0 && (
+              <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                <span style={{ background: 'linear-gradient(135deg, #FFD700, #FFA500)', color: '#000', padding: '1px 6px', borderRadius: 4, fontSize: 10, fontWeight: 700 }}>VIP{qqUser.vipLevel}</span>
+              </span>
+            )}
+            {qqUser.follow !== undefined && <span>关注 {qqUser.follow}</span>}
+            {qqUser.fans !== undefined && <span>粉丝 {qqUser.fans}</span>}
+            {qqUser.userId && <span style={{ color: 'var(--text-muted)' }}>QQ: {qqUser.userId}</span>}
+          </div>
+        )}
+        {/* 网易云用户详情 */}
+        {isLoggedInNetease && neteaseUser && (
+          <div style={{ display: 'flex', gap: 16, justifyContent: 'center', marginTop: 10, fontSize: 12, color: 'var(--text-secondary)' }}>
+            {neteaseUser.userId && <span style={{ color: 'var(--text-muted)' }}>ID: {neteaseUser.userId}</span>}
+          </div>
+        )}
+
         {/* 登录按钮：未登录时显示，已登录显示退出 */}
         <div style={{ display: 'flex', gap: 10, justifyContent: 'center', marginTop: 16, flexWrap: 'wrap' }}>
           {!isLoggedInNetease ? (
