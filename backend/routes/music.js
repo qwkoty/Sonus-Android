@@ -131,8 +131,9 @@ const loginResults = new Map();
 const processing = new Set();
 
 async function qqQrCreate() {
-  // 上一代登录方式：ssl.pt.qq.com / l=L / da=25 / pt_3rd_aid=0
-  const resp = await axios.get('https://ssl.pt.qq.com/ptqrshow', {
+  // 用稳定域名 ssl.ptlogin2.qq.com（ssl.pt.qq.com 在部分服务器 TLS 握手失败）
+  // 参数沿用上一代风格：l=L / da=25 / pt_3rd_aid=0
+  const resp = await axios.get('https://ssl.ptlogin2.qq.com/ptqrshow', {
     params: {
       appid: '716027609',
       e: '2',
@@ -167,7 +168,7 @@ async function qqQrCheck(qrsig) {
   }
 
   const ptqrtoken = hash33(qrsig);
-  const resp = await axios.get('https://ssl.pt.qq.com/ptqrlogin', {
+  const resp = await axios.get('https://ssl.ptlogin2.qq.com/ptqrlogin', {
     params: {
       u1: 'https://y.qq.com/',
       ptqrtoken,
