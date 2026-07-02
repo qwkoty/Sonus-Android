@@ -187,6 +187,31 @@ input {
   appearance: none;
 }
 
+/* placeholder 统一样式，去除浏览器默认浅灰 */
+input::placeholder {
+  color: var(--text-muted);
+  opacity: 1;
+}
+input::-moz-placeholder {
+  color: var(--text-muted);
+  opacity: 1;
+}
+input::-webkit-input-placeholder {
+  color: var(--text-muted);
+  opacity: 1;
+}
+
+/* 覆盖浏览器自动填充的黄色背景，保持深色主题一致 */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+input:-webkit-autofill:active {
+  -webkit-text-fill-color: var(--text-primary);
+  -webkit-box-shadow: 0 0 0 1000px var(--bg-secondary) inset;
+  caret-color: var(--text-primary);
+  transition: background-color 9999s ease-in-out 0s;
+}
+
 /* 隐藏 color input 原生外观 */
 input[type="color"] {
   -webkit-appearance: none;

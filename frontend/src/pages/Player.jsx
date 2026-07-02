@@ -92,6 +92,15 @@ export default function Player({ onNavigate }) {
     }
   }, [searchOpen]);
 
+  // 每次打开搜索面板都清空上次的搜索词与结果，保证全新状态
+  useEffect(() => {
+    if (searchOpen) {
+      setQuery('');
+      setResults([]);
+      setAddMenuTrack(null);
+    }
+  }, [searchOpen]);
+
   // 提示自动消失（成功提示 2.5s，错误提示 5s）
   useEffect(() => {
     if (error) {
@@ -890,6 +899,10 @@ export default function Player({ onNavigate }) {
               onChange={(e) => onQueryChange(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && doSearch(query)}
               placeholder="搜索歌曲、艺术家..."
+              autoComplete="off"
+              autoCorrect="off"
+              autoCapitalize="off"
+              spellCheck={false}
               style={{ flex: 1, background: 'transparent', border: 'none', fontSize: 15, color: 'var(--text-primary)' }}
             />
             {query && (

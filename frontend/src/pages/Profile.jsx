@@ -127,6 +127,9 @@ export default function Profile() {
               onKeyDown={(e) => e.key === 'Enter' && handleCreate()}
               placeholder="歌单名称"
               autoFocus
+              autoComplete="off"
+              autoCorrect="off"
+              spellCheck={false}
               style={{
                 flex: 1,
                 background: 'var(--bg-secondary)',
