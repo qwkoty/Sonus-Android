@@ -80,14 +80,17 @@ export default function Profile() {
       if (code === 801) setLoginMsg('等待扫码…');
       else if (code === 802) setLoginMsg('已扫码，请在手机确认');
       else if (code === 803) {
-        setLoginMsg('登录成功！');
+        setLoginMsg('登录成功，正在同步歌单…');
         const cookie = res.data.cookie;
         const user = res.data.user;
         setNeteaseAuth(cookie, user);
         stopPoll();
-        // 拉取用户歌单
-        if (user?.userId) fetchNeteasePlaylists(cookie, user.userId);
-        setTimeout(() => { setLoginPlatform(null); setQrImg(''); }, 1200);
+        // 自动同步账号歌单到本地
+        if (user?.userId) {
+          fetchNeteasePlaylists(cookie, user.userId);
+          syncNeteasePlaylists(cookie, user.userId, user);
+        }
+        setTimeout(() => { setLoginPlatform(null); setQrImg(''); }, 1500);
       } else if (code === 800) {
         setLoginMsg('二维码已过期，请刷新');
       }
@@ -100,6 +103,28 @@ export default function Profile() {
       const res = await music.neteasePlaylists(cookie, uid);
       setRemotePlaylists(res?.data?.list || []);
     } catch (e) {} finally { setLoadingRemote(false); }
+  };
+
+  // 自动同步网易云账号所有歌单到本地（含歌曲，最多取每个歌单前 300 首）
+  const syncNeteasePlaylists = async (cookie, uid, user) => {
+    try {
+      const res = await music.neteasePlaylists(cookie, uid);
+      const list = res?.data?.list || [];
+      // 逐个拉取歌单详情并导入本地（"我喜欢的音乐"标记特殊）
+      for (const pl of list.slice(0, 20)) {
+        try {
+          const detail = await music.playlist(pl.id, 'netease');
+          const tracks = detail?.data?.tracks || [];
+          if (tracks.length) {
+            const name = pl.id === list[0].id ? `我喜欢 · ${user?.nickname || '网易云'}` : pl.name;
+            importPlaylist(name, tracks, pl.cover);
+          }
+        } catch (e) { /* 单个歌单失败跳过 */ }
+      }
+      setError('已同步网易云歌单到本地');
+    } catch (e) {
+      setError('同步歌单失败');
+    }
   };
 
   // 开始 QQ 扫码登录
@@ -134,15 +159,18 @@ export default function Profile() {
       if (code === 801) setLoginMsg('等待扫码…');
       else if (code === 802) setLoginMsg('已扫码，请在手机确认');
       else if (code === 803 || res?.data?.code === '0' || res?.data?.cookie) {
-        setLoginMsg('登录成功！');
+        setLoginMsg('登录成功，正在同步歌单…');
         const cookieStr = res.data.cookie || '';
         const uin = res.data.uin || '';
         const key = res.data.key || '';
         const user = res.data.user || null;
         setQQAuth({ uin, key, raw: cookieStr }, user);
         stopPoll();
-        if (uin && key) fetchQQPlaylists(uin, key);
-        setTimeout(() => { setLoginPlatform(null); setQrImg(''); }, 1200);
+        if (uin && key) {
+          fetchQQPlaylists(uin, key);
+          syncQQPlaylists(uin, key, user);
+        }
+        setTimeout(() => { setLoginPlatform(null); setQrImg(''); }, 1500);
       } else if (code === 800) {
         setLoginMsg('二维码已过期，请刷新');
       }
@@ -155,6 +183,27 @@ export default function Profile() {
       const res = await music.qqPlaylists(uin, key);
       setRemotePlaylists(res?.data?.list || []);
     } catch (e) {} finally { setLoadingRemote(false); }
+  };
+
+  // 自动同步 QQ 账号所有歌单到本地
+  const syncQQPlaylists = async (uin, key, user) => {
+    try {
+      const res = await music.qqPlaylists(uin, key);
+      const list = res?.data?.list || [];
+      for (const pl of list.slice(0, 20)) {
+        try {
+          const detail = await music.playlist(pl.id, 'qq');
+          const tracks = detail?.data?.tracks || [];
+          if (tracks.length) {
+            const name = pl.id === list[0].id ? `我喜欢 · ${user?.nickname || 'QQ'}` : pl.name;
+            importPlaylist(name, tracks, pl.cover);
+          }
+        } catch (e) { /* 单个歌单失败跳过 */ }
+      }
+      setError('已同步QQ音乐歌单到本地');
+    } catch (e) {
+      setError('同步歌单失败');
+    }
   };
 
   const closeLogin = () => {
