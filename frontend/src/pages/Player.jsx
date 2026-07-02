@@ -3,7 +3,7 @@ import {
   Play, Pause, SkipBack, SkipForward,
   Heart, Shuffle, Repeat, ListMusic, Volume2,
   Search, X, Plus, Music, Loader2,
-  User, Palette, Check
+  User, Palette, Check, SlidersHorizontal
 } from 'lucide-react';
 import { usePlayerStore } from '../store/usePlayerStore';
 import { music } from '../api/music';
@@ -68,12 +68,15 @@ export default function Player({ onNavigate }) {
     try { return localStorage.getItem('sonus_accent_color') || '#4FC3F7'; } catch { return '#4FC3F7'; }
   });
   const [showPalette, setShowPalette] = useState(false);
+  const [showVizPanel, setShowVizPanel] = useState(false);
+  const [viz3DReady, setViz3DReady] = useState(false);
   const [seeking, setSeeking] = useState(false);
   const progressRef = useRef(null);
   const searchInputRef = useRef(null);
 
   const changeVizMode = (m) => {
     setVizMode(m);
+    if (m === '3d') setViz3DReady(false);
     try { localStorage.setItem('sonus_viz_mode', m); } catch {}
   };
 
@@ -237,7 +240,13 @@ export default function Player({ onNavigate }) {
       }}>
         <FloatingLyrics lyrics={lyrics} isPlaying={isPlaying} />
         {vizMode === '3d'
-          ? <Suspense fallback={null}><Visualizer3D accent={accentColor} cover={coverFor3D} /></Suspense>
+          ? <Suspense fallback={null}>
+              <Visualizer3D
+                accent={accentColor}
+                cover={coverFor3D}
+                onReady={() => setViz3DReady(true)}
+              />
+            </Suspense>
           : <Visualizer isPlaying={isPlaying} mode={vizMode} accent={accentColor} />
         }
       </div>
@@ -261,7 +270,7 @@ export default function Player({ onNavigate }) {
       )}
 
       {/* ====== 加载指示器（屏幕居中） ====== */}
-      {isLoadingUrl && (
+      {(isLoadingUrl || (vizMode === '3d' && !viz3DReady)) && (
         <div style={{
           position: 'absolute',
           top: '50%', left: '50%',
@@ -327,145 +336,138 @@ export default function Player({ onNavigate }) {
         </p>
       </div>
 
-      {/* ====== 左上角：导航 ====== */}
+      {/* ====== 左上角：可展开浮窗（导航 / 可视化模式 / 调色盘） ====== */}
       <div style={{
         position: 'absolute',
         top: 'calc(12px + env(safe-area-inset-top))',
         left: 16,
         zIndex: 100,
-      }}>
-        <button
-          onClick={() => onNavigate?.('profile')}
-          style={floatBtn}
-          onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(50,50,56,0.8)'}
-          onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(30,30,36,0.7)'}
-        >
-          <User size={18} />
-        </button>
-      </div>
-
-      {/* ====== 右上角：搜索 ====== */}
-      <div style={{
-        position: 'absolute',
-        top: 'calc(12px + env(safe-area-inset-top))',
-        right: 16,
-        zIndex: 100,
-      }}>
-        <button
-          onClick={() => { setSearchOpen(!searchOpen); setResults([]); setQuery(''); setAddMenuTrack(null); }}
-          style={floatBtn}
-          onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(50,50,56,0.8)'}
-          onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(30,30,36,0.7)'}
-        >
-          {searchOpen ? <X size={18} /> : <Search size={18} />}
-        </button>
-      </div>
-
-      {/* ====== 右侧浮动：可视化模式切换（竖排） ====== */}
-      <div style={{
-        position: 'absolute',
-        right: 12,
-        top: '50%',
-        transform: 'translateY(-50%)',
         display: 'flex',
         flexDirection: 'column',
-        gap: 6,
-        zIndex: 100,
+        gap: 8,
+        alignItems: 'flex-start',
       }}>
-        {VIZ_MODES.map((m) => (
+        {/* 顶部一行：导航 + 展开/收起切换 */}
+        <div style={{ display: 'flex', gap: 8 }}>
           <button
-            key={m.key}
-            onClick={() => changeVizMode(m.key)}
-            style={{
-              width: 36, height: 36, borderRadius: 10,
-              background: vizMode === m.key ? '#fff' : 'rgba(30,30,36,0.7)',
-              backdropFilter: 'blur(16px)',
-              WebkitBackdropFilter: 'blur(16px)',
-              border: '1px solid var(--border)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              color: vizMode === m.key ? '#0A0A0A' : 'var(--text-muted)',
-              fontSize: 12, fontWeight: 700,
-              boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
-              transition: 'all 0.2s ease',
-              cursor: 'pointer',
-            }}
+            onClick={() => onNavigate?.('profile')}
+            style={floatBtn}
+            onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(50,50,56,0.8)'}
+            onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(30,30,36,0.7)'}
+            title="个人中心"
           >
-            {m.label}
+            <User size={18} />
           </button>
-        ))}
+          <button
+            onClick={() => { setShowVizPanel(!showVizPanel); setShowPalette(false); }}
+            style={{
+              ...floatBtn,
+              background: showVizPanel ? 'rgba(50,50,56,0.9)' : 'rgba(30,30,36,0.7)',
+              position: 'relative',
+            }}
+            onMouseEnter={(e) => { if (!showVizPanel) e.currentTarget.style.background = 'rgba(50,50,56,0.8)'; }}
+            onMouseLeave={(e) => { if (!showVizPanel) e.currentTarget.style.background = 'rgba(30,30,36,0.7)'; }}
+            title="可视化与颜色"
+          >
+            <SlidersHorizontal size={18} />
+            <span style={{
+              position: 'absolute', bottom: 5, right: 5,
+              width: 8, height: 8, borderRadius: '50%',
+              background: accentColor,
+              border: '1px solid rgba(255,255,255,0.3)',
+              boxShadow: `0 0 6px ${accentColor}`,
+            }} />
+          </button>
+        </div>
 
-        {/* 分隔线 */}
-        <div style={{ height: 1, background: 'var(--border)', margin: '4px 6px' }} />
-
-        {/* DIY 颜色按钮 */}
-        <button
-          onClick={() => setShowPalette(!showPalette)}
-          style={{
-            width: 36, height: 36, borderRadius: 10,
-            background: showPalette ? 'rgba(50,50,56,0.9)' : 'rgba(30,30,36,0.7)',
-            backdropFilter: 'blur(16px)',
-            WebkitBackdropFilter: 'blur(16px)',
+        {/* 展开面板：可视化模式 + 调色盘 */}
+        {showVizPanel && (
+          <div className="animate-slideUp" style={{
+            background: 'rgba(20,20,24,0.88)',
+            backdropFilter: 'blur(24px)',
+            WebkitBackdropFilter: 'blur(24px)',
+            borderRadius: 16,
             border: '1px solid var(--border)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            color: 'var(--text-muted)',
-            boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
-            transition: 'all 0.2s ease',
-            cursor: 'pointer',
-            position: 'relative',
-          }}
-          title="自定义颜色"
-        >
-          <Palette size={16} />
-          <span style={{
-            position: 'absolute', bottom: 4, right: 4,
-            width: 8, height: 8, borderRadius: '50%',
-            background: accentColor,
-            border: '1px solid rgba(255,255,255,0.3)',
-            boxShadow: `0 0 6px ${accentColor}`,
-          }} />
-        </button>
-
-        {/* 颜色选择面板 */}
-        {showPalette && (
-          <div className="animate-scaleIn" style={{
-            marginTop: 4,
+            padding: 10,
+            boxShadow: '0 8px 32px rgba(0,0,0,0.45)',
             display: 'flex',
             flexDirection: 'column',
-            gap: 6,
-            padding: 8,
-            background: 'rgba(20,20,24,0.92)',
-            backdropFilter: 'blur(20px)',
-            WebkitBackdropFilter: 'blur(20px)',
-            borderRadius: 14,
-            border: '1px solid var(--border)',
-            boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
+            gap: 8,
+            width: 168,
           }}>
-            {ACCENT_PRESETS.map((c) => (
-              <button
-                key={c}
-                onClick={() => changeAccent(c)}
-                style={{
-                  width: 28, height: 28, borderRadius: '50%',
-                  background: c,
-                  border: accentColor.toLowerCase() === c.toLowerCase()
-                    ? '2px solid #fff'
-                    : '1px solid rgba(255,255,255,0.15)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  cursor: 'pointer',
-                  boxShadow: accentColor.toLowerCase() === c.toLowerCase()
-                    ? `0 0 10px ${c}`
-                    : 'none',
-                  transition: 'all 0.15s ease',
-                }}
-              >
-                {accentColor.toLowerCase() === c.toLowerCase() && (
-                  <Check size={13} color={c === '#FFFFFF' || c === '#4ADE80' || c === '#FB923C' ? '#000' : '#fff'} />
-                )}
-              </button>
-            ))}
+            {/* 可视化模式切换（横排） */}
+            <div style={{ display: 'flex', gap: 6 }}>
+              {VIZ_MODES.map((m) => (
+                <button
+                  key={m.key}
+                  onClick={() => changeVizMode(m.key)}
+                  style={{
+                    flex: 1, height: 34, borderRadius: 10,
+                    background: vizMode === m.key ? '#fff' : 'rgba(40,40,46,0.7)',
+                    border: '1px solid var(--border)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    color: vizMode === m.key ? '#0A0A0A' : 'var(--text-muted)',
+                    fontSize: 12, fontWeight: 700,
+                    transition: 'all 0.18s ease',
+                    cursor: 'pointer',
+                  }}
+                >
+                  {m.label}
+                </button>
+              ))}
+            </div>
+
+            <div style={{ height: 1, background: 'var(--border)' }} />
+
+            {/* 调色盘标题行 */}
+            <div style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              padding: '0 2px',
+            }}>
+              <span style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 600, letterSpacing: 0.5 }}>
+                主题色
+              </span>
+              <span style={{
+                width: 12, height: 12, borderRadius: '50%',
+                background: accentColor,
+                boxShadow: `0 0 6px ${accentColor}`,
+              }} />
+            </div>
+
+            {/* 预设色（4列网格） */}
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(4, 1fr)',
+              gap: 6,
+            }}>
+              {ACCENT_PRESETS.map((c) => (
+                <button
+                  key={c}
+                  onClick={() => changeAccent(c)}
+                  style={{
+                    width: '100%', aspectRatio: '1', borderRadius: '50%',
+                    background: c,
+                    border: accentColor.toLowerCase() === c.toLowerCase()
+                      ? '2px solid #fff'
+                      : '1px solid rgba(255,255,255,0.15)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    cursor: 'pointer',
+                    boxShadow: accentColor.toLowerCase() === c.toLowerCase()
+                      ? `0 0 10px ${c}`
+                      : 'none',
+                    transition: 'all 0.15s ease',
+                  }}
+                >
+                  {accentColor.toLowerCase() === c.toLowerCase() && (
+                    <Check size={12} color={c === '#FFFFFF' || c === '#4ADE80' || c === '#FB923C' ? '#000' : '#fff'} />
+                  )}
+                </button>
+              ))}
+            </div>
+
             {/* 自定义拾色器 */}
             <label style={{
-              width: 28, height: 28, borderRadius: '50%',
+              height: 30, borderRadius: 10,
               background: 'conic-gradient(from 0deg, #ff0000, #ffff00, #00ff00, #00ffff, #0000ff, #ff00ff, #ff0000)',
               border: '1px solid rgba(255,255,255,0.2)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -483,9 +485,29 @@ export default function Player({ onNavigate }) {
                   opacity: 0, cursor: 'pointer', border: 'none',
                 }}
               />
+              <span style={{ fontSize: 10, color: '#fff', fontWeight: 700, textShadow: '0 1px 3px rgba(0,0,0,0.6)' }}>
+                自定义
+              </span>
             </label>
           </div>
         )}
+      </div>
+
+      {/* ====== 右上角：搜索 ====== */}
+      <div style={{
+        position: 'absolute',
+        top: 'calc(12px + env(safe-area-inset-top))',
+        right: 16,
+        zIndex: 100,
+      }}>
+        <button
+          onClick={() => { setSearchOpen(!searchOpen); setResults([]); setQuery(''); setAddMenuTrack(null); }}
+          style={floatBtn}
+          onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(50,50,56,0.8)'}
+          onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(30,30,36,0.7)'}
+        >
+          {searchOpen ? <X size={18} /> : <Search size={18} />}
+        </button>
       </div>
 
       {/* ====== 底部浮动播放胶囊 ====== */}

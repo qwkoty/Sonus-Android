@@ -6,14 +6,16 @@ const GRID = 140;          // 粒子网格边数（140x140 ≈ 2万粒子）
 const FOV = 60;
 
 // 3D 封面粒子画：粒子在 X-Y 平面排成封面图像（每粒子颜色 = 封面对应像素）
-// Z 轴随频谱起伏成 3D 波浪，整体随 bass 呼吸 + 缓慢摇摆旋转
+// Z 轴随整体音频能量一起起伏（所有粒子同步跳动），缓慢摇摆旋转
 // 完全自适应容器尺寸，永不超界
-export default function Visualizer3D({ accent = '#4FC3F7', cover = '' }) {
+export default function Visualizer3D({ accent = '#4FC3F7', cover = '', onReady }) {
   const containerRef = useRef(null);
   const accentRef = useRef(accent);
   const coverRef = useRef(cover);
   const imageDataRef = useRef(null);  // 封面像素 RGBA
   const hasCoverRef = useRef(false);
+  const onReadyRef = useRef(onReady);
+  useEffect(() => { onReadyRef.current = onReady; }, [onReady]);
 
   useEffect(() => { accentRef.current = accent; }, [accent]);
   useEffect(() => { coverRef.current = cover; }, [cover]);
@@ -94,7 +96,7 @@ export default function Visualizer3D({ accent = '#4FC3F7', cover = '' }) {
     const positions = new Float32Array(COUNT * 3);
     const colors = new Float32Array(COUNT * 3);
     const origXY = new Float32Array(COUNT * 2);     // 原始归一化 uv (0..1)
-    const barIdxMap = new Int32Array(COUNT);
+    const distFromCenter = new Float32Array(COUNT);  // 距中心归一化距离，用于环形波纹
 
     const buildGrid = () => {
       let idx = 0;
@@ -107,14 +109,16 @@ export default function Visualizer3D({ accent = '#4FC3F7', cover = '' }) {
           positions[idx * 3] = x;
           positions[idx * 3 + 1] = y;
           positions[idx * 3 + 2] = 0;
-          origXY[idx * 2] = gx / (GRID - 1);
-          origXY[idx * 2 + 1] = gy / (GRID - 1);
-          // 初始颜色（降级用主色渐变）
+          const u = gx / (GRID - 1);
+          const v = gy / (GRID - 1);
+          origXY[idx * 2] = u;
+          origXY[idx * 2 + 1] = v;
+          // 距中心距离（0 中心 ~ 1 边角）
+          const dx = u - 0.5, dy = v - 0.5;
+          distFromCenter[idx] = Math.min(1, Math.sqrt(dx * dx + dy * dy) * 2);
           colors[idx * 3] = 0.3;
           colors[idx * 3 + 1] = 0.6;
           colors[idx * 3 + 2] = 1.0;
-          // 频段索引：按 x 位置分配，横向形成频谱
-          barIdxMap[idx] = Math.floor((gx / GRID) * 64);
           idx++;
         }
       }
@@ -126,7 +130,7 @@ export default function Visualizer3D({ accent = '#4FC3F7', cover = '' }) {
     geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
 
     const material = new THREE.PointsMaterial({
-      size: planeSize * 2 / GRID * 1.1, // 粒子略大于网格间距，无缝拼接
+      size: planeSize * 2 / GRID * 1.1,
       vertexColors: true,
       transparent: true,
       opacity: 0.95,
@@ -135,61 +139,69 @@ export default function Visualizer3D({ accent = '#4FC3F7', cover = '' }) {
     });
 
     const points = new THREE.Points(geometry, material);
-    points.rotation.x = -0.18; // 略微俯视
+    points.rotation.x = -0.18;
     scene.add(points);
 
     let raf;
     const posAttr = geometry.attributes.position;
     const colorAttr = geometry.attributes.color;
 
-    // 从封面采样某 uv 处 RGB
     const sampleCover = (u, v) => {
       const d = imageDataRef.current;
       if (!d) return null;
       const px = Math.min(GRID - 1, Math.max(0, Math.floor(u * GRID)));
       const py = Math.min(GRID - 1, Math.max(0, Math.floor(v * GRID)));
       const i = (py * GRID + px) * 4;
-      return [d[i] / 255, d[i + 1] / 255, d[i + 2] / 255, d[i + 3] / 255 / 255];
+      return [d[i] / 255, d[i + 1] / 255, d[i + 2] / 255];
     };
+
+    // 首帧渲染后立即通知 ready，避免首切延迟空屏
+    let firstFrame = true;
 
     const animate = () => {
       const { data, hasData } = getSpectrumBars(64);
 
-      let bass = 0;
+      // ---- 整体能量：所有粒子一起跳 ----
+      // bass（低频）驱动主跳动，treble（高频）驱动细节微抖
+      let bass = 0, mid = 0, treble = 0;
       if (hasData) {
         for (let i = 0; i < 8; i++) bass += data[i];
         bass /= 8;
+        for (let i = 8; i < 32; i++) mid += data[i];
+        mid /= 24;
+        for (let i = 32; i < 64; i++) treble += data[i];
+        treble /= 32;
       } else {
         bass = 0.08 + Math.sin(Date.now() * 0.001) * 0.04;
+        mid = 0.05;
+        treble = 0.03;
       }
+      const energy = (bass * 1.0 + mid * 0.5 + treble * 0.3) / 1.8; // 0..1 综合能量
       const breathe = 1 + Math.min(bass, 1) * 0.08;
-      const zAmp = planeSize * MAX_Z * (0.5 + Math.min(bass, 1) * 0.7);
+      const zAmp = planeSize * MAX_Z * (0.5 + Math.min(energy, 1) * 0.8);
+      const time = Date.now() * 0.001;
 
       const hasCover = hasCoverRef.current;
-      const time = Date.now() * 0.001;
 
       for (let i = 0; i < COUNT; i++) {
         const u = origXY[i * 2];
         const v = origXY[i * 2 + 1];
-        const bi = barIdxMap[i];
-        const value = hasData
-          ? data[bi]
-          : 0.08 + Math.sin(time * 2 + i * 0.01) * 0.05;
+        const dc = distFromCenter[i];
 
-        // Z 起伏：频谱值 + 空间波浪 + 时间流动
-        const wave = Math.sin(u * 8 + time * 2) * 0.15 + Math.cos(v * 6 - time * 1.5) * 0.1;
-        const z = (value * 0.85 + wave * 0.15) * zAmp * breathe;
+        // 所有粒子同步跳动（基于整体能量），叠加从中心向外扩散的环形微涟漪
+        const ripple = Math.sin(dc * 10 - time * 4) * 0.08 * (0.4 + treble);
+        const z = (energy * 0.85 + ripple * 0.15) * zAmp * breathe;
         posAttr.array[i * 3 + 2] = z;
 
-        // 颜色：封面像素 / 降级主色
+        // 颜色：封面像素，整体能量越高越亮
         if (hasCover) {
           const s = sampleCover(u, v);
-          const boost = 0.7 + value * 0.6; // 高频段更亮
+          const boost = 0.65 + energy * 0.55;
           colorAttr.array[i * 3]     = Math.min(1, s[0] * boost);
           colorAttr.array[i * 3 + 1] = Math.min(1, s[1] * boost);
           colorAttr.array[i * 3 + 2] = Math.min(1, s[2] * boost);
         } else {
-          const intensity = 0.4 + value * 0.6;
+          const intensity = 0.4 + energy * 0.6;
           colorAttr.array[i * 3]     = 0.3 * intensity;
           colorAttr.array[i * 3 + 1] = 0.6 * intensity;
           colorAttr.array[i * 3 + 2] = 1.0 * intensity;
@@ -199,13 +211,17 @@ export default function Visualizer3D({ accent = '#4FC3F7', cover = '' }) {
       posAttr.needsUpdate = true;
       colorAttr.needsUpdate = true;
 
-      // 缓慢摇摆旋转，增加 3D 立体感
       points.rotation.y = Math.sin(time * 0.3) * 0.35;
       points.rotation.x = -0.18 + Math.sin(time * 0.4) * 0.08;
       const sc = breathe;
       points.scale.set(sc, sc, 1);
 
       renderer.render(scene, camera);
+
+      if (firstFrame) {
+        firstFrame = false;
+        if (onReadyRef.current) onReadyRef.current();
+      }
       raf = requestAnimationFrame(animate);
     };
     animate();
