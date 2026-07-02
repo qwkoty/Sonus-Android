@@ -457,7 +457,11 @@ router.get('/stream', async (req, res) => {
     for (const h of ['content-type', 'content-length', 'content-range', 'accept-ranges', 'cache-control']) {
       if (upstream.headers[h]) res.setHeader(h, upstream.headers[h]);
     }
+    // 强制声明支持 Range，让浏览器走分段请求做 seek
+    res.setHeader('Accept-Ranges', 'bytes');
     res.setHeader('Access-Control-Allow-Origin', '*');
+    // 暴露 Range 相关头给前端 JS，部分浏览器默认不暴露
+    res.setHeader('Access-Control-Expose-Headers', 'Content-Range, Accept-Ranges, Content-Length');
     upstream.data.pipe(res);
     req.on('close', () => upstream.data.destroy());
   } catch (err) {

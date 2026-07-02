@@ -43,12 +43,36 @@ export const usePlayerStore = create((set, get) => {
 
   audio.addEventListener('timeupdate', () => {
     const time = audio.currentTime || 0;
-    const { lyrics } = get();
+    const { lyrics, duration } = get();
+    // 流式音频 duration 可能为 Infinity，尝试从 seekable 修复
+    if ((!duration || !isFinite(duration)) && audio.seekable && audio.seekable.length > 0) {
+      const d = audio.seekable.end(audio.seekable.length - 1);
+      if (isFinite(d) && d > 0) set({ duration: d });
+    }
     set({ currentTime: time, currentLyric: getCurrentLyric(lyrics, time) });
   });
 
   audio.addEventListener('loadedmetadata', () => {
-    set({ duration: audio.duration || 0 });
+    let d = audio.duration;
+    // 流代理下 duration 常为 Infinity，回退到 track 元数据
+    if (!isFinite(d) || !d) {
+      const { currentTrack } = get();
+      d = currentTrack?.duration || 0;
+    }
+    set({ duration: d });
+  });
+
+  audio.addEventListener('progress', () => {
+    // duration 为 Infinity 时，从 seekable 末尾取真实时长
+    if (audio.seekable && audio.seekable.length > 0) {
+      const d = audio.seekable.end(audio.seekable.length - 1);
+      if (isFinite(d) && d > 0) {
+        const { duration } = get();
+        if (!duration || !isFinite(duration) || Math.abs(duration - d) > 1) {
+          set({ duration: d });
+        }
+      }
+    }
   });
 
   audio.addEventListener('ended', () => {
@@ -96,7 +120,8 @@ export const usePlayerStore = create((set, get) => {
     playTrack: async (track) => {
       initAudioSystem();
       const { audio } = get();
-      set({ currentTrack: track, isPlaying: false, currentTime: 0, duration: 0, isLoadingUrl: true, lyrics: [], currentLyric: '', error: null });
+      // 立即用 track.duration 兜底，避免流式加载期间 duration=0 进度条不可用
+      set({ currentTrack: track, isPlaying: false, currentTime: 0, duration: track?.duration || 0, isLoadingUrl: true, lyrics: [], currentLyric: '', error: null });
 
       const { playlist } = get();
       if (!playlist.some((t) => t.id === track.id)) {
@@ -194,9 +219,12 @@ export const usePlayerStore = create((set, get) => {
     },
 
     seek: (time) => {
-      const { audio } = get();
-      if (audio && audio.duration) {
-        audio.currentTime = Math.max(0, Math.min(time, audio.duration));
+      const { audio, duration } = get();
+      if (!audio) return;
+      // audio.duration 可能是 Infinity，用 store 里的 duration（已用 track 元数据兜底）作为上限
+      const maxTime = (isFinite(audio.duration) && audio.duration > 0) ? audio.duration : (duration || 0);
+      if (maxTime > 0) {
+        audio.currentTime = Math.max(0, Math.min(time, maxTime));
         set({ currentTime: audio.currentTime });
       }
     },

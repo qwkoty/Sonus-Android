@@ -244,7 +244,7 @@ export default function Player() {
 
   // ===== 进度条 =====
   const handleProgressDown = (e) => {
-    if (!progressRef.current || !duration) return;
+    if (!progressRef.current || !duration || !isFinite(duration)) return;
     setSeeking(true);
     const update = (clientX) => {
       const rect = progressRef.current.getBoundingClientRect();
