@@ -66,60 +66,105 @@ export default function Visualizer({ isPlaying, mode = 'ring' }) {
       ctx.arc(cx, cy, centerGlowR, 0, Math.PI * 2);
       ctx.fill();
 
-      // ---- 计算频谱曲线点 ----
-      const outerPts = [];
-      const innerPts = [];
-      for (let i = 0; i < NUM_BARS; i++) {
-        const angle = (i / NUM_BARS) * Math.PI * 2 - Math.PI / 2;
-        const value = hasData ? smooth[i] : 0.04;
-        const barLen = Math.max(1, value * safeBarScale * (hasData ? 1.0 : 0.4));
+      // ---- 频谱柱环带：柱子粘在一起形成实心环 ----
+      // 每根柱子是从内圈向外延伸的梯形，相邻柱子共享径向边（无间隙）
+      // 外轮廓 = 柱子顶部阶梯折线；内圈挖空；中间用径向细线体现柱子结构
+      const numBars = NUM_BARS;
+      const angleStep = (Math.PI * 2) / numBars;
 
-        outerPts.push({
-          x: cx + Math.cos(angle) * (INNER_R + barLen),
-          y: cy + Math.sin(angle) * (INNER_R + barLen),
-        });
-        const innerLen = Math.min(barLen * 0.5, INNER_R * 0.4);
-        innerPts.push({
-          x: cx + Math.cos(angle) * (INNER_R - innerLen),
-          y: cy + Math.sin(angle) * (INNER_R - innerLen),
-        });
+      // 每根柱子长度
+      const barLen = [];
+      for (let i = 0; i < numBars; i++) {
+        const value = hasData ? smooth[i] : 0.04;
+        barLen.push(Math.max(2, value * safeBarScale * (hasData ? 1.0 : 0.4)));
       }
 
-      // ---- 绘制平滑闭合曲线 ----
-      const drawSmoothLoop = (pts, lineWidth, alpha) => {
-        if (pts.length < 3) return;
+      // 角度/坐标辅助
+      const angleAt = (i) => i * angleStep - Math.PI / 2;
+      const radPos = (a, r) => ({ x: cx + Math.cos(a) * r, y: cy + Math.sin(a) * r });
+
+      // 构建阶梯外轮廓 + 内圈挖空路径（evenodd 填充环带）
+      const buildBandPath = () => {
         ctx.beginPath();
-        const midX = (pts[0].x + pts[pts.length - 1].x) / 2;
-        const midY = (pts[0].y + pts[pts.length - 1].y) / 2;
-        ctx.moveTo(midX, midY);
-        for (let i = 0; i < pts.length; i++) {
-          const next = pts[(i + 1) % pts.length];
-          const mx = (pts[i].x + next.x) / 2;
-          const my = (pts[i].y + next.y) / 2;
-          ctx.quadraticCurveTo(pts[i].x, pts[i].y, mx, my);
+        // 起点：第 0 根柱子左上角
+        const p0 = radPos(angleAt(0), INNER_R + barLen[0]);
+        ctx.moveTo(p0.x, p0.y);
+        // 沿每根柱子顶部阶梯走一圈：横到右上角 → 径向连到下一根左上角
+        for (let i = 0; i < numBars; i++) {
+          const aR = angleAt((i + 1) % numBars);
+          const rCur = INNER_R + barLen[i];
+          const rNext = INNER_R + barLen[(i + 1) % numBars];
+          const pTop = radPos(aR, rCur);
+          ctx.lineTo(pTop.x, pTop.y);
+          const pNext = radPos(aR, rNext);
+          ctx.lineTo(pNext.x, pNext.y);
         }
         ctx.closePath();
-
-        const grad = ctx.createLinearGradient(cx - INNER_R, cy, cx + INNER_R, cy);
-        grad.addColorStop(0, `hsla(30, 90%, 65%, ${alpha})`);
-        grad.addColorStop(0.5, `hsla(200, 90%, 65%, ${alpha})`);
-        grad.addColorStop(1, `hsla(320, 90%, 65%, ${alpha})`);
-        ctx.strokeStyle = grad;
-        ctx.lineWidth = lineWidth;
-        ctx.lineCap = 'round';
-        ctx.lineJoin = 'round';
-        ctx.stroke();
+        // 内圈逆时针挖空
+        const pIn0 = radPos(0, INNER_R);
+        ctx.moveTo(pIn0.x, pIn0.y);
+        for (let a = Math.PI * 2; a >= 0; a -= 0.08) {
+          const p = radPos(a, INNER_R);
+          ctx.lineTo(p.x, p.y);
+        }
+        ctx.closePath();
       };
 
-      const baseLW = minDim * 0.003;
+      // 渐变填充：蓝色（内）→ 白色（外）
+      const fillGrad = ctx.createRadialGradient(cx, cy, INNER_R, cx, cy, MAX_OUTER);
+      fillGrad.addColorStop(0, 'rgba(60, 140, 255, 0.7)');
+      fillGrad.addColorStop(0.5, 'rgba(100, 170, 255, 0.55)');
+      fillGrad.addColorStop(0.85, 'rgba(180, 210, 255, 0.45)');
+      fillGrad.addColorStop(1, 'rgba(255, 255, 255, 0.3)');
 
-      // 镜像反射层
-      drawSmoothLoop(innerPts, baseLW * 0.8, 0.1);
+      // 外辉光
+      ctx.save();
+      ctx.shadowColor = 'rgba(80, 150, 255, 0.6)';
+      ctx.shadowBlur = minDim * 0.02;
+      buildBandPath();
+      ctx.fillStyle = fillGrad;
+      ctx.fill('evenodd');
+      ctx.restore();
 
-      // 3 层辉光
-      drawSmoothLoop(outerPts, baseLW * 5, 0.05);
-      drawSmoothLoop(outerPts, baseLW * 2.5, 0.15);
-      drawSmoothLoop(outerPts, baseLW * 1.2, 0.85);
+      // 柱子径向分隔线：体现"柱子"结构，柱子之间粘在一起但有可见边界
+      ctx.save();
+      ctx.strokeStyle = 'rgba(8, 16, 32, 0.4)';
+      ctx.lineWidth = Math.max(1, minDim * 0.0009);
+      ctx.lineCap = 'butt';
+      for (let i = 0; i < numBars; i++) {
+        const a = angleAt(i);
+        // 共享边只画到相邻两根中较矮那根的顶部
+        const rL = INNER_R + barLen[(i - 1 + numBars) % numBars];
+        const rR = INNER_R + barLen[i];
+        const rEdge = Math.min(rL, rR);
+        const pIn = radPos(a, INNER_R);
+        const pOut = radPos(a, rEdge);
+        ctx.beginPath();
+        ctx.moveTo(pIn.x, pIn.y);
+        ctx.lineTo(pOut.x, pOut.y);
+        ctx.stroke();
+      }
+      ctx.restore();
+
+      // 顶部亮芯描边（阶梯轮廓）
+      ctx.beginPath();
+      const pTop0 = radPos(angleAt(0), INNER_R + barLen[0]);
+      ctx.moveTo(pTop0.x, pTop0.y);
+      for (let i = 0; i < numBars; i++) {
+        const aR = angleAt((i + 1) % numBars);
+        const rCur = INNER_R + barLen[i];
+        const rNext = INNER_R + barLen[(i + 1) % numBars];
+        const pTop = radPos(aR, rCur);
+        ctx.lineTo(pTop.x, pTop.y);
+        const pNext = radPos(aR, rNext);
+        ctx.lineTo(pNext.x, pNext.y);
+      }
+      ctx.closePath();
+      ctx.strokeStyle = 'rgba(220, 235, 255, 0.75)';
+      ctx.lineWidth = minDim * 0.0018;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.stroke();
     };
 
     // ---- 模式：波形示波器（自适应） ----
