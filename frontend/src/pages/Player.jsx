@@ -3,7 +3,7 @@ import {
   Play, Pause, SkipBack, SkipForward,
   Heart, Shuffle, Repeat, ListMusic, Volume2,
   Search, X, Plus, Music, Loader2,
-  User
+  User, Palette, Check
 } from 'lucide-react';
 import { usePlayerStore } from '../store/usePlayerStore';
 import { music } from '../api/music';
@@ -30,6 +30,18 @@ const VIZ_MODES = [
   { key: '3d', label: '3D' },
 ];
 
+// DIY 颜色预设
+const ACCENT_PRESETS = [
+  '#4FC3F7', // 青蓝
+  '#9F87C0', // 紫
+  '#FF6B9D', // 粉
+  '#4ADE80', // 绿
+  '#FB923C', // 橙
+  '#F87171', // 红
+  '#A78BFA', // 薰衣草
+  '#FFFFFF', // 白
+];
+
 export default function Player({ onNavigate }) {
   const store = usePlayerStore();
   const {
@@ -52,6 +64,10 @@ export default function Player({ onNavigate }) {
   const [vizMode, setVizMode] = useState(() => {
     try { return localStorage.getItem('sonus_viz_mode') || 'ring'; } catch { return 'ring'; }
   });
+  const [accentColor, setAccentColor] = useState(() => {
+    try { return localStorage.getItem('sonus_accent_color') || '#4FC3F7'; } catch { return '#4FC3F7'; }
+  });
+  const [showPalette, setShowPalette] = useState(false);
   const [seeking, setSeeking] = useState(false);
   const progressRef = useRef(null);
   const searchInputRef = useRef(null);
@@ -59,6 +75,11 @@ export default function Player({ onNavigate }) {
   const changeVizMode = (m) => {
     setVizMode(m);
     try { localStorage.setItem('sonus_viz_mode', m); } catch {}
+  };
+
+  const changeAccent = (c) => {
+    setAccentColor(c);
+    try { localStorage.setItem('sonus_accent_color', c); } catch {}
   };
 
   // 搜索面板打开时自动聚焦
@@ -75,6 +96,11 @@ export default function Player({ onNavigate }) {
       return () => clearTimeout(timer);
     }
   }, [error, clearError]);
+
+  // 同步 DIY 主色到全局 CSS 变量（背景光晕、滑块等跟随）
+  useEffect(() => {
+    document.documentElement.style.setProperty('--accent-dynamic', accentColor);
+  }, [accentColor]);
 
   // 键盘快捷键
   useEffect(() => {
@@ -204,8 +230,8 @@ export default function Player({ onNavigate }) {
       }}>
         <FloatingLyrics lyrics={lyrics} isPlaying={isPlaying} />
         {vizMode === '3d'
-          ? <Suspense fallback={null}><Visualizer3D /></Suspense>
-          : <Visualizer isPlaying={isPlaying} mode={vizMode} />
+          ? <Suspense fallback={null}><Visualizer3D accent={accentColor} /></Suspense>
+          : <Visualizer isPlaying={isPlaying} mode={vizMode} accent={accentColor} />
         }
       </div>
 
@@ -360,6 +386,99 @@ export default function Player({ onNavigate }) {
             {m.label}
           </button>
         ))}
+
+        {/* 分隔线 */}
+        <div style={{ height: 1, background: 'var(--border)', margin: '4px 6px' }} />
+
+        {/* DIY 颜色按钮 */}
+        <button
+          onClick={() => setShowPalette(!showPalette)}
+          style={{
+            width: 36, height: 36, borderRadius: 10,
+            background: showPalette ? 'rgba(50,50,56,0.9)' : 'rgba(30,30,36,0.7)',
+            backdropFilter: 'blur(16px)',
+            WebkitBackdropFilter: 'blur(16px)',
+            border: '1px solid var(--border)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            color: 'var(--text-muted)',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
+            transition: 'all 0.2s ease',
+            cursor: 'pointer',
+            position: 'relative',
+          }}
+          title="自定义颜色"
+        >
+          <Palette size={16} />
+          <span style={{
+            position: 'absolute', bottom: 4, right: 4,
+            width: 8, height: 8, borderRadius: '50%',
+            background: accentColor,
+            border: '1px solid rgba(255,255,255,0.3)',
+            boxShadow: `0 0 6px ${accentColor}`,
+          }} />
+        </button>
+
+        {/* 颜色选择面板 */}
+        {showPalette && (
+          <div className="animate-scaleIn" style={{
+            marginTop: 4,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 6,
+            padding: 8,
+            background: 'rgba(20,20,24,0.92)',
+            backdropFilter: 'blur(20px)',
+            WebkitBackdropFilter: 'blur(20px)',
+            borderRadius: 14,
+            border: '1px solid var(--border)',
+            boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
+          }}>
+            {ACCENT_PRESETS.map((c) => (
+              <button
+                key={c}
+                onClick={() => changeAccent(c)}
+                style={{
+                  width: 28, height: 28, borderRadius: '50%',
+                  background: c,
+                  border: accentColor.toLowerCase() === c.toLowerCase()
+                    ? '2px solid #fff'
+                    : '1px solid rgba(255,255,255,0.15)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  cursor: 'pointer',
+                  boxShadow: accentColor.toLowerCase() === c.toLowerCase()
+                    ? `0 0 10px ${c}`
+                    : 'none',
+                  transition: 'all 0.15s ease',
+                }}
+              >
+                {accentColor.toLowerCase() === c.toLowerCase() && (
+                  <Check size={13} color={c === '#FFFFFF' || c === '#4ADE80' || c === '#FB923C' ? '#000' : '#fff'} />
+                )}
+              </button>
+            ))}
+            {/* 自定义拾色器 */}
+            <label style={{
+              width: 28, height: 28, borderRadius: '50%',
+              background: 'conic-gradient(from 0deg, #ff0000, #ffff00, #00ff00, #00ffff, #0000ff, #ff00ff, #ff0000)',
+              border: '1px solid rgba(255,255,255,0.2)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              cursor: 'pointer',
+              position: 'relative',
+              overflow: 'hidden',
+            }} title="自定义颜色">
+              <input
+                type="color"
+                value={accentColor}
+                onChange={(e) => changeAccent(e.target.value)}
+                style={{
+                  position: 'absolute', inset: 0,
+                  width: '100%', height: '100%',
+                  opacity: 0, cursor: 'pointer', border: 'none',
+                }}
+              />
+            </label>
+          </div>
+        )}
       </div>
 
       {/* ====== 底部浮动播放胶囊 ====== */}
@@ -397,8 +516,8 @@ export default function Player({ onNavigate }) {
           >
             <div style={{
               width: `${progress}%`, height: '100%',
-              background: '#fff', borderRadius: 4,
-              boxShadow: '0 0 8px rgba(255,255,255,0.4)',
+              background: accentColor, borderRadius: 4,
+              boxShadow: `0 0 8px ${accentColor}`,
             }} />
           </div>
           <span style={{ fontSize: 10, color: 'var(--text-muted)', width: 32, fontVariantNumeric: 'tabular-nums' }}>
@@ -449,7 +568,7 @@ export default function Player({ onNavigate }) {
               background: '#fff',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               color: '#0A0A0A',
-              boxShadow: '0 4px 16px rgba(255,255,255,0.15)',
+              boxShadow: `0 4px 20px ${accentColor}66`,
               transition: 'transform 0.15s ease',
               cursor: 'pointer',
             }}

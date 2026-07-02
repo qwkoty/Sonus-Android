@@ -6,10 +6,21 @@ const PARTICLE_COUNT = 4000;
 const NUM_BARS = 64;
 const FOV = 75;
 
+// hex → 归一化 RGB
+const hexToRgb = (hex) => {
+  const r = parseInt(hex.slice(1, 3), 16) / 255;
+  const g = parseInt(hex.slice(3, 5), 16) / 255;
+  const b = parseInt(hex.slice(5, 7), 16) / 255;
+  return [r, g, b];
+};
+
 // 3D 粒子星球：球面粒子随频谱呼吸位移，加色混合辉光，自动旋转
 // 完全自适应容器尺寸：根据可视半径动态计算 BASE_RADIUS，保证粒子永不超出边界
-export default function Visualizer3D() {
+// 颜色跟随用户 DIY 主色派生
+export default function Visualizer3D({ accent = '#4FC3F7' }) {
   const containerRef = useRef(null);
+  const accentRef = useRef(accent);
+  useEffect(() => { accentRef.current = accent; }, [accent]);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -139,6 +150,11 @@ export default function Visualizer3D() {
       // 限制呼吸在安全范围内
       const breathe = 1 + Math.min(bass, 1) * MAX_BREATHE;
 
+      // 根据用户 DIY 主色派生粒子颜色（暗→亮渐变）
+      const [ar, ag, ab] = hexToRgb(accentRef.current);
+      const lowR = ar * 0.4, lowG = ag * 0.4, lowB = ab * 0.4;
+      const highR = ar * 0.5 + 0.5, highG = ag * 0.5 + 0.5, highB = ab * 0.5 + 0.5;
+
       for (let i = 0; i < PARTICLE_COUNT; i++) {
         const bi = barIdxMap[i];
         const value = hasData
@@ -153,13 +169,16 @@ export default function Visualizer3D() {
 
         const intensity = 0.35 + value * 0.65;
         const t = (original[i * 3 + 1] / baseRadius + 1) / 2;
-        colorAttr.array[i * 3] = (0.25 + t * 0.75) * intensity;
-        colorAttr.array[i * 3 + 1] = (0.75 + t * 0.25) * intensity;
-        colorAttr.array[i * 3 + 2] = 1.0 * intensity;
+        colorAttr.array[i * 3] = (lowR + t * (highR - lowR)) * intensity;
+        colorAttr.array[i * 3 + 1] = (lowG + t * (highG - lowG)) * intensity;
+        colorAttr.array[i * 3 + 2] = (lowB + t * (highB - lowB)) * intensity;
       }
 
       posAttr.needsUpdate = true;
       colorAttr.needsUpdate = true;
+
+      // halo 颜色跟随主色
+      haloMat.color.setRGB(ar * 0.35, ag * 0.35, ab * 0.35);
 
       points.rotation.y += 0.003;
       points.rotation.x += 0.0008;
