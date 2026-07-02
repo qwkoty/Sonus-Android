@@ -1,9 +1,15 @@
 const BASE = import.meta.env.VITE_API_BASE || '';
 
-async function get(path) {
-  const res = await fetch(`${BASE}${path}`);
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  return res.json();
+async function get(path, timeout = 30000) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeout);
+  try {
+    const res = await fetch(`${BASE}${path}`, { signal: controller.signal });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return await res.json();
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 export const music = {
@@ -23,13 +29,13 @@ export const music = {
   // ---- 扫码登录：网易云 ----
   neteaseUnikey: () => get('/api/music/login/netease/unikey'),
   neteaseQrcode: (unikey) => get(`/api/music/login/netease/qrcode?unikey=${encodeURIComponent(unikey)}`),
-  neteaseCheck: (unikey) => get(`/api/music/login/netease/check?unikey=${encodeURIComponent(unikey)}`),
+  neteaseCheck: (unikey) => get(`/api/music/login/netease/check?unikey=${encodeURIComponent(unikey)}`, 45000),
   neteasePlaylists: (cookie, uid) => get(`/api/music/user/netease/playlists?cookie=${encodeURIComponent(cookie)}&uid=${encodeURIComponent(uid)}`),
   neteaseLikedSongs: (cookie, uid) => get(`/api/music/user/netease/likedsongs?cookie=${encodeURIComponent(cookie)}&uid=${encodeURIComponent(uid)}`),
 
   // ---- 扫码登录：QQ 音乐 ----
   qqQrcode: () => get('/api/music/login/qq/qrcode'),
-  qqCheck: (qrsig) => get(`/api/music/login/qq/check?qrsig=${encodeURIComponent(qrsig)}`),
+  qqCheck: (qrsig) => get(`/api/music/login/qq/check?qrsig=${encodeURIComponent(qrsig)}`, 45000),
   qqPlaylists: (uin, key) => get(`/api/music/user/qq/playlists?uin=${encodeURIComponent(uin)}&key=${encodeURIComponent(key)}`),
   qqLikedSongs: (uin, key) => get(`/api/music/user/qq/likedsongs?uin=${encodeURIComponent(uin)}&key=${encodeURIComponent(key)}`),
 

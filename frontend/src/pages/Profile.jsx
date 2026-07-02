@@ -80,21 +80,21 @@ export default function Profile() {
       if (code === 801) setLoginMsg('等待扫码…');
       else if (code === 802) setLoginMsg('已扫码，请在手机确认');
       else if (code === 803) {
-        setLoginMsg('登录成功，正在同步歌单…');
+        setLoginMsg('登录成功！');
         const cookie = res.data.cookie;
         const user = res.data.user;
         setNeteaseAuth(cookie, user);
         stopPoll();
-        // 自动同步账号歌单到本地
+        // 立即关闭弹窗，歌单同步在后台进行
+        setTimeout(() => { setLoginPlatform(null); setQrImg(''); }, 800);
         if (user?.userId) {
           fetchNeteasePlaylists(cookie, user.userId);
           syncNeteasePlaylists(cookie, user.userId, user);
         }
-        setTimeout(() => { setLoginPlatform(null); setQrImg(''); }, 1500);
       } else if (code === 800) {
         setLoginMsg('二维码已过期，请刷新');
       }
-    } catch (e) { /* ignore */ }
+    } catch (e) { /* 超时或网络错误，静默忽略，下次轮询继续 */ }
   };
 
   const fetchNeteasePlaylists = async (cookie, uid) => {
@@ -157,24 +157,25 @@ export default function Profile() {
       const code = res?.data?.code;
       setLoginCode(code);
       if (code === 801) setLoginMsg('等待扫码…');
-      else if (code === 802) setLoginMsg('已扫码，请在手机确认');
-      else if (code === 803 || res?.data?.code === '0' || res?.data?.cookie) {
-        setLoginMsg('登录成功，正在同步歌单…');
+      else if (code === 802) setLoginMsg(res?.data?.msg?.includes('正在登录') ? '正在登录，请稍候…' : '已扫码，请在手机确认');
+      else if (code === 803 || res?.data?.cookie) {
+        setLoginMsg('登录成功！');
         const cookieStr = res.data.cookie || '';
         const uin = res.data.uin || '';
         const key = res.data.key || '';
         const user = res.data.user || null;
         setQQAuth({ uin, key, raw: cookieStr }, user);
         stopPoll();
+        // 立即关闭弹窗，歌单同步在后台进行
+        setTimeout(() => { setLoginPlatform(null); setQrImg(''); }, 800);
         if (uin && key) {
           fetchQQPlaylists(uin, key);
           syncQQPlaylists(uin, key, user);
         }
-        setTimeout(() => { setLoginPlatform(null); setQrImg(''); }, 1500);
       } else if (code === 800) {
         setLoginMsg('二维码已过期，请刷新');
       }
-    } catch (e) { /* ignore */ }
+    } catch (e) { /* 超时或网络错误，静默忽略，下次轮询继续 */ }
   };
 
   const fetchQQPlaylists = async (uin, key) => {

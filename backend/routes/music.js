@@ -95,7 +95,11 @@ async function neteaseQrCheck(unikey) {
   let user = null;
   if (cookie) {
     try {
-      user = await neteaseUserInfo(cookie);
+      // 5 秒超时，用户信息获取失败不阻塞登录成功
+      user = await Promise.race([
+        neteaseUserInfo(cookie),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 5000)),
+      ]);
     } catch (e) { /* ignore */ }
   }
   return { code: data.code, cookie, user };
@@ -141,6 +145,10 @@ async function neteaseUserPlaylists(cookie, uid) {
 
 // QQ 音乐二维码登录会话（key: qrsig, value: cookie jar）
 const qqCookieJars = new Map();
+// 正在处理登录重定向的 qrsig 集合，防止前端高频轮询导致并发处理
+const qqProcessing = new Map();
+// 已完成的登录结果缓存（防止前端请求超时后重试时丢失结果）
+const qqLoginResults = new Map();
 
 async function qqQrCreate() {
   const showUrl = 'https://ssl.ptlogin2.qq.com/ptqrshow';
@@ -182,12 +190,23 @@ function hash33(s) {
 }
 
 async function qqQrCheck(qrsig) {
+  // 如果已有完成的登录结果，直接返回（防止前端请求超时后重试丢失结果）
+  const cached = qqLoginResults.get(qrsig);
+  if (cached) {
+    qqLoginResults.delete(qrsig);
+    return cached;
+  }
+  // 防止前端高频轮询导致并发处理同一 qrsig 的重定向链
+  if (qqProcessing.has(qrsig)) {
+    return { code: 802, msg: '正在登录，请稍候…', cookie: '', uin: '', key: '', user: null };
+  }
+
   let jar = qqCookieJars.get(qrsig) || { qrsig };
   const ptqrtoken = hash33(qrsig);
   const loginUrl = 'https://ssl.ptlogin2.qq.com/ptqrlogin';
   const resp = await axios.get(loginUrl, {
     params: {
-      u1: 'https://graph.qq.com/oauth2.0/authorize?client_id=100497308&response_type=code&scope=get_user_info%2Cget_app_friends%2Cadd_t&redirect_uri=https%3A%2F%2Fy.qq.com%2Fportal%2Fwx_redirect.html&state=qqmusic',
+      u1: 'https://graph.qq.com/oauth2.0/authorize?client_id=100497308&redirect_uri=https%3A%2F%2Fy.qq.com%2Fportal%2Fwx_redirect.html&response_type=code&state=qqmusic',
       ptqrtoken,
       ptredirect: '0',
       h: '1',
@@ -209,7 +228,7 @@ async function qqQrCheck(qrsig) {
       Cookie: cookieJarToString(jar),
       Referer: 'https://y.qq.com/',
     },
-    timeout: 15000,
+    timeout: 10000,
     maxRedirects: 0,
     validateStatus: () => true,
   });
@@ -220,82 +239,117 @@ async function qqQrCheck(qrsig) {
   if (!m) return { code: 800, msg: '解析失败', cookie: '', uin: '', key: '', user: null };
   const [, code, , redirectUrl, , msg] = m;
 
-  if (code === '0' && redirectUrl) {
-    try {
-      let currentUrl = redirectUrl;
-      for (let hop = 0; hop < 12; hop++) {
-        const hopResp = await axios.get(currentUrl, {
-          headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            Cookie: cookieJarToString(jar),
-            Referer: 'https://y.qq.com/',
-          },
-          timeout: 15000,
-          maxRedirects: 0,
-          validateStatus: () => true,
-        });
-        Object.assign(jar, parseSetCookies(hopResp.headers?.['set-cookie']));
-        let loc = hopResp.headers?.location;
-        if (loc) {
-          if (loc.startsWith('/')) {
-            try {
-              const u = new URL(currentUrl);
-              loc = `${u.protocol}//${u.host}${loc}`;
-            } catch (e) {}
-          }
-          if (loc.startsWith('http')) {
-            currentUrl = loc;
-            continue;
-          }
-        }
-        if (hopResp.status >= 300 && hopResp.status < 400 && loc) continue;
-        break;
-      }
-
-      if (!jar.qqmusic_key && !jar.uin) {
-        try {
-          const homeResp = await axios.get('https://y.qq.com/', {
-            headers: {
-              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-              Cookie: cookieJarToString(jar),
-            },
-            timeout: 10000,
-            maxRedirects: 5,
-            validateStatus: () => true,
-          });
-          Object.assign(jar, parseSetCookies(homeResp.headers?.['set-cookie']));
-        } catch (e) {}
-      }
-
-      let uin = (jar.uin || jar.wxuin || '').toString();
-      uin = uin.replace(/^o0*/, '');
-      let key = jar.qqmusic_key || jar.ptmqmusicticket || jar.p_skey || jar.skey || '';
-      if (!key) {
-        for (const k of Object.keys(jar)) {
-          if (/music.*key/i.test(k) && jar[k]) { key = jar[k]; break; }
-        }
-      }
-
-      const cookieStr = cookieJarToString(jar);
-      let user = null;
-      if (uin) {
-        const tryCookie = key
-          ? `uin=o0${uin}; qqmusic_key=${key};`
-          : cookieStr;
-        try { user = await qqUserInfo(uin, key || ''); } catch (e) {
-          console.error('QQ userinfo error:', e.message);
-        }
-      }
-      qqCookieJars.delete(qrsig);
-      return { code: 803, msg: '登录成功', cookie: cookieStr, uin, key, user };
-    } catch (e) {
-      console.error('QQ redirect error:', e.message);
-      return { code: 800, msg: '登录跳转失败: ' + e.message, cookie: '', uin: '', key: '', user: null };
-    }
+  // 未登录成功：保存 jar 并返回状态码
+  if (code !== '0' || !redirectUrl) {
+    qqCookieJars.set(qrsig, jar);
+    const statusMap = { '66': 801, '67': 802, '65': 800, '68': 800 };
+    return { code: statusMap[code] || 800, msg: msg || '', cookie: '', uin: '', key: '', user: null };
   }
-  qqCookieJars.set(qrsig, jar);
-  const statusMap = { '66': 801, '67': 802, '65': 800, '68': 800 };
-  return { code: statusMap[code] || 800, msg: msg || '', cookie: '', uin: '', key: '', user: null };
+
+  // 登录成功，标记为处理中，防止并发
+  qqProcessing.set(qrsig, true);
+  const deadline = Date.now() + 20000; // 重定向链总超时 20 秒
+
+  try {
+    // 跟随重定向链（最多 8 跳，同时检测 HTTP 302 和 JS 跳转）
+    let currentUrl = redirectUrl;
+    for (let hop = 0; hop < 8 && Date.now() < deadline; hop++) {
+      const hopResp = await axios.get(currentUrl, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          Cookie: cookieJarToString(jar),
+          Referer: 'https://y.qq.com/',
+        },
+        timeout: 6000,
+        maxRedirects: 0,
+        validateStatus: () => true,
+      });
+      Object.assign(jar, parseSetCookies(hopResp.headers?.['set-cookie']));
+
+      // 1. 检查 HTTP 302/301 重定向
+      let loc = hopResp.headers?.location;
+      if (loc) {
+        if (loc.startsWith('/')) {
+          try { const u = new URL(currentUrl); loc = `${u.protocol}//${u.host}${loc}`; } catch (e) {}
+        }
+        if (loc.startsWith('http')) { currentUrl = loc; continue; }
+      }
+
+      // 2. 检查 HTML 中的 JS 跳转和 meta refresh（OAuth 回调页常用）
+      if (hopResp.data && typeof hopResp.data === 'string') {
+        const jsMatch = hopResp.data.match(/(?:window\.location|location)\.href\s*=\s*["']([^"']+)["']/i);
+        const metaMatch = hopResp.data.match(/<meta[^>]*http-equiv=["']refresh["'][^>]*url=([^"'>\s]+)/i);
+        const found = jsMatch || metaMatch;
+        if (found) {
+          let nextUrl = found[1];
+          if (nextUrl.startsWith('/')) {
+            try { const u = new URL(currentUrl); nextUrl = `${u.protocol}//${u.host}${nextUrl}`; } catch (e) {}
+          }
+          if (nextUrl.startsWith('http')) { currentUrl = nextUrl; continue; }
+        }
+      }
+      break; // 没有更多跳转
+    }
+
+    // 始终访问 QQ 音乐主页获取 qqmusic_key（无论重定向链结果如何）
+    try {
+      const homeResp = await axios.get('https://y.qq.com/', {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          Cookie: cookieJarToString(jar),
+        },
+        timeout: 6000,
+        maxRedirects: 5,
+        validateStatus: () => true,
+      });
+      Object.assign(jar, parseSetCookies(homeResp.headers?.['set-cookie']));
+    } catch (e) { /* 主页访问失败不阻塞 */ }
+
+    // 提取 uin 和 key
+    let uin = (jar.uin || jar.wxuin || '').toString().replace(/^o0*/, '');
+    let key = jar.qqmusic_key || jar.ptmqmusicticket || jar.p_skey || jar.skey || '';
+    if (!key) {
+      for (const k of Object.keys(jar)) {
+        if (/music.*key/i.test(k) && jar[k]) { key = jar[k]; break; }
+      }
+    }
+    const cookieStr = cookieJarToString(jar);
+
+    // 获取用户信息（5 秒超时，失败不阻塞登录成功）
+    let user = null;
+    if (uin) {
+      try {
+        user = await Promise.race([
+          qqUserInfo(uin, key || ''),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 5000)),
+        ]);
+      } catch (e) {
+        console.error('QQ userinfo error:', e.message);
+      }
+    }
+
+    qqCookieJars.delete(qrsig);
+    const result = { code: 803, msg: '登录成功', cookie: cookieStr, uin, key, user };
+    qqLoginResults.set(qrsig, result);
+    setTimeout(() => qqLoginResults.delete(qrsig), 60000);
+    return result;
+  } catch (e) {
+    console.error('QQ redirect error:', e.message);
+    // 即使重定向链出错，也尝试用已收集的 cookie 返回成功
+    let uin = (jar.uin || jar.wxuin || '').toString().replace(/^o0*/, '');
+    let key = jar.qqmusic_key || jar.p_skey || jar.skey || '';
+    const cookieStr = cookieJarToString(jar);
+    qqCookieJars.delete(qrsig);
+    if (uin || cookieStr) {
+      const result = { code: 803, msg: '登录成功', cookie: cookieStr, uin, key, user: null };
+      qqLoginResults.set(qrsig, result);
+      setTimeout(() => qqLoginResults.delete(qrsig), 60000);
+      return result;
+    }
+    return { code: 800, msg: '登录跳转失败: ' + e.message, cookie: '', uin: '', key: '', user: null };
+  } finally {
+    qqProcessing.delete(qrsig);
+  }
 }
 
 // QQ 音乐用户信息
