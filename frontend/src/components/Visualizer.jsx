@@ -143,28 +143,9 @@ export default function Visualizer({ isPlaying, mode = 'ring', accent = '#4FC3F7
         barLen.push(Math.max(2, value * safeBarScale * (hasData ? 1.0 : 0.4)));
       }
 
-      const buildBandPath = () => {
-        ctx.beginPath();
-        const p0 = radPos(angleAt(0), INNER_R + barLen[0]);
-        ctx.moveTo(p0.x, p0.y);
-        for (let i = 0; i < numBars; i++) {
-          const aR = angleAt((i + 1) % numBars);
-          const rCur = INNER_R + barLen[i];
-          const rNext = INNER_R + barLen[(i + 1) % numBars];
-          const pTop = radPos(aR, rCur);
-          ctx.lineTo(pTop.x, pTop.y);
-          const pNext = radPos(aR, rNext);
-          ctx.lineTo(pNext.x, pNext.y);
-        }
-        ctx.closePath();
-        const pIn0 = radPos(0, INNER_R);
-        ctx.moveTo(pIn0.x, pIn0.y);
-        for (let a = Math.PI * 2; a >= 0; a -= 0.08) {
-          const p = radPos(a, INNER_R);
-          ctx.lineTo(p.x, p.y);
-        }
-        ctx.closePath();
-      };
+      // 等宽梯形柱子：每根柱子占 angleStep*BAR_RATIO 宽度，间隙 BAR_GAP
+      const BAR_RATIO = 0.82; // 柱子占角度比例，剩余为间隙
+      const barHalfSpan = angleStep * BAR_RATIO / 2;
 
       const fillGrad = ctx.createRadialGradient(cx, cy, INNER_R, cx, cy, MAX_OUTER);
       fillGrad.addColorStop(0, C.inner);
@@ -175,49 +156,57 @@ export default function Visualizer({ isPlaying, mode = 'ring', accent = '#4FC3F7
       ctx.save();
       ctx.shadowColor = C.glow;
       ctx.shadowBlur = minDim * 0.025;
-      buildBandPath();
       ctx.fillStyle = fillGrad;
-      ctx.fill('evenodd');
-      ctx.restore();
-
-      // 柱子径向分隔线（极淡白色）
-      ctx.save();
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.13)';
-      ctx.lineWidth = Math.max(0.8, minDim * 0.0007);
-      ctx.lineCap = 'butt';
+      // 逐根绘制等宽梯形柱子（内圆弧 + 外圆弧 + 两条径向边）
       for (let i = 0; i < numBars; i++) {
         const a = angleAt(i);
-        const rL = INNER_R + barLen[(i - 1 + numBars) % numBars];
-        const rR = INNER_R + barLen[i];
-        const rEdge = Math.min(rL, rR);
-        const pIn = radPos(a, INNER_R);
-        const pOut = radPos(a, rEdge);
+        const rOut = INNER_R + barLen[i];
+        const aL = a - barHalfSpan;
+        const aR = a + barHalfSpan;
+        const steps = 4; // 圆弧细分
         ctx.beginPath();
-        ctx.moveTo(pIn.x, pIn.y);
-        ctx.lineTo(pOut.x, pOut.y);
+        // 内圆弧（顺时针 aL→aR）
+        for (let s = 0; s <= steps; s++) {
+          const aa = aL + (aR - aL) * (s / steps);
+          const p = radPos(aa, INNER_R);
+          if (s === 0) ctx.moveTo(p.x, p.y);
+          else ctx.lineTo(p.x, p.y);
+        }
+        // 外圆弧（aR→aL）
+        for (let s = 0; s <= steps; s++) {
+          const aa = aR - (aR - aL) * (s / steps);
+          const p = radPos(aa, rOut);
+          ctx.lineTo(p.x, p.y);
+        }
+        ctx.closePath();
+        ctx.fill();
+      }
+      ctx.restore();
+
+      // 柱子顶部亮芯描边（每根独立，等宽）
+      ctx.save();
+      ctx.strokeStyle = C.tip;
+      ctx.globalAlpha = 0.55;
+      ctx.lineWidth = Math.max(1, minDim * 0.0012);
+      ctx.lineCap = 'round';
+      for (let i = 0; i < numBars; i++) {
+        const a = angleAt(i);
+        const rOut = INNER_R + barLen[i];
+        const aL = a - barHalfSpan;
+        const aR = a + barHalfSpan;
+        const pL = radPos(aL, rOut);
+        const pR = radPos(aR, rOut);
+        ctx.beginPath();
+        ctx.moveTo(pL.x, pL.y);
+        // 顶部用圆弧连接
+        for (let s = 0; s <= 4; s++) {
+          const aa = aL + (aR - aL) * (s / 4);
+          const p = radPos(aa, rOut);
+          ctx.lineTo(p.x, p.y);
+        }
         ctx.stroke();
       }
       ctx.restore();
-
-      // 顶部阶梯亮芯描边
-      ctx.beginPath();
-      const pTop0 = radPos(angleAt(0), INNER_R + barLen[0]);
-      ctx.moveTo(pTop0.x, pTop0.y);
-      for (let i = 0; i < numBars; i++) {
-        const aR = angleAt((i + 1) % numBars);
-        const rCur = INNER_R + barLen[i];
-        const rNext = INNER_R + barLen[(i + 1) % numBars];
-        const pTop = radPos(aR, rCur);
-        ctx.lineTo(pTop.x, pTop.y);
-        const pNext = radPos(aR, rNext);
-        ctx.lineTo(pNext.x, pNext.y);
-      }
-      ctx.closePath();
-      ctx.strokeStyle = C.stroke;
-      ctx.lineWidth = minDim * 0.0016;
-      ctx.lineCap = 'round';
-      ctx.lineJoin = 'round';
-      ctx.stroke();
 
       // 内圈玻璃高光环
       ctx.save();

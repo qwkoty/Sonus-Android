@@ -409,20 +409,49 @@ export default function Player({ onNavigate }) {
         {/* 展开面板：可视化模式 + 调色盘 */}
         {showVizPanel && (
           <div className="animate-slideUp" style={{
-            background: 'rgba(18,18,22,0.92)',
-            backdropFilter: 'blur(28px) saturate(140%)',
-            WebkitBackdropFilter: 'blur(28px) saturate(140%)',
-            borderRadius: 18,
-            border: '1px solid rgba(255,255,255,0.1)',
-            padding: 12,
-            boxShadow: '0 12px 40px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.06)',
+            background: 'linear-gradient(180deg, rgba(26,26,32,0.96), rgba(16,16,20,0.96))',
+            backdropFilter: 'blur(32px) saturate(160%)',
+            WebkitBackdropFilter: 'blur(32px) saturate(160%)',
+            borderRadius: 20,
+            border: '1px solid rgba(255,255,255,0.12)',
+            padding: 14,
+            boxShadow: '0 16px 48px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.08)',
             display: 'flex',
             flexDirection: 'column',
-            gap: 10,
-            width: 196,
+            gap: 12,
+            width: 220,
           }}>
-            {/* 可视化模式切换（横排，图标+文字） */}
-            <div style={{ display: 'flex', gap: 6 }}>
+            {/* 头部：标题 + 关闭 */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 2px' }}>
+              <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: 0.6 }}>
+                可视化设置
+              </span>
+              <button
+                onClick={() => setShowVizPanel(false)}
+                aria-label="关闭"
+                style={{
+                  width: 22, height: 22, borderRadius: 7,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  color: 'var(--text-secondary)',
+                  cursor: 'pointer',
+                  transition: 'all 0.18s ease',
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.1)'; e.currentTarget.style.color = '#fff'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-secondary)'; }}
+              >
+                <X size={14} />
+              </button>
+            </div>
+
+            {/* 可视化模式：分段控件样式（内嵌深色轨道，激活态主色填充） */}
+            <div style={{
+              display: 'flex',
+              gap: 4,
+              padding: 4,
+              background: 'rgba(0,0,0,0.28)',
+              borderRadius: 14,
+              border: '1px solid rgba(255,255,255,0.05)',
+            }}>
               {VIZ_MODES.map((m) => {
                 const active = vizMode === m.key;
                 return (
@@ -430,21 +459,25 @@ export default function Player({ onNavigate }) {
                     key={m.key}
                     onClick={() => changeVizMode(m.key)}
                     style={{
-                      flex: 1, height: 44, borderRadius: 12,
+                      flex: 1, height: 46, borderRadius: 10,
                       background: active
                         ? `linear-gradient(135deg, ${accentColor}, ${accentColor}cc)`
-                        : 'rgba(40,40,48,0.6)',
-                      border: active ? 'none' : '1px solid rgba(255,255,255,0.08)',
+                        : 'transparent',
+                      border: 'none',
                       display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                      gap: 2,
+                      gap: 3,
                       color: active ? '#0A0A0A' : 'var(--text-muted)',
                       fontSize: 11, fontWeight: 700,
-                      boxShadow: active ? `0 4px 14px ${accentColor}55` : 'none',
+                      boxShadow: active
+                        ? `0 4px 14px ${accentColor}55, inset 0 1px 0 rgba(255,255,255,0.3)`
+                        : 'none',
                       transition: 'all 0.2s ease',
                       cursor: 'pointer',
                     }}
+                    onMouseEnter={(e) => { if (!active) e.currentTarget.style.color = 'var(--text-secondary)'; }}
+                    onMouseLeave={(e) => { if (!active) e.currentTarget.style.color = 'var(--text-muted)'; }}
                   >
-                    <span style={{ fontSize: 15, lineHeight: 1 }}>{m.icon}</span>
+                    <span style={{ fontSize: 16, lineHeight: 1 }}>{m.icon}</span>
                     <span>{m.label}</span>
                   </button>
                 );
@@ -453,7 +486,7 @@ export default function Player({ onNavigate }) {
 
             <div style={{ height: 1, background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent)' }} />
 
-            {/* 调色盘标题行 */}
+            {/* 主题色标题行 */}
             <div style={{
               display: 'flex', alignItems: 'center', justifyContent: 'space-between',
               padding: '0 2px',
@@ -468,7 +501,7 @@ export default function Player({ onNavigate }) {
               }} />
             </div>
 
-            {/* 预设色（4列网格，选中态环形高亮） */}
+            {/* 预设色（4列网格，圆角方形，选中态环形高亮） */}
             <div style={{
               display: 'grid',
               gridTemplateColumns: 'repeat(4, 1fr)',
@@ -487,7 +520,7 @@ export default function Player({ onNavigate }) {
                     onClick={() => changeAccent(c)}
                     aria-label={`选择颜色 ${c}`}
                     style={{
-                      width: '100%', aspectRatio: '1', borderRadius: '50%',
+                      width: '100%', aspectRatio: '1', borderRadius: 10,
                       background: c,
                       border: active
                         ? `2px solid ${accentColor}`
@@ -500,6 +533,8 @@ export default function Player({ onNavigate }) {
                       transition: 'all 0.18s ease',
                       transform: active ? 'scale(1.08)' : 'scale(1)',
                     }}
+                    onMouseEnter={(e) => { if (!active) e.currentTarget.style.transform = 'scale(1.06)'; }}
+                    onMouseLeave={(e) => { if (!active) e.currentTarget.style.transform = 'scale(1)'; }}
                   >
                     {active && <Check size={13} color={checkColor} strokeWidth={3} />}
                   </button>
