@@ -141,7 +141,7 @@ export default function Login({ onBack }) {
           <div style={{ textAlign: 'center' }}>
             <div style={{ fontSize: 22, fontWeight: 700, letterSpacing: 0.5 }}>Sonus</div>
             <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 4 }}>
-              登录 QQ 音乐，解锁全部音源与你的歌单
+              登录 QQ 音乐，同步你的歌单
             </div>
           </div>
         </div>
@@ -233,7 +233,7 @@ export default function Login({ onBack }) {
         }}>
           <ChevronRight size={14} color="var(--text-secondary)" />
           <span style={{ fontSize: 11, color: 'var(--text-secondary)', lineHeight: 1.5 }}>
-            扫码登录后即可播放 VIP 歌曲、同步你的 QQ 音乐歌单
+            扫码登录后即可同步你的 QQ 音乐歌单
           </span>
         </div>
       </div>

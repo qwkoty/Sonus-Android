@@ -381,7 +381,7 @@ export default function Player() {
             fontSize: 11, color: 'var(--text-secondary)', marginTop: 2,
             whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
           }}>
-            {currentTrack?.artist || (isLoggedIn ? 'QQ音乐 · 点击搜索开始播放' : '点击左上角登录解锁 VIP 与歌单')}
+            {currentTrack?.artist || (isLoggedIn ? 'QQ音乐 · 点击搜索开始播放' : '请在左上方登录')}
           </div>
         </div>
 
