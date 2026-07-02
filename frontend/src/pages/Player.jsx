@@ -186,10 +186,12 @@ export default function Player({ onNavigate }) {
     try {
       const searchPlatforms = platform === 'none' ? 'netease,qq' : platform;
       const res = await music.search(kw, searchPlatforms, 15);
-      const list = (res.data || []).map((item) => ({
-        ...item,
-        cover: item.cover || `https://picsum.photos/seed/${item.id}/400/400`,
-      }));
+      // res.data 现在是 { netease: [...], qq: [...] } 分组结构
+      const groups = res.data || {};
+      const list = [
+        ...(groups.netease || []).map((item) => ({ ...item, cover: item.cover || `https://picsum.photos/seed/${item.id}/400/400` })),
+        ...(groups.qq || []).map((item) => ({ ...item, cover: item.cover || `https://picsum.photos/seed/${item.id}/400/400` })),
+      ];
       setResults(list);
       preloadUrls(list);
     } catch (err) {
@@ -937,7 +939,140 @@ export default function Player({ onNavigate }) {
           )}
 
           <div style={{ flex: 1, overflowY: 'auto' }}>
-            {results.map((track) => (
+            {/* 网易云分区 */}
+            {results.filter((t) => t.platform === 'netease').length > 0 && (
+              <>
+                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', padding: '8px 0 4px', letterSpacing: 1 }}>网易云</div>
+                {results.filter((t) => t.platform === 'netease').map((track) => (
+              <div key={track.id} style={{
+                display: 'flex', alignItems: 'center', gap: 12,
+                padding: '10px 0', borderBottom: '1px solid var(--border)', position: 'relative',
+              }}>
+                <img src={track.cover} alt="" onClick={() => handlePlaySearch(track)}
+                  style={{ width: 44, height: 44, borderRadius: 8, objectFit: 'cover', flexShrink: 0, cursor: 'pointer' }} />
+                <div style={{ flex: 1, minWidth: 0 }} onClick={() => handlePlaySearch(track)}>
+                  <div style={{ fontSize: 14, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', cursor: 'pointer' }}>
+                    {track.title}
+                  </div>
+                  <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 2 }}>
+                    {track.artist}
+                  </div>
+                </div>
+                <button onClick={() => setAddMenuTrack(addMenuTrack === track.id ? null : track.id)}
+                  aria-label="添加到歌单"
+                  style={{
+                    width: 36, height: 36, borderRadius: '50%',
+                    background: addMenuTrack === track.id ? '#fff' : 'var(--surface)',
+                    color: addMenuTrack === track.id ? '#0A0A0A' : 'var(--text-secondary)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                    cursor: 'pointer',
+                  }}>
+                  <Plus size={16} />
+                </button>
+                <button onClick={() => handlePlaySearch(track)} aria-label="播放"
+                  style={{
+                    width: 36, height: 36, borderRadius: '50%',
+                    background: 'rgba(255,255,255,0.1)', color: '#fff', flexShrink: 0, cursor: 'pointer',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  }}>
+                  <Play size={18} fill="currentColor" />
+                </button>
+
+                {addMenuTrack === track.id && (
+                  <div className="animate-scaleIn" style={{
+                    position: 'absolute', right: 8, top: 48,
+                    background: 'var(--bg-elevated)', borderRadius: 12,
+                    border: '1px solid var(--border)', padding: '8px 0', minWidth: 160,
+                    boxShadow: '0 8px 32px rgba(0,0,0,0.5)', zIndex: 300,
+                  }}>
+                    <div style={{ padding: '4px 12px 8px', fontSize: 11, color: 'var(--text-muted)', borderBottom: '1px solid var(--border)' }}>
+                      添加到歌单
+                    </div>
+                    {playlists.length === 0 ? (
+                      <div style={{ padding: '12px', fontSize: 12, color: 'var(--text-muted)', textAlign: 'center' }}>
+                        暂无歌单<br />请先在个人中心创建
+                      </div>
+                    ) : (
+                      playlists.map((pl) => (
+                        <button key={pl.id} onClick={() => { addToPlaylist(pl.id, track); setAddMenuTrack(null); setError('已添加到「' + pl.name + '」'); }}
+                          style={{ display: 'block', width: '100%', padding: '8px 12px', fontSize: 13, textAlign: 'left', color: 'var(--text-primary)', borderBottom: '1px solid var(--border)', cursor: 'pointer' }}>
+                          {pl.name}
+                        </button>
+                      ))
+                    )}
+                  </div>
+                )}
+              </div>
+            ))}
+              </>
+            )}
+            {/* QQ音乐分区 */}
+            {results.filter((t) => t.platform === 'qq').length > 0 && (
+              <>
+                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', padding: '8px 0 4px', letterSpacing: 1 }}>QQ音乐</div>
+                {results.filter((t) => t.platform === 'qq').map((track) => (
+              <div key={track.id} style={{
+                display: 'flex', alignItems: 'center', gap: 12,
+                padding: '10px 0', borderBottom: '1px solid var(--border)', position: 'relative',
+              }}>
+                <img src={track.cover} alt="" onClick={() => handlePlaySearch(track)}
+                  style={{ width: 44, height: 44, borderRadius: 8, objectFit: 'cover', flexShrink: 0, cursor: 'pointer' }} />
+                <div style={{ flex: 1, minWidth: 0 }} onClick={() => handlePlaySearch(track)}>
+                  <div style={{ fontSize: 14, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', cursor: 'pointer' }}>
+                    {track.title}
+                  </div>
+                  <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 2 }}>
+                    {track.artist}
+                  </div>
+                </div>
+                <button onClick={() => setAddMenuTrack(addMenuTrack === track.id ? null : track.id)}
+                  aria-label="添加到歌单"
+                  style={{
+                    width: 36, height: 36, borderRadius: '50%',
+                    background: addMenuTrack === track.id ? '#fff' : 'var(--surface)',
+                    color: addMenuTrack === track.id ? '#0A0A0A' : 'var(--text-secondary)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                    cursor: 'pointer',
+                  }}>
+                  <Plus size={16} />
+                </button>
+                <button onClick={() => handlePlaySearch(track)} aria-label="播放"
+                  style={{
+                    width: 36, height: 36, borderRadius: '50%',
+                    background: 'rgba(255,255,255,0.1)', color: '#fff', flexShrink: 0, cursor: 'pointer',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  }}>
+                  <Play size={18} fill="currentColor" />
+                </button>
+
+                {addMenuTrack === track.id && (
+                  <div className="animate-scaleIn" style={{
+                    position: 'absolute', right: 8, top: 48,
+                    background: 'var(--bg-elevated)', borderRadius: 12,
+                    border: '1px solid var(--border)', padding: '8px 0', minWidth: 160,
+                    boxShadow: '0 8px 32px rgba(0,0,0,0.5)', zIndex: 300,
+                  }}>
+                    <div style={{ padding: '4px 12px 8px', fontSize: 11, color: 'var(--text-muted)', borderBottom: '1px solid var(--border)' }}>
+                      添加到歌单
+                    </div>
+                    {playlists.length === 0 ? (
+                      <div style={{ padding: '12px', fontSize: 12, color: 'var(--text-muted)', textAlign: 'center' }}>
+                        暂无歌单<br />请先在个人中心创建
+                      </div>
+                    ) : (
+                      playlists.map((pl) => (
+                        <button key={pl.id} onClick={() => { addToPlaylist(pl.id, track); setAddMenuTrack(null); setError('已添加到「' + pl.name + '」'); }}
+                          style={{ display: 'block', width: '100%', padding: '8px 12px', fontSize: 13, textAlign: 'left', color: 'var(--text-primary)', borderBottom: '1px solid var(--border)', cursor: 'pointer' }}>
+                          {pl.name}
+                        </button>
+                      ))
+                    )}
+                  </div>
+                )}
+              </div>
+            ))}
+              </>
+            )}
               <div key={track.id} style={{
                 display: 'flex', alignItems: 'center', gap: 12,
                 padding: '10px 0', borderBottom: '1px solid var(--border)', position: 'relative',

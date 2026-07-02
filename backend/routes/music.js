@@ -849,39 +849,36 @@ async function getQQRankSongs(topId) {
   });
 }
 
-// ---------- 聚合搜索 ----------
+// ---------- 聚合搜索（不合并，按平台分组返回） ----------
 router.get('/search', async (req, res) => {
   try {
     const { keyword, platforms = 'netease,qq', limit = 20 } = req.query;
     if (!keyword) return res.status(400).json({ error: 'keyword required' });
 
     const platformList = String(platforms).split(',').map((p) => p.trim());
-    const jobs = [];
+    const groups = {};
 
+    const tasks = [];
     if (platformList.includes('netease')) {
-      jobs.push(
-        searchNetease(keyword, Number(limit)).catch((err) => {
-          console.error('Netease search error:', err.message);
-          return [];
-        })
+      tasks.push(
+        searchNetease(keyword, Number(limit))
+          .then((r) => { groups.netease = r; })
+          .catch((err) => { console.error('Netease search error:', err.message); groups.netease = []; })
       );
     }
     if (platformList.includes('qq')) {
-      jobs.push(
-        searchQQ(keyword, 1, Number(limit)).catch((err) => {
-          console.error('QQ search error:', err.message);
-          return [];
-        })
+      tasks.push(
+        searchQQ(keyword, 1, Number(limit))
+          .then((r) => { groups.qq = r; })
+          .catch((err) => { console.error('QQ search error:', err.message); groups.qq = []; })
       );
     }
 
-    const results = await Promise.all(jobs);
-    const allSongs = results.flat();
+    await Promise.all(tasks);
 
     res.json({
       code: 200,
-      data: allSongs,
-      total: allSongs.length,
+      data: groups,
       platforms: platformList,
     });
   } catch (err) {
