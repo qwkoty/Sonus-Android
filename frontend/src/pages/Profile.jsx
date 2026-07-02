@@ -508,44 +508,108 @@ export default function Profile() {
       {loginPlatform && (
         <div style={{
           position: 'fixed', inset: 0, zIndex: 1000,
-          background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)',
+          background: 'rgba(0,0,0,0.85)',
+          backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)',
           display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20,
         }} onClick={closeLogin}>
           <div style={{
-            background: 'var(--bg-secondary)', borderRadius: 24, padding: 28,
-            width: 'min(90vw, 320px)', textAlign: 'center',
-            border: '1px solid var(--border)', boxShadow: '0 20px 60px rgba(0,0,0,0.6)',
+            background: 'var(--glass-2, rgba(20,20,24,0.9))',
+            borderRadius: 28, padding: 0,
+            width: 'min(92vw, 340px)',
+            border: '1px solid rgba(255,255,255,0.08)',
+            boxShadow: '0 24px 80px rgba(0,0,0,0.7)',
+            overflow: 'hidden',
           }} onClick={(e) => e.stopPropagation()}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-              <span style={{ fontSize: 16, fontWeight: 700 }}>
-                {loginPlatform === 'netease' ? '网易云登录' : 'QQ音乐登录'}
-              </span>
-              <button onClick={closeLogin} style={{ width: 28, height: 28, borderRadius: 8, background: 'var(--surface)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', border: 'none' }}>
-                <X size={16} color="var(--text-secondary)" />
+            {/* 头部：平台标识 + 关闭 */}
+            <div style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              padding: '20px 24px 0',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div style={{
+                  width: 28, height: 28, borderRadius: 8,
+                  background: loginPlatform === 'netease'
+                    ? 'linear-gradient(135deg, #E1306C, #F56040)'
+                    : 'linear-gradient(135deg, #31C27C, #1ED760)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  color: '#fff', fontSize: 14, fontWeight: 800,
+                }}>
+                  {loginPlatform === 'netease' ? '网' : 'Q'}
+                </div>
+                <span style={{ fontSize: 16, fontWeight: 700 }}>
+                  {loginPlatform === 'netease' ? '网易云音乐' : 'QQ音乐'}登录
+                </span>
+              </div>
+              <button onClick={closeLogin} style={{
+                width: 30, height: 30, borderRadius: 10,
+                background: 'rgba(255,255,255,0.06)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                cursor: 'pointer', border: 'none', color: 'var(--text-secondary)',
+                transition: 'background 0.2s',
+              }} onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.12)'}
+                onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.06)'}>
+                <X size={16} />
               </button>
             </div>
 
-            <div style={{
-              width: 200, height: 200, margin: '0 auto 16', borderRadius: 16,
-              background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center',
-              position: 'relative', overflow: 'hidden',
-            }}>
-              {qrImg ? (
-                <img src={qrImg} alt="二维码" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
-              ) : (
-                <Loader2 size={32} style={{ animation: 'spin 1s linear infinite' }} color="#999" />
-              )}
-              {loginCode === 800 && (
-                <button onClick={loginPlatform === 'netease' ? startNeteaseLogin : startQQLogin}
-                  style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.7)', color: '#fff', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, fontSize: 14 }}>
-                  <RefreshCw size={16} /> 刷新二维码
-                </button>
-              )}
-            </div>
+            {/* 二维码区 */}
+            <div style={{ padding: '20px 24px 16px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+              <div style={{
+                width: 200, height: 200, borderRadius: 18,
+                background: '#fff', padding: 10,
+                position: 'relative', overflow: 'hidden',
+                boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
+              }}>
+                {qrImg ? (
+                  <img src={qrImg} alt="二维码" style={{ width: '100%', height: '100%', objectFit: 'contain', borderRadius: 10 }} />
+                ) : (
+                  <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 10 }}>
+                    <Loader2 size={28} style={{ animation: 'spin 1s linear infinite' }} color="#999" />
+                  </div>
+                )}
+                {loginCode === 800 && (
+                  <button onClick={loginPlatform === 'netease' ? startNeteaseLogin : startQQLogin}
+                    style={{
+                      position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.75)',
+                      color: '#fff', border: 'none', cursor: 'pointer',
+                      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8,
+                      fontSize: 13, fontWeight: 600, borderRadius: 18,
+                    }}>
+                    <RefreshCw size={22} />
+                    二维码已过期
+                    <span style={{ fontSize: 11, opacity: 0.7 }}>点击刷新</span>
+                  </button>
+                )}
+                {loginCode === 803 && (
+                  <div style={{
+                    position: 'absolute', inset: 0, background: 'rgba(31,193,124,0.85)',
+                    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8,
+                    color: '#fff', borderRadius: 18,
+                  }}>
+                    <Check size={36} />
+                    <span style={{ fontSize: 14, fontWeight: 700 }}>登录成功</span>
+                  </div>
+                )}
+              </div>
 
-            <div style={{ fontSize: 13, color: 'var(--text-secondary)', minHeight: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-              {loginCode === 802 && <Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} />}
-              {loginMsg}
+              {/* 状态文字 */}
+              <div style={{
+                marginTop: 16, fontSize: 14, fontWeight: 600, minHeight: 22,
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                color: loginCode === 803 ? '#31C27C' : loginCode === 800 ? '#F87171' : 'var(--text-primary)',
+              }}>
+                {(loginCode === 801 || loginCode === 802 || loginCode === 0) && loginMsg && !loginMsg.includes('失败') && (
+                  <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} />
+                )}
+                {loginMsg || '生成二维码中…'}
+              </div>
+
+              {/* 提示 */}
+              <div style={{
+                marginTop: 8, fontSize: 12, color: 'var(--text-muted)', textAlign: 'center', lineHeight: 1.5,
+              }}>
+                请使用{loginPlatform === 'netease' ? '网易云音乐' : 'QQ音乐'}App<br />扫描上方二维码完成登录
+              </div>
             </div>
           </div>
         </div>
