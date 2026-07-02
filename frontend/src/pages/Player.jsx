@@ -798,9 +798,9 @@ export default function Player({ onNavigate }) {
           <div className="animate-slideUp" style={{
             width: '100%',
             maxHeight: 200, overflowY: 'auto',
-            background: 'rgba(20,20,24,0.9)',
-            backdropFilter: 'blur(20px)',
-            WebkitBackdropFilter: 'blur(20px)',
+            background: 'var(--glass-2)',
+            backdropFilter: 'blur(24px)',
+            WebkitBackdropFilter: 'blur(24px)',
             borderRadius: 16,
             border: '1px solid var(--border)',
             padding: '8px 12px',

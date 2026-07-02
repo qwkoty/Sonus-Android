@@ -130,13 +130,13 @@ export default function Visualizer3D({ accent = '#4FC3F7', cover = '', onReady }
     geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
 
     const material = new THREE.PointsMaterial({
-      size: planeSize * 2 / GRID * 1.05, // 粒子略大于网格间距，紧密贴合形成清晰封面
+      size: planeSize * 2 / GRID * 0.82, // 留有间隙，呈现颗粒质感
       vertexColors: true,
       transparent: true,
       opacity: 1.0,
       depthWrite: false,
       sizeAttenuation: true,
-      blending: THREE.AdditiveBlending, // 加色混合，封面颜色更亮更通透
+      blending: THREE.NormalBlending, // 正常混合，颜色真实还原封面，不叠加发糊
     });
 
     const points = new THREE.Points(geometry, material);
@@ -206,13 +206,15 @@ export default function Visualizer3D({ accent = '#4FC3F7', cover = '', onReady }
         const z = (localEnergy * 0.85 + ripple) * zAmp * falloff * breathe;
         posAttr.array[i * 3 + 2] = z;
 
-        // 颜色：封面像素，提亮 + 能量增强，保证清晰可见
+        // 颜色：封面像素真实还原，暗部给最低亮度底避免在深色背景消失，亮部随能量轻微提亮
         if (hasCover) {
           const s = sampleCover(u, v);
-          const boost = 0.75 + localEnergy * 0.6;
-          colorAttr.array[i * 3]     = Math.min(1, s[0] * boost);
-          colorAttr.array[i * 3 + 1] = Math.min(1, s[1] * boost);
-          colorAttr.array[i * 3 + 2] = Math.min(1, s[2] * boost);
+          const boost = 0.92 + localEnergy * 0.35;
+          // 暗部保底：保证封面暗处粒子也可见，但保留明暗对比
+          const minBright = 0.14;
+          colorAttr.array[i * 3]     = Math.max(s[0] * boost, minBright * (0.6 + s[0]));
+          colorAttr.array[i * 3 + 1] = Math.max(s[1] * boost, minBright * (0.6 + s[1]));
+          colorAttr.array[i * 3 + 2] = Math.max(s[2] * boost, minBright * (0.6 + s[2]));
         } else {
           const intensity = 0.3 + localEnergy * 0.7;
           colorAttr.array[i * 3]     = 0.3 * intensity;
@@ -244,7 +246,7 @@ export default function Visualizer3D({ accent = '#4FC3F7', cover = '', onReady }
       computeLayout();
       buildGrid();
       posAttr.needsUpdate = true;
-      material.size = planeSize * 2 / GRID * 1.05;
+      material.size = planeSize * 2 / GRID * 0.82;
       renderer.setSize(W, H);
     };
     window.addEventListener('resize', handleResize);
