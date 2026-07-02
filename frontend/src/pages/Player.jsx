@@ -201,63 +201,49 @@ export default function Player({ onNavigate }) {
       <div style={{
         position: 'absolute',
         inset: 0,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
       }}>
-        <div style={{
-          position: 'relative',
-          width: 'min(85vw, 340px)',
-          height: 'min(85vw, 340px)',
-        }}>
-          <FloatingLyrics lyrics={lyrics} isPlaying={isPlaying} />
-          {vizMode === '3d'
-            ? <Suspense fallback={null}><Visualizer3D /></Suspense>
-            : <Visualizer isPlaying={isPlaying} mode={vizMode} />
-          }
-
-          {vizMode !== '3d' && (
-            <div style={{
-              position: 'absolute',
-              top: '50%', left: '50%',
-              transform: 'translate(-50%, -50%)',
-              width: 'min(44vw, 180px)',
-              height: 'min(44vw, 180px)',
-              borderRadius: '50%',
-              overflow: 'hidden',
-              zIndex: 3,
-              border: '1px solid rgba(255,255,255,0.06)',
-              boxShadow: '0 8px 40px rgba(0,0,0,0.6)',
-              animation: isPlaying ? 'spin 24s linear infinite' : 'none',
-            }}>
-              {currentTrack ? (
-                <img src={currentTrack.cover} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-              ) : (
-                <div style={{ width: '100%', height: '100%', background: 'var(--bg-elevated)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)' }}>
-                  <Music size={40} />
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* 加载指示器 */}
-          {isLoadingUrl && (
-            <div style={{
-              position: 'absolute',
-              top: '50%', left: '50%',
-              transform: 'translate(-50%, -50%)',
-              zIndex: 10,
-              width: 'min(44vw, 180px)',
-              height: 'min(44vw, 180px)',
-              borderRadius: '50%',
-              background: 'rgba(0,0,0,0.4)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-            }}>
-              <Loader2 size={32} color="#fff" className="animate-spin" style={{ animation: 'spin 1s linear infinite' }} />
-            </div>
-          )}
-        </div>
+        <FloatingLyrics lyrics={lyrics} isPlaying={isPlaying} />
+        {vizMode === '3d'
+          ? <Suspense fallback={null}><Visualizer3D /></Suspense>
+          : <Visualizer isPlaying={isPlaying} mode={vizMode} />
+        }
       </div>
+
+      {/* ====== 封面缩略图（左下角，不挡视野） ====== */}
+      {vizMode !== '3d' && currentTrack && (
+        <div style={{
+          position: 'absolute',
+          bottom: 'calc(90px + var(--safe-bottom))',
+          left: 16,
+          zIndex: 50,
+          width: 48, height: 48,
+          borderRadius: 10,
+          overflow: 'hidden',
+          border: '1px solid rgba(255,255,255,0.1)',
+          boxShadow: '0 4px 16px rgba(0,0,0,0.5)',
+          flexShrink: 0,
+        }}>
+          <img src={currentTrack.cover} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+        </div>
+      )}
+
+      {/* ====== 加载指示器（屏幕居中） ====== */}
+      {isLoadingUrl && (
+        <div style={{
+          position: 'absolute',
+          top: '50%', left: '50%',
+          transform: 'translate(-50%, -50%)',
+          zIndex: 10,
+          width: 56, height: 56,
+          borderRadius: '50%',
+          background: 'rgba(0,0,0,0.5)',
+          backdropFilter: 'blur(12px)',
+          WebkitBackdropFilter: 'blur(12px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>
+          <Loader2 size={24} color="#fff" style={{ animation: 'spin 1s linear infinite' }} />
+        </div>
+      )}
 
       {/* ====== 歌曲信息（顶部居中浮层） ====== */}
       <div style={{

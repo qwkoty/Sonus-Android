@@ -7,6 +7,7 @@ export default function Visualizer({ isPlaying, mode = 'ring' }) {
   const canvasRef = useRef(null);
   const rafRef = useRef(null);
   const smoothRef = useRef(new Float32Array(NUM_BARS));
+  const bassSmoothRef = useRef(0);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -25,29 +26,54 @@ export default function Visualizer({ isPlaying, mode = 'ring' }) {
     resize();
     window.addEventListener('resize', resize);
 
-    // ---- 模式：连续闭合环形频谱（完全自适应） ----
+    // ---- 模式：连续闭合环形频谱（完全自适应 + 中心填充） ----
     const drawRing = (spectrum, hasData) => {
       const data = spectrum;
 
-      // 自适应：所有半径基于容器实际尺寸计算
-      // 封面内圆半径 = 容器短边的 22%（匹配封面图大小）
-      const INNER_R = minDim * 0.22;
-      // 最大外延 = 容器短边的一半 × 0.85（留 15% 安全余量）
+      // 自适应半径
+      const INNER_R = minDim * 0.15;
       const MAX_OUTER = minDim * 0.5 * 0.85;
-      // 频谱柱最大长度 = 可用外延空间
       const MAX_BAR = MAX_OUTER - INNER_R;
-      // 频谱值最大 1.2 倍放大时的安全限制
-      const MAX_VALUE_SCALE = 1.2;
-      const safeBarScale = MAX_BAR / MAX_VALUE_SCALE;
+      const safeBarScale = MAX_BAR / 1.2;
 
-      // 平滑过渡：每帧向目标值靠拢，消除抖动
+      // 平滑
       const smooth = smoothRef.current;
       const smoothFactor = 0.35;
       for (let i = 0; i < NUM_BARS; i++) {
         smooth[i] += (data[i] - smooth[i]) * smoothFactor;
       }
 
-      // 计算每个点的坐标（外层 + 内层镜像）
+      // 计算 bass 能量（前 8 个频段平均），用于中心辉光脉动
+      let bass = 0;
+      if (hasData) {
+        for (let i = 0; i < 8; i++) bass += smooth[i];
+        bass /= 8;
+      } else {
+        bass = 0.05 + Math.sin(Date.now() * 0.001) * 0.03;
+      }
+      bassSmoothRef.current += (bass - bassSmoothRef.current) * 0.2;
+      const bassSmooth = bassSmoothRef.current;
+
+      // ---- 中心填充：径向渐变辉光 ----
+      const centerGlowR = INNER_R * (1.2 + bassSmooth * 0.4);
+      const centerGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, centerGlowR);
+      const baseAlpha = 0.08 + bassSmooth * 0.12;
+      centerGrad.addColorStop(0, `hsla(30, 90%, 55%, ${baseAlpha})`);
+      centerGrad.addColorStop(0.4, `hsla(200, 80%, 45%, ${baseAlpha * 0.6})`);
+      centerGrad.addColorStop(1, 'hsla(280, 80%, 40%, 0)');
+      ctx.fillStyle = centerGrad;
+      ctx.beginPath();
+      ctx.arc(cx, cy, centerGlowR, 0, Math.PI * 2);
+      ctx.fill();
+
+      // ---- 中心内圈描边（细微的圆环线） ----
+      ctx.strokeStyle = `hsla(200, 90%, 65%, ${0.06 + bassSmooth * 0.08})`;
+      ctx.lineWidth = minDim * 0.001;
+      ctx.beginPath();
+      ctx.arc(cx, cy, INNER_R, 0, Math.PI * 2);
+      ctx.stroke();
+
+      // ---- 计算频谱曲线点 ----
       const outerPts = [];
       const innerPts = [];
       for (let i = 0; i < NUM_BARS; i++) {
@@ -59,7 +85,6 @@ export default function Visualizer({ isPlaying, mode = 'ring' }) {
           x: cx + Math.cos(angle) * (INNER_R + barLen),
           y: cy + Math.sin(angle) * (INNER_R + barLen),
         });
-        // 镜像反射：向内，不超过内圆半径的 40%
         const innerLen = Math.min(barLen * 0.5, INNER_R * 0.4);
         innerPts.push({
           x: cx + Math.cos(angle) * (INNER_R - innerLen),
@@ -67,7 +92,7 @@ export default function Visualizer({ isPlaying, mode = 'ring' }) {
         });
       }
 
-      // 绘制平滑闭合曲线
+      // ---- 绘制平滑闭合曲线 ----
       const drawSmoothLoop = (pts, lineWidth, alpha) => {
         if (pts.length < 3) return;
         ctx.beginPath();
@@ -82,7 +107,6 @@ export default function Visualizer({ isPlaying, mode = 'ring' }) {
         }
         ctx.closePath();
 
-        // 按频率分色的渐变描边
         const grad = ctx.createLinearGradient(cx - INNER_R, cy, cx + INNER_R, cy);
         grad.addColorStop(0, `hsla(30, 90%, 65%, ${alpha})`);
         grad.addColorStop(0.5, `hsla(200, 90%, 65%, ${alpha})`);
@@ -94,16 +118,15 @@ export default function Visualizer({ isPlaying, mode = 'ring' }) {
         ctx.stroke();
       };
 
-      // 线宽也自适应容器尺寸
-      const baseLW = minDim * 0.004;
+      const baseLW = minDim * 0.003;
 
-      // 镜像反射层（向内，暗色）
+      // 镜像反射层
       drawSmoothLoop(innerPts, baseLW * 0.8, 0.1);
 
       // 3 层辉光
-      drawSmoothLoop(outerPts, baseLW * 5, 0.05);  // 外光晕
-      drawSmoothLoop(outerPts, baseLW * 2.5, 0.15); // 中层
-      drawSmoothLoop(outerPts, baseLW * 1.2, 0.85); // 亮芯
+      drawSmoothLoop(outerPts, baseLW * 5, 0.05);
+      drawSmoothLoop(outerPts, baseLW * 2.5, 0.15);
+      drawSmoothLoop(outerPts, baseLW * 1.2, 0.85);
     };
 
     // ---- 模式：波形示波器（自适应） ----
@@ -111,9 +134,8 @@ export default function Visualizer({ isPlaying, mode = 'ring' }) {
       const wave = readTimeDomainData();
       const hasData = wave.length > 0 && isPlaying;
       const midY = cy;
-      // 振幅 = 容器高度的 35%，保证不超出
       const amp = h * 0.35;
-      const baseLW = minDim * 0.004;
+      const baseLW = minDim * 0.003;
 
       const layers = [
         { width: baseLW * 4, alpha: 0.08, color: '#4FC3F7' },
@@ -151,7 +173,6 @@ export default function Visualizer({ isPlaying, mode = 'ring' }) {
       ctx.globalAlpha = 1;
     };
 
-    // ---- 主循环 ----
     const draw = () => {
       ctx.clearRect(0, 0, w, h);
       const { data, hasData } = getSpectrumBars(NUM_BARS);
@@ -166,6 +187,7 @@ export default function Visualizer({ isPlaying, mode = 'ring' }) {
     };
 
     smoothRef.current.fill(0);
+    bassSmoothRef.current = 0;
     draw();
     return () => {
       cancelAnimationFrame(rafRef.current);
