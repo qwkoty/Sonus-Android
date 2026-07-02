@@ -139,7 +139,7 @@ export default function Visualizer3D({ accent = '#4FC3F7', cover = '', onReady }
     geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
 
     const material = new THREE.PointsMaterial({
-      size: planeSize * 2 / GRID * 1.1,
+      size: planeSize * 2 / GRID * 0.6, // 粒子小于网格间距，分散有间隙
       vertexColors: true,
       transparent: true,
       opacity: 0.95,
@@ -202,12 +202,14 @@ export default function Visualizer3D({ accent = '#4FC3F7', cover = '', onReady }
         const tFreq = Math.max(0, 1 - Math.abs(dc - 0.85) * 3);
         let localEnergy = bass * bFreq + mid * mFreq * 0.7 + treble * tFreq * 0.5;
 
-        // 基础呼吸波动：即使频谱为 0 所有粒子也起伏，保证都会跳
-        const baseBreathe = (Math.sin(time * 1.4 + dc * 8 + u * 3) * 0.5 + 0.5) * 0.12;
+        // 基础呼吸波动：每个粒子独立相位，即使频谱为 0 也起伏，保证都会跳
+        // 用 u+v 作为粒子标识，相位分散，避免大片同步
+        const phase = u * 21.5 + v * 17.3 + dc * 9;
+        const baseBreathe = (Math.sin(time * 1.8 + phase) * 0.5 + 0.5) * 0.22;
         localEnergy = Math.max(localEnergy, baseBreathe);
 
         // 外扩波纹（增加流动感）
-        const ripple = Math.sin(dc * 12 - time * 2.5) * 0.06 * (0.3 + mid);
+        const ripple = Math.sin(dc * 12 - time * 2.5) * 0.08 * (0.3 + mid);
 
         const z = (localEnergy * 0.85 + ripple) * zAmp * falloff * breathe;
         posAttr.array[i * 3 + 2] = z;
