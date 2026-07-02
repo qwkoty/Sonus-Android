@@ -59,6 +59,10 @@ export default function Visualizer3D({ accent = '#4FC3F7', cover = '', onReady }
     let H = container.offsetHeight;
 
     const scene = new THREE.Scene();
+    // 雾效：远端粒子变暗，增强 3D 纵深感
+    scene.fog = new THREE.Fog(0x050505, 0, 0);
+    scene.fog.near = 1;
+    scene.fog.far = 0; // 后面根据相机距离动态设置
     const camera = new THREE.PerspectiveCamera(FOV, W / H, 0.1, 3000);
 
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
@@ -88,6 +92,11 @@ export default function Visualizer3D({ accent = '#4FC3F7', cover = '', onReady }
       camera.aspect = aspect;
       camera.position.z = cameraZ;
       camera.updateProjectionMatrix();
+      // 雾效：近端清晰，远端淡化，增强纵深
+      if (scene.fog) {
+        scene.fog.near = cameraZ * 0.6;
+        scene.fog.far = cameraZ * 1.3;
+      }
     };
     computeLayout();
 
@@ -161,7 +170,7 @@ export default function Visualizer3D({ accent = '#4FC3F7', cover = '', onReady }
     const animate = () => {
       const { data, hasData } = getSpectrumBars(64);
 
-      // 频段分组：treble 高频居中，向外依次 mid、bass，形成中心高频向外递减的同心圆
+      // 频段分组：bass 低频居中，向外依次 mid、treble
       let bass = 0, mid = 0, treble = 0;
       if (hasData) {
         for (let i = 0; i < 8; i++) bass += data[i];
@@ -175,40 +184,43 @@ export default function Visualizer3D({ accent = '#4FC3F7', cover = '', onReady }
         mid = 0.05;
         treble = 0.03;
       }
-      const breathe = 1 + Math.min(bass, 1) * 0.06;
-      const zAmp = planeSize * MAX_Z;
+      const breathe = 1 + Math.min(bass, 1) * 0.08;
+      const zAmp = planeSize * MAX_Z * 1.4; // 增大振幅，起伏更明显
       const time = Date.now() * 0.001;
       const hasCover = hasCoverRef.current;
 
-      // 中心高频、向外递减：能量随距中心距离衰减，起伏集中在中央而非一坨
       for (let i = 0; i < COUNT; i++) {
         const u = origXY[i * 2];
         const v = origXY[i * 2 + 1];
         const dc = distFromCenter[i]; // 0 中心 ~ 1 边角
 
-        // 距离衰减：中心 1，边缘 ~0.2，使起伏集中在中央
-        const falloff = Math.pow(1 - dc, 1.6) * 0.85 + 0.15;
-        // 频段分配：中心用 bass（低频），中圈用 mid，外圈用 treble（高频），平滑过渡
-        const bFreq = Math.max(0, 1 - dc * 1.8);              // 中心 1 → 外 0
-        const mFreq = Math.max(0, 1 - Math.abs(dc - 0.4) * 2.5); // 中圈峰值
-        const tFreq = Math.max(0, 1 - Math.abs(dc - 0.85) * 3);  // 外圈峰值
-        const localEnergy = bass * bFreq + mid * mFreq * 0.7 + treble * tFreq * 0.5;
+        // 距离衰减减弱：中心 1，边缘 0.5，让边缘也明显跳动
+        const falloff = Math.pow(1 - dc, 1.0) * 0.5 + 0.5;
+        // 频段分配：中心 bass，中圈 mid，外圈 treble
+        const bFreq = Math.max(0, 1 - dc * 1.8);
+        const mFreq = Math.max(0, 1 - Math.abs(dc - 0.4) * 2.5);
+        const tFreq = Math.max(0, 1 - Math.abs(dc - 0.85) * 3);
+        let localEnergy = bass * bFreq + mid * mFreq * 0.7 + treble * tFreq * 0.5;
 
-        // 缓慢外扩波纹（增加流动感，不抢主起伏）
-        const ripple = Math.sin(dc * 14 - time * 3) * 0.05 * (0.3 + mid);
+        // 基础呼吸波动：即使频谱为 0 所有粒子也起伏，保证都会跳
+        const baseBreathe = (Math.sin(time * 1.4 + dc * 8 + u * 3) * 0.5 + 0.5) * 0.12;
+        localEnergy = Math.max(localEnergy, baseBreathe);
 
-        const z = (localEnergy * 0.9 + ripple) * zAmp * falloff * breathe;
+        // 外扩波纹（增加流动感）
+        const ripple = Math.sin(dc * 12 - time * 2.5) * 0.06 * (0.3 + mid);
+
+        const z = (localEnergy * 0.85 + ripple) * zAmp * falloff * breathe;
         posAttr.array[i * 3 + 2] = z;
 
-        // 颜色：封面像素，中心更亮（高频驱动）
+        // 颜色：封面像素，能量越高越亮
         if (hasCover) {
           const s = sampleCover(u, v);
-          const boost = 0.55 + localEnergy * 0.7;
+          const boost = 0.5 + localEnergy * 0.8;
           colorAttr.array[i * 3]     = Math.min(1, s[0] * boost);
           colorAttr.array[i * 3 + 1] = Math.min(1, s[1] * boost);
           colorAttr.array[i * 3 + 2] = Math.min(1, s[2] * boost);
         } else {
-          const intensity = 0.35 + localEnergy * 0.65;
+          const intensity = 0.3 + localEnergy * 0.7;
           colorAttr.array[i * 3]     = 0.3 * intensity;
           colorAttr.array[i * 3 + 1] = 0.6 * intensity;
           colorAttr.array[i * 3 + 2] = 1.0 * intensity;
@@ -218,8 +230,9 @@ export default function Visualizer3D({ accent = '#4FC3F7', cover = '', onReady }
       posAttr.needsUpdate = true;
       colorAttr.needsUpdate = true;
 
-      points.rotation.y = Math.sin(time * 0.3) * 0.32;
-      points.rotation.x = -0.18 + Math.sin(time * 0.4) * 0.06;
+      // 加大倾斜角增强 3D 纵深感 + 缓慢摇摆
+      points.rotation.y = Math.sin(time * 0.25) * 0.4;
+      points.rotation.x = -0.42 + Math.sin(time * 0.35) * 0.08;
       const sc = breathe;
       points.scale.set(sc, sc, 1);
 
