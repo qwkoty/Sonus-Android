@@ -224,6 +224,17 @@ export default function Visualizer({ isPlaying, mode = 'ring', accent = '#4FC3F7
       ctx.beginPath();
       ctx.arc(cx, cy, INNER_R - minDim * 0.005, 0, Math.PI * 2);
       ctx.stroke();
+
+      // 外圈引导环（极淡，框定最大范围，增强现代结构感）
+      ctx.save();
+      ctx.strokeStyle = C.glass;
+      ctx.globalAlpha = 0.25;
+      ctx.lineWidth = Math.max(0.5, minDim * 0.0006);
+      ctx.setLineDash([minDim * 0.004, minDim * 0.008]);
+      ctx.beginPath();
+      ctx.arc(cx, cy, MAX_OUTER, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
     };
 
     // ---- 模式：波形（频谱柱镜像 + 渐变填充 + 中心线 · 自适应） ----
@@ -250,6 +261,15 @@ export default function Visualizer({ isPlaying, mode = 'ring', accent = '#4FC3F7
       ctx.moveTo(0, midY);
       ctx.lineTo(w, midY);
       ctx.stroke();
+
+      // 中线两侧柔光带（增加层次与氛围）
+      const bandH = h * 0.16;
+      const bandGrad = ctx.createLinearGradient(0, midY - bandH, 0, midY + bandH);
+      bandGrad.addColorStop(0, C.halo(0));
+      bandGrad.addColorStop(0.5, C.halo(0.06));
+      bandGrad.addColorStop(1, C.halo(0));
+      ctx.fillStyle = bandGrad;
+      ctx.fillRect(0, midY - bandH, w, bandH * 2);
 
       // 镜像频谱柱：上下对称，每根柱子用垂直渐变填充
       for (let i = 0; i < NUM_BARS; i++) {

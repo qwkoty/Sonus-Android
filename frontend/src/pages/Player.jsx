@@ -102,6 +102,13 @@ export default function Player({ onNavigate }) {
     document.documentElement.style.setProperty('--accent-dynamic', accentColor);
   }, [accentColor]);
 
+  // 3D 粒子采样的封面：走同源代理绕过 CORS（picsum 等已支持 CORS 的可直连）
+  const coverFor3D = currentTrack?.cover
+    ? (currentTrack.cover.startsWith('https://picsum.photos')
+        ? currentTrack.cover
+        : music.cover(currentTrack.cover))
+    : '';
+
   // 键盘快捷键
   useEffect(() => {
     const onKey = (e) => {
@@ -230,7 +237,7 @@ export default function Player({ onNavigate }) {
       }}>
         <FloatingLyrics lyrics={lyrics} isPlaying={isPlaying} />
         {vizMode === '3d'
-          ? <Suspense fallback={null}><Visualizer3D accent={accentColor} /></Suspense>
+          ? <Suspense fallback={null}><Visualizer3D accent={accentColor} cover={coverFor3D} /></Suspense>
           : <Visualizer isPlaying={isPlaying} mode={vizMode} accent={accentColor} />
         }
       </div>
@@ -634,7 +641,7 @@ export default function Player({ onNavigate }) {
               <Volume2 size={13} color="var(--text-muted)" />
               <input type="range" min={0} max={1} step={0.01} value={volume}
                 onChange={(e) => setVolume(parseFloat(e.target.value))}
-                style={{ flex: 1, accentColor: '#fff', height: 2, cursor: 'pointer' }} />
+                style={{ flex: 1, height: 2, cursor: 'pointer' }} />
             </div>
             <button
               onClick={() => setShowPlaylist(!showPlaylist)}

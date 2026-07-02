@@ -482,6 +482,37 @@ router.get('/stream', async (req, res) => {
   }
 });
 
+// ---------- 封面图代理（解决 CORS，供 3D 粒子采样） ----------
+router.get('/cover', async (req, res) => {
+  try {
+    const { url } = req.query;
+    if (!url) return res.status(400).json({ error: 'url required' });
+    // 仅允许 http(s)
+    if (!/^https?:\/\//i.test(url)) return res.status(400).json({ error: 'invalid url' });
+
+    const upstream = await axios.get(url, {
+      responseType: 'stream',
+      headers: COMMON_HEADERS,
+      timeout: 10000,
+      maxRedirects: 5,
+      validateStatus: () => true,
+    });
+
+    res.status(upstream.status);
+    const passHeaders = ['content-type', 'content-length', 'cache-control'];
+    for (const h of passHeaders) {
+      if (upstream.headers[h]) res.setHeader(h, upstream.headers[h]);
+    }
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Cache-Control', 'public, max-age=86400');
+
+    upstream.data.pipe(res);
+    req.on('close', () => upstream.data.destroy());
+  } catch (err) {
+    if (!res.headersSent) res.status(500).json({ error: err.message });
+  }
+});
+
 // ---------- 获取歌词 ----------
 router.get('/lyric', async (req, res) => {
   try {
