@@ -111,9 +111,9 @@ export default function Visualizer({ isPlaying, mode = 'ring', accent = '#4FC3F7
       ctx.arc(cx, cy, coreR, 0, Math.PI * 2);
       ctx.fill();
 
-      // ---- 多层辐射波浪环（从核心边缘向外，无空隙） ----
+      // ---- 多层辐射波浪环（从核心边缘向外，无空隙，间隙小） ----
       // 每层是一个圆环，半径上叠加频谱波形 + 时间动画（向外扩散）
-      const NUM_RINGS = 6;
+      const NUM_RINGS = 8;
       const halfBars = NUM_BARS / 2;
       // 第一层起始半径 = 核心半径，确保无空隙
       const ringStart = coreR;
@@ -125,6 +125,9 @@ export default function Visualizer({ isPlaying, mode = 'ring', accent = '#4FC3F7
         const phase = ring * 0.8;
         // 透明度从内到外递减
         const alpha = 0.75 - ring * 0.12;
+        // 频段映射：内层环=低频，外层环=高频（中心低频，周围高频）
+        const freqIdx = Math.min(NUM_BARS - 1, Math.floor((ring / (NUM_RINGS - 1)) * NUM_BARS));
+        const ringFreq = smooth[freqIdx];
 
         ctx.save();
         ctx.strokeStyle = `hsla(${hexToHsl(accentRef.current)[0] + ring * 8}, 80%, ${68 - ring * 4}%, ${alpha})`;
@@ -138,17 +141,13 @@ export default function Visualizer({ isPlaying, mode = 'ring', accent = '#4FC3F7
         const STEPS = 180;
         for (let s = 0; s <= STEPS; s++) {
           const angle = (s / STEPS) * Math.PI * 2;
-          // 距顶部的步数（用于频段映射：中心低频，外层高频）
-          const dNorm = Math.abs(Math.sin(angle)); // 0~1，正弦让顶部底部为高点
-          // 映射到频段：dNorm 小 → 低频，大 → 高频
-          const freqIdx = Math.min(NUM_BARS - 1, Math.floor(dNorm * NUM_BARS));
-          // 波浪振幅：频谱值 + 呼吸 + 向外扩散的行波
+          // 波浪振幅：本环频段值 + 呼吸 + 向外扩散的行波
           const breathe = (Math.sin(tNow * 1.4 + angle * 3 + phase) * 0.5 + 0.5) * 0.06;
-          const value = hasData ? Math.max(smooth[freqIdx], breathe) : 0.04 + breathe;
+          const value = hasData ? Math.max(ringFreq, breathe) : 0.04 + breathe;
           // 行波：让波形随时间向外传播
           const wave = Math.sin(tNow * 2.2 - ring * 0.6 + angle * 5) * 0.15;
-          const amp = value * (MAX_R - ringStart) * 0.18 * (hasData ? 1 : 0.4);
-          const r = baseR + amp + wave * minDim * 0.008;
+          const amp = value * (MAX_R - ringStart) * 0.16 * (hasData ? 1 : 0.4);
+          const r = baseR + amp + wave * minDim * 0.006;
           const x = cx + Math.cos(angle) * r;
           const y = cy + Math.sin(angle) * r;
           if (s === 0) ctx.moveTo(x, y);

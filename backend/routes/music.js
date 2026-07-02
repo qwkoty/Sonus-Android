@@ -112,134 +112,73 @@ async function neteaseUserPlaylists(cookie, uid) {
 }
 
 // ---------- 扫码登录：QQ 音乐 ----------
-// 生成 QQ 二维码扫码 token (ptqrshow + ptqrlogin 流程)
-// 使用 QQ 音乐网页版 appid 716027609
+// 走 QQ 音乐官方 unikey 接口（musicu.fcg），比 ptqrshow 稳定，且直接返回 QQ 音乐 cookie
 async function qqQrCreate() {
-  // 1. 请求 ptqrshow 获取 qrsig（同时拿到验证图片 PNG）
-  const showUrl = 'https://ssl.pt.qq.com/ptqrshow';
-  const showResp = await axios.get(showUrl, {
-    params: {
-      appid: '716027609',
-      e: '2',
-      l: 'L',
-      s: '3',
-      d: '72',
-      v: '4',
-      t: String(Math.random()),
-      da: '25',
-      pt_3rd_aid: '0',
-    },
+  // 1. 生成 QQ 音乐扫码 unikey
+  const url = 'https://u.y.qq.com/cgi-bin/musicu.fcg';
+  const payload = {
+    comm: { _channelid: '0', _os_version: '0', authst: '', ct: '24', cv: '0', patch: '118', tmeAppID: 'qqmusic', uin: '0', v: '80300' },
+    req: { module: 'QQConnectLogin.LoginServer', method: 'QQLogin', param: { state: String(Math.random()) } },
+  };
+  const resp = await axios.post(url, payload, {
     headers: {
       'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      'Content-Type': 'application/json',
       Referer: 'https://y.qq.com/',
     },
     timeout: 10000,
-    responseType: 'arraybuffer',
-    maxRedirects: 0,
-    validateStatus: () => true,
   });
-  const setCookies = showResp.headers?.['set-cookie'] || [];
-  let qrsig = '';
-  // 从 set-cookie 中提取 qrsig（可能多个 cookie）
-  for (const c of setCookies) {
-    const m = c.match(/qrsig=([^;]+)/);
-    if (m) { qrsig = m[1]; break; }
+  const d = resp.data?.req?.data;
+  if (!d?.qrcode || !d?.state) throw new Error('获取 QQ 二维码失败');
+  // qrcode 是二维码图片 base64（不带前缀）
+  let qrimg = d.qrcode;
+  if (qrimg && !qrimg.startsWith('data:image')) {
+    qrimg = 'data:image/png;base64,' + qrimg;
   }
-  if (!qrsig) throw new Error('获取 qrsig 失败');
-  const qrimg = 'data:image/png;base64,' + Buffer.from(showResp.data).toString('base64');
-  return { qrsig, qrimg };
-}
-
-// 计算 ptqrlogin 所需的 qrcode index（gd 版 hash）
-function hash33(s) {
-  let h = 0;
-  for (let i = 0; i < s.length; i++) {
-    h += (h << 5) + s.charCodeAt(i);
-  }
-  return 2147483647 & h;
+  return { qrsig: d.state, qrimg };
 }
 
 // 轮询 QQ 登录状态
 async function qqQrCheck(qrsig) {
-  const ptqrtoken = hash33(qrsig);
-  const loginUrl = 'https://ssl.pt.qq.com/ptqrlogin';
-  const resp = await axios.get(loginUrl, {
-    params: {
-      u1: 'https://y.qq.com/',
-      ptqrtoken,
-      ptredirect: '0',
-      h: '1',
-      t: '1',
-      g: '1',
-      from_ui: '1',
-      ptlang: '2052',
-      action: '0-0-' + Date.now(),
-      js_ver: '24042410',
-      js_type: '1',
-      login_sig: '',
-      pt_uistyle: '40',
-      aid: '716027609',
-      daid: '383',
-      pt_3rd_aid: '0',
-    },
+  const url = 'https://u.y.qq.com/cgi-bin/musicu.fcg';
+  const payload = {
+    comm: { _channelid: '0', _os_version: '0', authst: '', ct: '24', cv: '0', patch: '118', tmeAppID: 'qqmusic', uin: '0', v: '80300' },
+    req: { module: 'QQConnectLogin.LoginServer', method: 'QQLoginCheck', param: { state: qrsig } },
+  };
+  const resp = await axios.post(url, payload, {
     headers: {
       'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-      Cookie: `qrsig=${qrsig}`,
+      'Content-Type': 'application/json',
       Referer: 'https://y.qq.com/',
     },
     timeout: 10000,
-    maxRedirects: 0,
-    validateStatus: () => true,
   });
-  const body = typeof resp.data === 'string' ? resp.data : JSON.stringify(resp.data);
-  // 返回内容类似: ptuiCB('66','0','','0','二维码未失效。(2059131352)', '');
-  // code: 66 未扫描, 67 已扫码待确认, 0 登录成功(第四个参数为跳转url)
-  const m = body.match(/ptuiCB\('(\d+)','(\d+)','([^']*)','(\d+)','([^']*)'/);
-  if (!m) return { code: 800, msg: '解析失败', cookie: '' };
-  const [, code, , redirectUrl, , msg] = m;
-  // 登录成功，跟随重定向拿 cookie
-  if (code === '0' && redirectUrl) {
-    try {
-      // ptredirect=0 时需要手动跟随多次重定向收集所有 set-cookie
-      const cookieResp = await axios.get(redirectUrl, {
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-          Referer: 'https://y.qq.com/',
-        },
-        timeout: 10000,
-        maxRedirects: 5,
-        validateStatus: () => true,
-      });
-      // 收集整个重定向链路上的 set-cookie
-      const allCookies = {};
-      const collectCookies = (resp) => {
-        const sc = resp.headers?.['set-cookie'] || [];
-        for (const c of sc) {
-          const eq = c.indexOf('=');
-          if (eq > 0) {
-            const k = c.slice(0, eq).trim();
-            const v = c.slice(eq + 1).split(';')[0];
-            if (k) allCookies[k] = v;
-          }
-        }
-      };
-      collectCookies(cookieResp);
-      // axios 不会直接暴露中间重定向的 set-cookie，这里用 response history（如可用）
-      const uin = (allCookies.uin || allCookies.wxuin || '').toString().replace(/^o0*/, '');
-      const key = allCookies.ptvpnmusic || allCookies.qqmusic_key || allCookies.p_skey || allCookies.skey || '';
-      const cookieStr = Object.entries(allCookies).map(([k, v]) => `${k}=${v}`).join('; ');
-      let user = null;
-      if (uin && key) {
-        try { user = await qqUserInfo(uin, key); } catch (e) {}
-      }
-      return { code: 803, msg, cookie: cookieStr, uin, key, user };
-    } catch (e) {
-      return { code: 803, msg: '登录成功但获取cookie失败', cookie: '', uin: '', key: '', user: null };
+  const d = resp.data?.req?.data || {};
+  // code: 0 未扫描, 1 已扫码待确认, 2 已确认登录成功, 3 过期
+  const code = d.code;
+  let result = { code: 800, msg: d.msg || '', cookie: '', uin: '', key: '', user: null };
+  if (code === 0) result.code = 801;
+  else if (code === 1) result.code = 802;
+  else if (code === 2) {
+    // 登录成功，提取 cookie 信息
+    result.code = 803;
+    result.uin = String(d.uin || d.uin_uin || '');
+    result.key = d.key || d.music_u || d.qqmusic_key || '';
+    // 拼接 cookie 字符串
+    const cookieParts = [];
+    if (result.uin) cookieParts.push(`uin=o${result.uin}`, `wxuin=o${result.uin}`);
+    if (result.key) cookieParts.push(`qqmusic_key=${result.key}`, `p_skey=${result.key}`);
+    if (d.music_u) cookieParts.push(`MUSIC_U=${d.music_u}`);
+    result.cookie = cookieParts.join('; ');
+    // 拉取用户信息
+    if (result.uin && result.key) {
+      try { result.user = await qqUserInfo(result.uin, result.key); } catch (e) {}
     }
+  } else if (code === 3) {
+    result.code = 800;
+    result.msg = '二维码已过期';
   }
-  // 映射状态码到网易云一致风格：66→801 等待, 67→802 已扫码, 65→800 过期
-  const statusMap = { '66': 801, '67': 802, '65': 800 };
-  return { code: statusMap[code] || 800, msg, cookie: '' };
+  return result;
 }
 
 // QQ 音乐用户信息
