@@ -134,8 +134,8 @@ export default function Visualizer({ isPlaying, mode = 'ring', accent = '#4FC3F7
       for (let i = 0; i < numBars; i++) {
         // 距顶部的步数（0..halfBars）
         const d = i <= halfBars ? i : numBars - i;
-        // 映射到频段索引：d=0 → 最高频(NUM_BARS-1)，d=halfBars → 最低频(0)
-        const freqIdx = Math.round((1 - d / halfBars) * (NUM_BARS - 1));
+        // 映射到频段索引：d=0 → 最低频(0)，d=halfBars → 最高频(NUM_BARS-1)
+        const freqIdx = Math.round((d / halfBars) * (NUM_BARS - 1));
         const value = hasData ? smooth[freqIdx] : 0.04;
         barLen.push(Math.max(2, value * safeBarScale * (hasData ? 1.0 : 0.4)));
       }
@@ -286,8 +286,8 @@ export default function Visualizer({ isPlaying, mode = 'ring', accent = '#4FC3F7
       for (let i = 0; i < NUM_BARS; i++) {
         // 距中心的步数（0..halfBarsW）
         const d = i <= halfBarsW ? halfBarsW - i : i - halfBarsW;
-        // 映射频段：d=0 → 最高频，d=halfBarsW → 最低频
-        const freqIdx = Math.round((1 - d / halfBarsW) * (NUM_BARS - 1));
+        // 映射频段：d=0 → 最低频，d=halfBarsW → 最高频
+        const freqIdx = Math.round((d / halfBarsW) * (NUM_BARS - 1));
         const value = hasData
           ? smooth[freqIdx]
           : 0.04 + Math.sin(Date.now() * 0.002 + i * 0.2) * 0.02;

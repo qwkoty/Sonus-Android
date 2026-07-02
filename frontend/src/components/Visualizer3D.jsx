@@ -188,11 +188,11 @@ export default function Visualizer3D({ accent = '#4FC3F7', cover = '', onReady }
 
         // 距离衰减：中心 1，边缘 ~0.2，使起伏集中在中央
         const falloff = Math.pow(1 - dc, 1.6) * 0.85 + 0.15;
-        // 频段分配：中心用 treble，中圈用 mid，外圈用 bass，平滑过渡
-        const tFreq = Math.max(0, 1 - dc * 1.8);              // 中心 1 → 外 0
+        // 频段分配：中心用 bass（低频），中圈用 mid，外圈用 treble（高频），平滑过渡
+        const bFreq = Math.max(0, 1 - dc * 1.8);              // 中心 1 → 外 0
         const mFreq = Math.max(0, 1 - Math.abs(dc - 0.4) * 2.5); // 中圈峰值
-        const bFreq = Math.max(0, 1 - Math.abs(dc - 0.85) * 3);  // 外圈峰值
-        const localEnergy = treble * tFreq + mid * mFreq * 0.7 + bass * bFreq * 0.5;
+        const tFreq = Math.max(0, 1 - Math.abs(dc - 0.85) * 3);  // 外圈峰值
+        const localEnergy = bass * bFreq + mid * mFreq * 0.7 + treble * tFreq * 0.5;
 
         // 缓慢外扩波纹（增加流动感，不抢主起伏）
         const ripple = Math.sin(dc * 14 - time * 3) * 0.05 * (0.3 + mid);
