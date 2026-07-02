@@ -121,14 +121,22 @@ export default function Visualizer({ isPlaying, mode = 'ring', accent = '#4FC3F7
       ctx.fill();
 
       // ---- 柱子粘在一起的环带 ----
+      // 频段映射：顶部（i=0）= 高频中心，向两侧递减到低频
+      // 频谱数组 smooth[0]=低频 .. smooth[NUM_BARS-1]=高频
+      // 柱子 i 距顶部的角度步数 d（0..numBars/2），d 越小取越高频段
       const numBars = NUM_BARS;
       const angleStep = (Math.PI * 2) / numBars;
       const angleAt = (i) => i * angleStep - Math.PI / 2;
       const radPos = (a, r) => ({ x: cx + Math.cos(a) * r, y: cy + Math.sin(a) * r });
+      const halfBars = numBars / 2;
 
       const barLen = [];
       for (let i = 0; i < numBars; i++) {
-        const value = hasData ? smooth[i] : 0.04;
+        // 距顶部的步数（0..halfBars）
+        const d = i <= halfBars ? i : numBars - i;
+        // 映射到频段索引：d=0 → 最高频(NUM_BARS-1)，d=halfBars → 最低频(0)
+        const freqIdx = Math.round((1 - d / halfBars) * (NUM_BARS - 1));
+        const value = hasData ? smooth[freqIdx] : 0.04;
         barLen.push(Math.max(2, value * safeBarScale * (hasData ? 1.0 : 0.4)));
       }
 
@@ -272,8 +280,17 @@ export default function Visualizer({ isPlaying, mode = 'ring', accent = '#4FC3F7
       ctx.fillRect(0, midY - bandH, w, bandH * 2);
 
       // 镜像频谱柱：上下对称，每根柱子用垂直渐变填充
+      // 频段映射：屏幕中心 = 高频，向两侧递减到低频
+      // 频谱 smooth[0]=低频 .. smooth[NUM_BARS-1]=高频
+      const halfBarsW = NUM_BARS / 2;
       for (let i = 0; i < NUM_BARS; i++) {
-        const value = hasData ? smooth[i] : 0.04 + Math.sin(Date.now() * 0.002 + i * 0.2) * 0.02;
+        // 距中心的步数（0..halfBarsW）
+        const d = i <= halfBarsW ? halfBarsW - i : i - halfBarsW;
+        // 映射频段：d=0 → 最高频，d=halfBarsW → 最低频
+        const freqIdx = Math.round((1 - d / halfBarsW) * (NUM_BARS - 1));
+        const value = hasData
+          ? smooth[freqIdx]
+          : 0.04 + Math.sin(Date.now() * 0.002 + i * 0.2) * 0.02;
         const amp = Math.max(2, value * maxAmp * (hasData ? 1 : 0.4));
         const x = i * barW + gap / 2;
 
