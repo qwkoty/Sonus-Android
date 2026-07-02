@@ -70,74 +70,154 @@ export default function Visualizer({ isPlaying, mode = 'ring', accent = '#4FC3F7
     const drawRadialWave = (spectrum, hasData) => {
       const C = palette();
       const data = spectrum;
+      const [H] = hexToHsl(accentRef.current);
 
       const smooth = smoothRef.current;
       for (let i = 0; i < NUM_BARS; i++) {
         smooth[i] += (data[i] - smooth[i]) * 0.32;
       }
 
-      let bass = 0;
+      // 频段提取：bass / mid / treble
+      const tNow = Date.now() * 0.001;
+      let bass = 0, mid = 0, treble = 0;
       if (hasData) {
         for (let i = 0; i < 8; i++) bass += smooth[i];
         bass /= 8;
+        for (let i = 8; i < 28; i++) mid += smooth[i];
+        mid /= 20;
+        for (let i = 28; i < NUM_BARS; i++) treble += smooth[i];
+        treble /= (NUM_BARS - 28);
       } else {
-        bass = 0.05 + Math.sin(Date.now() * 0.001) * 0.03;
+        // 待机动画：缓慢呼吸
+        bass = 0.08 + Math.sin(tNow * 0.8) * 0.04;
+        mid = 0.05 + Math.sin(tNow * 1.2 + 1) * 0.03;
+        treble = 0.03 + Math.sin(tNow * 1.6 + 2) * 0.02;
       }
-      bassSmoothRef.current += (bass - bassSmoothRef.current) * 0.2;
+      bassSmoothRef.current += (bass - bassSmoothRef.current) * 0.18;
       const bassSmooth = bassSmoothRef.current;
 
-      const INNER_R = minDim * 0.06;
+      const INNER_R = minDim * 0.04;
       const MAX_R = minDim * 0.5 * 0.88;
-      const tNow = Date.now() * 0.001;
 
-      // 中心发光核心（跟随低频脉动）
-      const coreR = INNER_R * (2.5 + bassSmooth * 2.0);
+      // === 1. 中心填充：径向频谱（低频在中心，向外渐变到高频）===
+      // 用极坐标绘制填充区域，中心用低频，边缘用高频
+      const FILL_STEPS = 120;
+      const FILL_RINGS = 24;
+      for (let layer = FILL_RINGS - 1; layer >= 0; layer--) {
+        const layerProgress = layer / FILL_RINGS; // 0=中心, 1=边缘
+        const layerR = INNER_R + (MAX_R * 0.65 - INNER_R) * layerProgress;
+        // 频率映射：中心=低频，边缘=高频
+        const freqIdx = Math.min(NUM_BARS - 1, Math.floor(layerProgress * NUM_BARS * 0.8));
+        const layerValue = hasData ? smooth[freqIdx] : (0.04 + Math.sin(tNow * 0.8 + layer * 0.3) * 0.03);
+        const alpha = (1 - layerProgress) * 0.06 + 0.02;
+        const hue = H + layerProgress * 30;
+        const lightness = 60 - layerProgress * 15;
+
+        ctx.save();
+        ctx.fillStyle = `hsla(${hue}, 75%, ${lightness}%, ${alpha + layerValue * 0.15})`;
+        ctx.beginPath();
+        for (let s = 0; s <= FILL_STEPS; s++) {
+          const angle = (s / FILL_STEPS) * Math.PI * 2;
+          const angleWave = Math.sin(tNow * 1.5 + angle * 3 + layer * 0.4) * 0.08;
+          const amp = layerValue * minDim * 0.04 * (1 - layerProgress * 0.3);
+          const r = layerR + amp + angleWave * minDim * 0.01;
+          const x = cx + Math.cos(angle) * r;
+          const y = cy + Math.sin(angle) * r;
+          if (s === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        }
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+      }
+
+      // === 2. 中心发光核心（跟随低频脉动）===
+      const coreR = INNER_R * (3.0 + bassSmooth * 3.5);
       const coreGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, coreR);
-      coreGrad.addColorStop(0, C.coreBright(0.85 + bassSmooth * 0.15));
-      coreGrad.addColorStop(0.3, C.coreMain(0.5 + bassSmooth * 0.2));
-      coreGrad.addColorStop(0.7, C.halo(0.2));
-      coreGrad.addColorStop(1, C.halo(0));
+      coreGrad.addColorStop(0, `hsla(${H}, 90%, 92%, ${0.8 + bassSmooth * 0.2})`);
+      coreGrad.addColorStop(0.2, `hsla(${H}, 85%, 70%, ${0.5 + bassSmooth * 0.3})`);
+      coreGrad.addColorStop(0.5, `hsla(${H}, 75%, 55%, ${0.25 + bassSmooth * 0.15})`);
+      coreGrad.addColorStop(0.8, `hsla(${H}, 70%, 50%, 0.08)`);
+      coreGrad.addColorStop(1, `hsla(${H}, 70%, 50%, 0)`);
       ctx.fillStyle = coreGrad;
       ctx.beginPath();
       ctx.arc(cx, cy, coreR, 0, Math.PI * 2);
       ctx.fill();
 
-      // 辐射波浪：内圈=低频，外圈=高频，中间逐渐过渡
-      const NUM_RINGS = 6;
-      for (let ring = 0; ring < NUM_RINGS; ring++) {
-        const ringProgress = (ring + 1) / NUM_RINGS; // 0~1，内到外
-        const baseR = INNER_R + (MAX_R - INNER_R) * ringProgress;
-        const phase = ring * 0.8;
-        const alpha = 0.8 - ring * 0.1;
+      // === 3. 中心波形线（实时波形穿过中心）===
+      const wave = readTimeDomainData();
+      const waveHasData = wave.length > 0 && isPlaying;
+      ctx.save();
+      ctx.strokeStyle = `hsla(${H}, 85%, 75%, ${hasData ? 0.6 : 0.25})`;
+      ctx.lineWidth = Math.max(1, minDim * 0.0015);
+      ctx.shadowColor = C.glow;
+      ctx.shadowBlur = minDim * 0.015;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.beginPath();
+      const waveR = MAX_R * 0.3;
+      if (waveHasData) {
+        const step = wave.length / FILL_STEPS;
+        for (let s = 0; s <= FILL_STEPS; s++) {
+          const angle = (s / FILL_STEPS) * Math.PI * 2;
+          const idx = Math.floor(s * step) % wave.length;
+          const v = (wave[idx] - 128) / 128;
+          const r = waveR + v * minDim * 0.03;
+          const x = cx + Math.cos(angle) * r;
+          const y = cy + Math.sin(angle) * r;
+          if (s === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        }
+      } else {
+        // 待机：缓慢旋转的波形
+        for (let s = 0; s <= FILL_STEPS; s++) {
+          const angle = (s / FILL_STEPS) * Math.PI * 2;
+          const v = Math.sin(angle * 3 + tNow * 0.8) * 0.15 + Math.sin(angle * 5 - tNow * 1.2) * 0.1;
+          const r = waveR + v * minDim * 0.02;
+          const x = cx + Math.cos(angle) * r;
+          const y = cy + Math.sin(angle) * r;
+          if (s === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        }
+      }
+      ctx.closePath();
+      ctx.stroke();
+      ctx.restore();
 
-        // 频率映射：内圈用低频段，外圈用高频段
-        const freqStart = Math.floor(ringProgress * NUM_BARS * 0.7);
-        const freqEnd = Math.min(NUM_BARS, Math.floor((ringProgress * 0.7 + 0.3) * NUM_BARS));
+      // === 4. 辐射波浪环：内圈=低频，外圈=高频 ===
+      const NUM_RINGS = 5;
+      for (let ring = 0; ring < NUM_RINGS; ring++) {
+        const ringProgress = (ring + 1) / NUM_RINGS;
+        const baseR = MAX_R * 0.35 + (MAX_R - MAX_R * 0.35) * ringProgress;
+        const phase = ring * 0.8;
+        const alpha = 0.75 - ring * 0.1;
+
+        // 频率映射：内圈低频，外圈高频
+        const freqStart = Math.floor(ringProgress * NUM_BARS * 0.6);
+        const freqEnd = Math.min(NUM_BARS, Math.floor((ringProgress * 0.6 + 0.4) * NUM_BARS));
         const freqRange = Math.max(1, freqEnd - freqStart);
 
         ctx.save();
-        ctx.strokeStyle = `hsla(${hexToHsl(accentRef.current)[0] + ring * 10}, 80%, ${70 - ring * 5}%, ${alpha})`;
-        ctx.lineWidth = Math.max(1.0, minDim * (0.0028 - ring * 0.0003));
+        ctx.strokeStyle = `hsla(${H + ring * 12}, 80%, ${70 - ring * 5}%, ${alpha})`;
+        ctx.lineWidth = Math.max(1.0, minDim * (0.0025 - ring * 0.0003));
         ctx.shadowColor = C.glow;
-        ctx.shadowBlur = minDim * (0.018 - ring * 0.002);
+        ctx.shadowBlur = minDim * (0.016 - ring * 0.002);
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
 
         ctx.beginPath();
-        const STEPS = 200;
+        const STEPS = 180;
         for (let s = 0; s <= STEPS; s++) {
           const angle = (s / STEPS) * Math.PI * 2;
-          // 角度方向也产生频率变化，让波形更有层次
           const angleFreq = Math.abs(Math.sin(angle)) * freqRange;
           const freqIdx = Math.min(NUM_BARS - 1, freqStart + Math.floor(angleFreq));
-          const breathe = (Math.sin(tNow * 1.4 + angle * 3 + phase) * 0.5 + 0.5) * 0.06;
-          const value = hasData ? Math.max(smooth[freqIdx], breathe) : 0.04 + breathe;
+          const breathe = (Math.sin(tNow * 1.4 + angle * 3 + phase) * 0.5 + 0.5) * 0.05;
+          const value = hasData ? Math.max(smooth[freqIdx], breathe) : 0.03 + breathe;
           // 行波：从中心向外扩散
-          const wave = Math.sin(tNow * 2.5 - ring * 0.8 + angle * 4) * 0.12;
-          // 内圈振幅大（低频能量强），外圈振幅逐渐减小
-          const ampScale = (1 - ringProgress * 0.4);
-          const amp = value * (MAX_R - INNER_R) * 0.16 * ampScale * (hasData ? 1 : 0.4);
-          const r = baseR + amp + wave * minDim * 0.006;
+          const waveOffset = Math.sin(tNow * 2.2 - ring * 0.7 + angle * 4) * 0.1;
+          const ampScale = (1 - ringProgress * 0.3);
+          const amp = value * (MAX_R - INNER_R) * 0.14 * ampScale * (hasData ? 1 : 0.35);
+          const r = baseR + amp + waveOffset * minDim * 0.005;
           const x = cx + Math.cos(angle) * r;
           const y = cy + Math.sin(angle) * r;
           if (s === 0) ctx.moveTo(x, y);
@@ -148,22 +228,38 @@ export default function Visualizer({ isPlaying, mode = 'ring', accent = '#4FC3F7
         ctx.restore();
       }
 
-      // 外圈光晕
+      // === 5. 外圈光晕 ===
       const outerGrad = ctx.createRadialGradient(cx, cy, MAX_R * 0.7, cx, cy, MAX_R);
-      outerGrad.addColorStop(0, C.halo(0));
-      outerGrad.addColorStop(0.7, C.halo(0.04 + bassSmooth * 0.03));
-      outerGrad.addColorStop(1, C.halo(0));
+      outerGrad.addColorStop(0, `hsla(${H}, 70%, 55%, 0)`);
+      outerGrad.addColorStop(0.7, `hsla(${H}, 70%, 55%, ${0.03 + bassSmooth * 0.04})`);
+      outerGrad.addColorStop(1, `hsla(${H}, 70%, 55%, 0)`);
       ctx.fillStyle = outerGrad;
       ctx.beginPath();
       ctx.arc(cx, cy, MAX_R, 0, Math.PI * 2);
       ctx.fill();
 
-      // 中心亮点
-      const sparkR = INNER_R * (0.6 + bassSmooth * 0.8);
+      // === 6. 待机时的扩散涟漪 ===
+      if (!hasData) {
+        for (let i = 0; i < 3; i++) {
+          const ripplePhase = (tNow * 0.3 + i * 0.33) % 1;
+          const rippleR = INNER_R + (MAX_R - INNER_R) * ripplePhase;
+          const rippleAlpha = (1 - ripplePhase) * 0.15;
+          ctx.save();
+          ctx.strokeStyle = `hsla(${H}, 75%, 65%, ${rippleAlpha})`;
+          ctx.lineWidth = Math.max(1, minDim * 0.001);
+          ctx.beginPath();
+          ctx.arc(cx, cy, rippleR, 0, Math.PI * 2);
+          ctx.stroke();
+          ctx.restore();
+        }
+      }
+
+      // === 7. 中心亮点 ===
+      const sparkR = INNER_R * (0.8 + bassSmooth * 1.2);
       const sparkGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, sparkR);
       sparkGrad.addColorStop(0, 'rgba(255,255,255,0.9)');
-      sparkGrad.addColorStop(0.5, C.coreBright(0.5));
-      sparkGrad.addColorStop(1, C.coreBright(0));
+      sparkGrad.addColorStop(0.5, `hsla(${H}, 85%, 85%, 0.4)`);
+      sparkGrad.addColorStop(1, `hsla(${H}, 85%, 85%, 0)`);
       ctx.fillStyle = sparkGrad;
       ctx.beginPath();
       ctx.arc(cx, cy, sparkR, 0, Math.PI * 2);

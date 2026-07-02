@@ -676,8 +676,15 @@ async function getQQLyric(songmid) {
 }
 
 // QQ 歌单详情
-async function getQQPlaylist(id) {
+async function getQQPlaylist(id, cookie = '') {
   return withCache(`qq_pl_${id}`, 120000, async () => {
+    const cookieHeader = cookie ? { Cookie: cookie } : {};
+    // 从 cookie 提取 uin
+    let uin = 0;
+    if (cookie) {
+      const m = cookie.match(/(?:^|;\s*)uin=o?(\d+)/i);
+      if (m) uin = Number(m[1]);
+    }
     const url = 'https://u.y.qq.com/cgi-bin/musicu.fcg';
     const payload = {
       req_0: {
@@ -685,11 +692,11 @@ async function getQQPlaylist(id) {
         method: 'GetDissInfo',
         param: { disstid: Number(id), song_num: 100, song_begin: 0 },
       },
-      comm: { uin: 0, format: 'json', ct: 24, cv: 0 },
+      comm: { uin, format: 'json', ct: 24, cv: 0 },
     };
     const { data } = await axios.get(url, {
       params: { data: JSON.stringify(payload) },
-      headers: { ...COMMON_HEADERS, Referer: 'https://y.qq.com/' },
+      headers: { ...COMMON_HEADERS, ...cookieHeader, Referer: 'https://y.qq.com/' },
       timeout: 15000,
     });
     const dirinfo = data?.req_0?.data?.dirinfo || {};
@@ -951,7 +958,7 @@ router.get('/lyric', async (req, res) => {
 // ---------- 获取歌单详情 ----------
 router.get('/playlist', async (req, res) => {
   try {
-    const { id, platform } = req.query;
+    const { id, platform, cookie = '' } = req.query;
     if (!id || !platform) return res.status(400).json({ error: 'id and platform required' });
 
     if (platform === 'netease') {
@@ -960,7 +967,7 @@ router.get('/playlist', async (req, res) => {
     }
 
     if (platform === 'qq') {
-      const detail = await getQQPlaylist(id);
+      const detail = await getQQPlaylist(id, cookie);
       return res.json({ code: 200, data: detail });
     }
 
@@ -1120,7 +1127,8 @@ router.get('/user/qq/likedsongs', async (req, res) => {
     const list = await qqUserPlaylists(uin, key);
     if (!list.length) return res.json({ code: 200, data: { tracks: [], name: '我喜欢' } });
     const likedId = list[0].id;
-    const detail = await getQQPlaylist(likedId);
+    const cookieStr = `uin=o0${uin}; qqmusic_key=${key};`;
+    const detail = await getQQPlaylist(likedId, cookieStr);
     res.json({ code: 200, data: { tracks: detail.tracks, name: detail.name, cover: detail.cover } });
   } catch (err) {
     res.status(500).json({ error: err.message });

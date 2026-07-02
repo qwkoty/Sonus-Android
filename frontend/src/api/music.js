@@ -40,5 +40,5 @@ export const music = {
   qqLikedSongs: (uin, key) => get(`/api/music/user/qq/likedsongs?uin=${encodeURIComponent(uin)}&key=${encodeURIComponent(key)}`),
 
   // ---- 歌单详情（加载云歌单歌曲） ----
-  playlist: (id, platform) => get(`/api/music/playlist?id=${encodeURIComponent(id)}&platform=${encodeURIComponent(platform)}`),
+  playlist: (id, platform, cookie = '') => get(`/api/music/playlist?id=${encodeURIComponent(id)}&platform=${encodeURIComponent(platform)}${cookie ? `&cookie=${encodeURIComponent(cookie)}` : ''}`),
 };

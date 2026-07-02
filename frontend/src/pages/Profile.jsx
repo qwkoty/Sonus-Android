@@ -191,9 +191,10 @@ export default function Profile() {
     try {
       const res = await music.qqPlaylists(uin, key);
       const list = res?.data?.list || [];
+      const cookieStr = qqCookie?.raw || '';
       for (const pl of list.slice(0, 20)) {
         try {
-          const detail = await music.playlist(pl.id, 'qq');
+          const detail = await music.playlist(pl.id, 'qq', cookieStr);
           const tracks = detail?.data?.tracks || [];
           if (tracks.length) {
             const name = pl.id === list[0].id ? `我喜欢 · ${user?.nickname || 'QQ'}` : pl.name;
@@ -228,7 +229,8 @@ export default function Profile() {
   const loadRemotePlaylist = async (platform, id) => {
     try {
       setLoadingRemote(true);
-      const res = await music.playlist(id, platform);
+      const cookieStr = platform === 'qq' ? (qqCookie?.raw || '') : '';
+      const res = await music.playlist(id, platform, cookieStr);
       const tracks = res?.data?.tracks || [];
       if (tracks.length) {
         setPlaylist(tracks);
@@ -268,7 +270,8 @@ export default function Profile() {
   const importRemotePlaylist = async (platform, pl) => {
     setImportingId(pl.id);
     try {
-      const res = await music.playlist(pl.id, platform);
+      const cookieStr = platform === 'qq' ? (qqCookie?.raw || '') : '';
+      const res = await music.playlist(pl.id, platform, cookieStr);
       const tracks = res?.data?.tracks || [];
       importPlaylist(pl.name, tracks, pl.cover);
       setError(`已导入「${pl.name}」到本地，共 ${tracks.length} 首`);
