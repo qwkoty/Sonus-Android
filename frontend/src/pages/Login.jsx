@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { RefreshCw, Loader2, Music, ChevronRight } from 'lucide-react';
+import { RefreshCw, Loader2, Music, ChevronRight, ArrowLeft } from 'lucide-react';
 import { music } from '../api/music';
 import { useAuthStore } from '../store/useAuthStore';
 
@@ -10,7 +10,7 @@ const STATUS_TEXT = {
   0: '登录成功，正在进入…',
 };
 
-export default function Login() {
+export default function Login({ onBack }) {
   const setAuth = useAuthStore((s) => s.setAuth);
   const [qrsig, setQrsig] = useState('');
   const [qrcode, setQrcode] = useState('');
@@ -114,6 +114,20 @@ export default function Login() {
         display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 24,
         padding: '40px 32px', maxWidth: 360, width: '90%',
       }}>
+        {/* 返回按钮 */}
+        {onBack && (
+          <button onClick={onBack} style={{
+            position: 'absolute', top: 'calc(12px + env(safe-area-inset-top))', left: 16,
+            width: 40, height: 40, borderRadius: 12,
+            background: 'var(--glass-1)', backdropFilter: 'blur(16px)',
+            WebkitBackdropFilter: 'blur(16px)', border: '1px solid var(--border)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            color: 'var(--text-primary)', cursor: 'pointer',
+          }}>
+            <ArrowLeft size={18} />
+          </button>
+        )}
+
         {/* Logo / 标题 */}
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
           <div style={{

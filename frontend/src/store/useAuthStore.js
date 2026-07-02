@@ -41,11 +41,13 @@ export const useAuthStore = create((set, get) => {
     nickname: persisted?.nickname || 'QQ音乐用户',
     userInfo: null,
     loadingInfo: false,
+    showLogin: false, // 是否主动打开登录页（未登录时可听歌，点登录才进登录页）
 
     // 登录成功后写入
     setAuth: ({ cookie, uin, key, nickname }) => {
       const next = {
         isLoggedIn: true,
+        showLogin: false,
         cookie,
         uin: String(uin || ''),
         key: key || '',
@@ -57,6 +59,8 @@ export const useAuthStore = create((set, get) => {
       // 拉取用户详细信息
       get().fetchUserInfo();
     },
+
+    setShowLogin: (v) => set({ showLogin: v }),
 
     fetchUserInfo: async () => {
       const { cookie, uin, isLoggedIn } = get();
@@ -73,6 +77,7 @@ export const useAuthStore = create((set, get) => {
     logout: () => {
       const next = {
         isLoggedIn: false,
+        showLogin: false,
         cookie: '',
         uin: '',
         key: '',

@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, lazy, Suspense } from 'react';
 import {
   Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Repeat1,
   ListMusic, Volume2, Search, X, Loader2, SlidersHorizontal,
-  User, Music2, Crown, Users, ChevronRight, ArrowLeft, LogOut,
+  User, Music2, Crown, Users, ChevronRight, ArrowLeft, LogOut, LogIn,
 } from 'lucide-react';
 import { usePlayerStore } from '../store/usePlayerStore';
 import { useAuthStore } from '../store/useAuthStore';
@@ -123,7 +123,8 @@ export default function Player() {
     lyrics, currentLyric, isLoadingUrl, error, clearError, setError,
   } = usePlayerStore();
 
-  const { userInfo, nickname, logout } = useAuthStore();
+  const { isLoggedIn, userInfo, nickname, logout } = useAuthStore();
+  const setShowLogin = useAuthStore((s) => s.setShowLogin);
 
   // 面板状态
   const [searchOpen, setSearchOpen] = useState(false);
@@ -354,11 +355,15 @@ export default function Player() {
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         zIndex: 100, gap: 10,
       }}>
-        {/* 左：用户 */}
-        <button onClick={openUserPanel} style={{ ...floatBtn, padding: 0, overflow: 'hidden' }} title="我的音乐">
-          {avatar
+        {/* 左：用户（未登录→进登录页，已登录→用户面板） */}
+        <button
+          onClick={() => isLoggedIn ? openUserPanel() : setShowLogin(true)}
+          style={{ ...floatBtn, padding: 0, overflow: 'hidden' }}
+          title={isLoggedIn ? '我的音乐' : '登录 QQ 音乐'}
+        >
+          {isLoggedIn && avatar
             ? <img src={music.cover(avatar)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-            : <User size={18} />
+            : (isLoggedIn ? <User size={18} /> : <LogIn size={18} />)
           }
         </button>
 
@@ -376,7 +381,7 @@ export default function Player() {
             fontSize: 11, color: 'var(--text-secondary)', marginTop: 2,
             whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
           }}>
-            {currentTrack?.artist || 'QQ音乐 · 点击搜索开始播放'}
+            {currentTrack?.artist || (isLoggedIn ? 'QQ音乐 · 点击搜索开始播放' : '点击左上角登录解锁 VIP 与歌单')}
           </div>
         </div>
 
