@@ -155,6 +155,7 @@ export const usePlayerStore = create((set, get) => {
     },
 
     clearError: () => set({ error: null }),
+    setError: (msg) => set({ error: msg }),
 
     // 预加载：流代理模式下无需提前获取 URL
     preloadUrls: async () => {},

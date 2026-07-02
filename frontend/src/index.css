@@ -18,7 +18,16 @@
   --radius-md: 14px;
   --radius-lg: 22px;
   --radius-xl: 32px;
+  /* 统一玻璃面板色（替代各处硬编码 rgba(20,20,24,...)） */
+  --glass-1: rgba(30,30,36,0.7);
+  --glass-2: rgba(20,20,24,0.85);
+  --glass-3: rgba(40,40,46,0.7);
+  --danger: rgba(180,40,40,0.92);
+  /* safe-area 统一变量 */
+  --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
 }
 
 /* 动态主色背景光晕：跟随用户 DIY 颜色，增加全局氛围层次 */

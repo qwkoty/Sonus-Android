@@ -51,7 +51,7 @@ export default function Player({ onNavigate }) {
     toggleMode, toggleLike, playTrack, addToPlaylist,
     platform, preloadUrls,
     lyrics, currentLyric, isLoadingUrl,
-    error, clearError,
+    error, clearError, setError,
   } = store;
 
   const [searchOpen, setSearchOpen] = useState(false);
@@ -92,10 +92,11 @@ export default function Player({ onNavigate }) {
     }
   }, [searchOpen]);
 
-  // 错误提示自动消失
+  // 提示自动消失（成功提示 2.5s，错误提示 5s）
   useEffect(() => {
     if (error) {
-      const timer = setTimeout(() => clearError(), 4000);
+      const isSuccess = error.includes('已添加');
+      const timer = setTimeout(() => clearError(), isSuccess ? 2500 : 5000);
       return () => clearTimeout(timer);
     }
   }, [error, clearError]);
@@ -115,7 +116,14 @@ export default function Player({ onNavigate }) {
   // 键盘快捷键
   useEffect(() => {
     const onKey = (e) => {
-      // 输入框中不触发快捷键
+      // Escape 关闭搜索/面板（输入框中也生效）
+      if (e.code === 'Escape') {
+        if (searchOpen) { setSearchOpen(false); setResults([]); setQuery(''); setAddMenuTrack(null); }
+        else if (showExtra) setShowExtra(false);
+        else if (showVizPanel) setShowVizPanel(false);
+        return;
+      }
+      // 输入框中不触发其余快捷键
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
       if (searchOpen) return;
 
@@ -158,7 +166,7 @@ export default function Player({ onNavigate }) {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [togglePlay, next, prev, seek, setVolume, toggleMode, toggleLike, currentTrack, duration, currentTime, volume, searchOpen]);
+  }, [togglePlay, next, prev, seek, setVolume, toggleMode, toggleLike, currentTrack, duration, currentTime, volume, searchOpen, showExtra, showVizPanel]);
 
   const isLiked = currentTrack ? liked.has(currentTrack.id) : false;
   const progress = duration ? (currentTime / duration) * 100 : 0;
@@ -177,9 +185,19 @@ export default function Player({ onNavigate }) {
       preloadUrls(list);
     } catch (err) {
       console.error(err);
+      setError('搜索失败，请稍后重试');
     } finally {
       setSearching(false);
     }
+  };
+
+  // 搜索防抖
+  const searchTimerRef = useRef(null);
+  const onQueryChange = (val) => {
+    setQuery(val);
+    if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+    if (!val.trim()) { setResults([]); return; }
+    searchTimerRef.current = setTimeout(() => doSearch(val), 400);
   };
 
   const handlePlaySearch = (track) => {
@@ -191,8 +209,10 @@ export default function Player({ onNavigate }) {
 
   // 进度条交互：支持拖动
   const handleProgressDown = (e) => {
+    if (!progressRef.current || !duration) return;
     setSeeking(true);
     const update = (clientX) => {
+      if (!progressRef.current) return;
       const rect = progressRef.current.getBoundingClientRect();
       const ratio = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
       seek(ratio * duration);
@@ -276,14 +296,20 @@ export default function Player({ onNavigate }) {
           top: '50%', left: '50%',
           transform: 'translate(-50%, -50%)',
           zIndex: 10,
-          width: 56, height: 56,
-          borderRadius: '50%',
-          background: 'rgba(0,0,0,0.5)',
-          backdropFilter: 'blur(12px)',
-          WebkitBackdropFilter: 'blur(12px)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10,
         }}>
-          <Loader2 size={24} color="#fff" style={{ animation: 'spin 1s linear infinite' }} />
+          <div style={{
+            width: 56, height: 56, borderRadius: '50%',
+            background: 'rgba(0,0,0,0.5)',
+            backdropFilter: 'blur(12px)',
+            WebkitBackdropFilter: 'blur(12px)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}>
+            <Loader2 size={24} color="#fff" style={{ animation: 'spin 1s linear infinite' }} />
+          </div>
+          <span style={{ fontSize: 12, color: 'var(--text-secondary)', textShadow: '0 2px 8px rgba(0,0,0,0.8)' }}>
+            {vizMode === '3d' && !viz3DReady ? '正在构建粒子封面…' : '正在加载音源…'}
+          </span>
         </div>
       )}
 
@@ -527,9 +553,9 @@ export default function Player({ onNavigate }) {
         <div style={{
           display: 'flex', alignItems: 'center', gap: 8,
           width: '100%',
-          padding: '0 4px',
+          padding: '8px 4px',
         }}>
-          <span style={{ fontSize: 10, color: 'var(--text-muted)', width: 32, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
+          <span style={{ fontSize: 11, color: 'var(--text-muted)', width: 34, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
             {formatTime(currentTime)}
           </span>
           <div
@@ -539,6 +565,7 @@ export default function Player({ onNavigate }) {
               background: 'rgba(255,255,255,0.12)', borderRadius: 4,
               cursor: 'pointer',
               transition: 'height 0.15s ease',
+              position: 'relative',
             }}
             onMouseDown={handleProgressDown}
             onTouchStart={handleProgressDown}
@@ -567,11 +594,12 @@ export default function Player({ onNavigate }) {
         }}>
           <button
             onClick={() => setShowExtra(!showExtra)}
+            aria-label={showExtra ? '收起扩展' : '展开扩展'}
             style={{
               width: 38, height: 38, borderRadius: '50%',
               background: 'transparent',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              color: showExtra ? '#fff' : 'var(--text-muted)',
+              color: showExtra ? accentColor : 'var(--text-muted)',
               transition: 'all 0.2s ease',
               cursor: 'pointer',
             }}
@@ -580,6 +608,7 @@ export default function Player({ onNavigate }) {
           </button>
           <button
             onClick={prev}
+            aria-label="上一首"
             style={{
               width: 38, height: 38, borderRadius: '50%',
               background: 'transparent',
@@ -592,6 +621,7 @@ export default function Player({ onNavigate }) {
           </button>
           <button
             onClick={togglePlay}
+            aria-label={isPlaying ? '暂停' : '播放'}
             style={{
               width: 48, height: 48, borderRadius: '50%',
               background: '#fff',
@@ -611,6 +641,7 @@ export default function Player({ onNavigate }) {
           </button>
           <button
             onClick={next}
+            aria-label="下一首"
             style={{
               width: 38, height: 38, borderRadius: '50%',
               background: 'transparent',
@@ -621,16 +652,37 @@ export default function Player({ onNavigate }) {
           >
             <SkipForward size={20} fill="currentColor" />
           </button>
+          {/* 收藏：高频操作提至主控制条 */}
           <button
-            onClick={toggleMode}
+            onClick={() => currentTrack && toggleLike(currentTrack.id)}
+            aria-label={isLiked ? '取消收藏' : '收藏'}
+            aria-pressed={isLiked}
             style={{
               width: 38, height: 38, borderRadius: '50%',
               background: 'transparent',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              color: playMode !== 'list' ? '#fff' : 'var(--text-muted)',
+              color: isLiked ? accentColor : 'var(--text-muted)',
+              transition: 'all 0.2s ease',
               cursor: 'pointer',
             }}
-            title={playMode === 'random' ? '随机播放' : playMode === 'single' ? '单曲循环' : '列表循环'}
+          >
+            <Heart size={16} fill={isLiked ? 'currentColor' : 'none'} />
+          </button>
+          {/* 播放模式：选中态用 accent 色 + 强提示 */}
+          <button
+            onClick={toggleMode}
+            aria-label={
+              playMode === 'random' ? '随机播放（当前）' :
+              playMode === 'single' ? '单曲循环（当前）' : '列表循环（当前）'
+            }
+            style={{
+              width: 38, height: 38, borderRadius: '50%',
+              background: playMode !== 'list' ? `${accentColor}22` : 'transparent',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              color: playMode !== 'list' ? accentColor : 'var(--text-muted)',
+              cursor: 'pointer',
+              transition: 'all 0.2s ease',
+            }}
           >
             {playMode === 'random' ? <Shuffle size={16} /> : playMode === 'single' ? <Repeat size={16} /> : <ListMusic size={16} />}
           </button>
@@ -692,37 +744,56 @@ export default function Player({ onNavigate }) {
             boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
           }}>
             {playlist.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: 20, color: 'var(--text-muted)', fontSize: 12 }}>
-                播放列表为空
+              <div style={{ textAlign: 'center', padding: 24, color: 'var(--text-muted)', fontSize: 12 }}>
+                <ListMusic size={28} style={{ marginBottom: 8, opacity: 0.4 }} />
+                <div>播放列表为空</div>
+                <button
+                  onClick={() => { setShowPlaylist(false); setSearchOpen(true); }}
+                  style={{
+                    marginTop: 10, padding: '6px 14px', fontSize: 12,
+                    color: accentColor, background: `${accentColor}1a`,
+                    borderRadius: 14, border: '1px solid var(--border)', cursor: 'pointer',
+                  }}
+                >
+                  去搜索添加
+                </button>
               </div>
             ) : playlist.map((track, i) => (
               <div
                 key={track.id}
                 onClick={() => playTrack(track)}
                 style={{
-                  display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0',
-                  cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', gap: 10, padding: '8px 4px',
+                  cursor: 'pointer', position: 'relative',
                   borderBottom: i < playlist.length - 1 ? '1px solid var(--border)' : 'none',
                   color: currentTrack?.id === track.id ? '#fff' : 'var(--text-primary)',
                   opacity: currentTrack?.id === track.id ? 1 : 0.7,
                   transition: 'opacity 0.2s ease',
+                  paddingLeft: currentTrack?.id === track.id ? 8 : 4,
                 }}
                 onMouseEnter={(e) => e.currentTarget.style.opacity = '1'}
                 onMouseLeave={(e) => e.currentTarget.style.opacity = currentTrack?.id === track.id ? '1' : '0.7'}
               >
-                <img src={track.cover} alt="" style={{ width: 32, height: 32, borderRadius: 6, objectFit: 'cover' }} />
+                {currentTrack?.id === track.id && (
+                  <span style={{
+                    position: 'absolute', left: 0, top: '50%', transform: 'translateY(-50%)',
+                    width: 3, height: 16, borderRadius: 2,
+                    background: accentColor, boxShadow: `0 0 6px ${accentColor}`,
+                  }} />
+                )}
+                <img src={track.cover} alt={track.title} style={{ width: 32, height: 32, borderRadius: 6, objectFit: 'cover' }} />
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 12, fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                     {track.title}
                   </div>
-                  <div style={{ fontSize: 10, color: 'var(--text-secondary)' }}>{track.artist}</div>
+                  <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>{track.artist}</div>
                 </div>
                 {currentTrack?.id === track.id && isPlaying && (
                   <div style={{ display: 'flex', gap: 2, alignItems: 'flex-end', height: 14 }}>
                     {[3, 7, 5].map((h, idx) => (
                       <div key={idx} style={{
                         width: 2, height: h,
-                        background: '#fff', borderRadius: 1,
+                        background: accentColor, borderRadius: 1,
                         animation: `eqBar 0.8s ease-in-out ${idx * 0.15}s infinite alternate`,
                       }} />
                     ))}
@@ -753,13 +824,13 @@ export default function Player({ onNavigate }) {
             <input
               ref={searchInputRef}
               value={query}
-              onChange={(e) => setQuery(e.target.value)}
+              onChange={(e) => onQueryChange(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && doSearch(query)}
               placeholder="搜索歌曲、艺术家..."
               style={{ flex: 1, background: 'transparent', border: 'none', fontSize: 15, color: 'var(--text-primary)' }}
             />
             {query && (
-              <button onClick={() => { setQuery(''); setResults([]); }} style={{ cursor: 'pointer' }}>
+              <button onClick={() => { setQuery(''); setResults([]); }} aria-label="清除" style={{ cursor: 'pointer', padding: 4 }}>
                 <X size={18} color="var(--text-muted)" />
               </button>
             )}
@@ -769,6 +840,23 @@ export default function Player({ onNavigate }) {
             <div style={{ textAlign: 'center', padding: 30, color: 'var(--text-muted)', fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
               <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} />
               正在搜寻...
+            </div>
+          )}
+
+          {/* 空状态：搜过但无结果 */}
+          {!searching && query.trim() && results.length === 0 && (
+            <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)', fontSize: 13 }}>
+              <Search size={32} style={{ marginBottom: 12, opacity: 0.3 }} />
+              <div>未找到相关结果</div>
+              <div style={{ fontSize: 11, marginTop: 4 }}>试试其他关键词</div>
+            </div>
+          )}
+
+          {/* 初始引导：未输入时 */}
+          {!searching && !query.trim() && (
+            <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)', fontSize: 13 }}>
+              <Search size={32} style={{ marginBottom: 12, opacity: 0.3 }} />
+              <div>输入歌名或歌手开始搜索</div>
             </div>
           )}
 
@@ -789,35 +877,47 @@ export default function Player({ onNavigate }) {
                   </div>
                 </div>
                 <button onClick={() => setAddMenuTrack(addMenuTrack === track.id ? null : track.id)}
+                  aria-label="添加到歌单"
                   style={{
-                    width: 28, height: 28, borderRadius: '50%',
+                    width: 36, height: 36, borderRadius: '50%',
                     background: addMenuTrack === track.id ? '#fff' : 'var(--surface)',
                     color: addMenuTrack === track.id ? '#0A0A0A' : 'var(--text-secondary)',
                     display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
                     cursor: 'pointer',
                   }}>
-                  <Plus size={14} />
+                  <Plus size={16} />
                 </button>
-                <button onClick={() => handlePlaySearch(track)} style={{ color: '#fff', flexShrink: 0, cursor: 'pointer' }}>
-                  <Play size={18} />
+                <button onClick={() => handlePlaySearch(track)} aria-label="播放"
+                  style={{
+                    width: 36, height: 36, borderRadius: '50%',
+                    background: 'rgba(255,255,255,0.1)', color: '#fff', flexShrink: 0, cursor: 'pointer',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  }}>
+                  <Play size={18} fill="currentColor" />
                 </button>
 
-                {addMenuTrack === track.id && playlists.length > 0 && (
+                {addMenuTrack === track.id && (
                   <div className="animate-scaleIn" style={{
-                    position: 'absolute', right: 8, top: 44,
+                    position: 'absolute', right: 8, top: 48,
                     background: 'var(--bg-elevated)', borderRadius: 12,
-                    border: '1px solid var(--border)', padding: '8px 0', minWidth: 140,
+                    border: '1px solid var(--border)', padding: '8px 0', minWidth: 160,
                     boxShadow: '0 8px 32px rgba(0,0,0,0.5)', zIndex: 300,
                   }}>
                     <div style={{ padding: '4px 12px 8px', fontSize: 11, color: 'var(--text-muted)', borderBottom: '1px solid var(--border)' }}>
                       添加到歌单
                     </div>
-                    {playlists.map((pl) => (
-                      <button key={pl.id} onClick={() => { addToPlaylist(pl.id, track); setAddMenuTrack(null); }}
-                        style={{ display: 'block', width: '100%', padding: '8px 12px', fontSize: 13, textAlign: 'left', color: 'var(--text-primary)', borderBottom: '1px solid var(--border)', cursor: 'pointer' }}>
-                        {pl.name}
-                      </button>
-                    ))}
+                    {playlists.length === 0 ? (
+                      <div style={{ padding: '12px', fontSize: 12, color: 'var(--text-muted)', textAlign: 'center' }}>
+                        暂无歌单<br />请先在个人中心创建
+                      </div>
+                    ) : (
+                      playlists.map((pl) => (
+                        <button key={pl.id} onClick={() => { addToPlaylist(pl.id, track); setAddMenuTrack(null); setError('已添加到「' + pl.name + '」'); }}
+                          style={{ display: 'block', width: '100%', padding: '8px 12px', fontSize: 13, textAlign: 'left', color: 'var(--text-primary)', borderBottom: '1px solid var(--border)', cursor: 'pointer' }}>
+                          {pl.name}
+                        </button>
+                      ))
+                    )}
                   </div>
                 )}
               </div>
@@ -826,15 +926,15 @@ export default function Player({ onNavigate }) {
         </div>
       )}
 
-      {/* ====== Toast 错误提示 ====== */}
+      {/* ====== Toast 提示（成功/错误分级，位置避开歌名） ====== */}
       {error && (
         <div className="animate-slideUp" style={{
           position: 'absolute',
-          top: 'calc(60px + env(safe-area-inset-top))',
+          top: 'calc(70px + env(safe-area-inset-top))',
           left: '50%',
           transform: 'translateX(-50%)',
           zIndex: 500,
-          background: 'rgba(180,40,40,0.9)',
+          background: error.includes('已添加') ? `${accentColor}e6` : 'rgba(180,40,40,0.92)',
           backdropFilter: 'blur(16px)',
           WebkitBackdropFilter: 'blur(16px)',
           color: '#fff',
@@ -850,7 +950,7 @@ export default function Player({ onNavigate }) {
           gap: 8,
         }}>
           <span>{error}</span>
-          <button onClick={clearError} style={{ cursor: 'pointer', opacity: 0.7, marginLeft: 4 }}>
+          <button onClick={clearError} aria-label="关闭提示" style={{ cursor: 'pointer', opacity: 0.8, marginLeft: 4, display: 'flex' }}>
             <X size={14} />
           </button>
         </div>
