@@ -52,181 +52,125 @@ export default function Visualizer({ isPlaying, mode = 'ring', accent = '#4FC3F7
     const palette = () => {
       const [H] = hexToHsl(accentRef.current);
       return {
-        inner: `hsla(${H}, 82%, 60%, 0.88)`,
-        mid:   `hsla(${H + 15}, 74%, 66%, 0.72)`,
-        outer: `hsla(${H + 30}, 62%, 76%, 0.55)`,
-        tip:   `hsla(${H + 40}, 85%, 90%, 0.85)`,
-        coreBright: (a) => `hsla(${H}, 92%, 92%, ${a})`,
-        coreMain:   (a) => `hsla(${H}, 80%, 64%, ${a})`,
-        halo:       (a) => `hsla(${H}, 78%, 60%, ${a})`,
-        glass: `hsla(${H}, 72%, 78%, 0.6)`,
-        glow:  `hsla(${H}, 80%, 62%, 0.72)`,
-        stroke: `hsla(${H + 10}, 82%, 88%, 0.75)`,
-        waveCore: `hsl(${H}, 84%, 64%)`,
+        inner: `hsla(${H}, 78%, 56%, 0.78)`,
+        mid:   `hsla(${H + 18}, 66%, 63%, 0.6)`,
+        outer: `hsla(${H + 36}, 54%, 76%, 0.42)`,
+        tip:   `hsla(${H + 40}, 48%, 86%, 0.32)`,
+        coreBright: (a) => `hsla(${H}, 85%, 90%, ${a})`,
+        coreMain:   (a) => `hsla(${H}, 75%, 60%, ${a})`,
+        halo:       (a) => `hsla(${H}, 70%, 58%, ${a})`,
+        glass: `hsla(${H}, 72%, 72%, 0.55)`,
+        glow:  `hsla(${H}, 75%, 60%, 0.7)`,
+        stroke: `hsla(${H + 10}, 80%, 88%, 0.72)`,
+        waveCore: `hsl(${H}, 82%, 62%)`,
+        waveGlow: `hsla(${H}, 80%, 60%, 1)`,
       };
     };
 
-    const drawRing = (spectrum, hasData) => {
+    const drawRadialWave = (spectrum, hasData) => {
       const C = palette();
+      const data = spectrum;
+
       const smooth = smoothRef.current;
       for (let i = 0; i < NUM_BARS; i++) {
-        const target = spectrum[i];
-        const k = target > smooth[i] ? 0.5 : 0.2;
-        smooth[i] += (target - smooth[i]) * k;
+        smooth[i] += (data[i] - smooth[i]) * 0.32;
       }
 
       let bass = 0;
       if (hasData) {
-        for (let i = 0; i < 6; i++) bass += smooth[i];
-        bass /= 6;
+        for (let i = 0; i < 8; i++) bass += smooth[i];
+        bass /= 8;
       } else {
-        bass = 0.06 + Math.sin(Date.now() * 0.0012) * 0.04;
+        bass = 0.05 + Math.sin(Date.now() * 0.001) * 0.03;
       }
-      bassSmoothRef.current += (bass - bassSmoothRef.current) * 0.18;
+      bassSmoothRef.current += (bass - bassSmoothRef.current) * 0.2;
       const bassSmooth = bassSmoothRef.current;
 
-      const INNER_R = minDim * 0.12;
-      const MAX_OUTER = minDim * 0.46;
-      const MAX_BAR = MAX_OUTER - INNER_R - minDim * 0.02;
-
-      const numBars = NUM_BARS;
-      const angleStep = (Math.PI * 2) / numBars;
-      const angleAt = (i) => i * angleStep - Math.PI / 2;
-      const radPos = (a, r) => ({ x: cx + Math.cos(a) * r, y: cy + Math.sin(a) * r });
-      const halfBars = numBars / 2;
-
-      const haloR = INNER_R * (1.9 + bassSmooth * 0.35);
-      const haloGrad = ctx.createRadialGradient(cx, cy, INNER_R * 0.3, cx, cy, haloR);
-      haloGrad.addColorStop(0, C.coreBright(0.35 + bassSmooth * 0.2));
-      haloGrad.addColorStop(0.4, C.coreMain(0.18 + bassSmooth * 0.1));
-      haloGrad.addColorStop(1, C.halo(0));
-      ctx.fillStyle = haloGrad;
-      ctx.beginPath();
-      ctx.arc(cx, cy, haloR, 0, Math.PI * 2);
-      ctx.fill();
-
-      const barLen = [];
+      const INNER_R = minDim * 0.08;
+      const MAX_R = minDim * 0.5 * 0.88;
       const tNow = Date.now() * 0.001;
-      for (let i = 0; i < numBars; i++) {
-        const d = i <= halfBars ? i : numBars - i;
-        const freqIdx = Math.round((d / halfBars) * (NUM_BARS - 1));
-        const breathe = (Math.sin(tNow * 1.6 + i * 0.18) * 0.5 + 0.5) * 0.06;
-        const value = hasData ? Math.max(smooth[freqIdx], breathe) : 0.04 + breathe;
-        barLen.push(Math.max(minDim * 0.006, value * MAX_BAR * (hasData ? 1.0 : 0.4)));
-      }
 
-      const BAR_RATIO = 0.78;
-      const barHalfSpan = angleStep * BAR_RATIO / 2;
-
-      const fillGrad = ctx.createRadialGradient(cx, cy, INNER_R, cx, cy, MAX_OUTER);
-      fillGrad.addColorStop(0, C.inner);
-      fillGrad.addColorStop(0.45, C.mid);
-      fillGrad.addColorStop(0.82, C.outer);
-      fillGrad.addColorStop(1, C.tip);
-
-      ctx.save();
-      ctx.shadowColor = C.glow;
-      ctx.shadowBlur = minDim * 0.022;
-      ctx.fillStyle = fillGrad;
-      for (let i = 0; i < numBars; i++) {
-        const a = angleAt(i);
-        const rOut = INNER_R + barLen[i];
-        const aL = a - barHalfSpan;
-        const aR = a + barHalfSpan;
-        const steps = 4;
-        ctx.beginPath();
-        for (let s = 0; s <= steps; s++) {
-          const aa = aL + (aR - aL) * (s / steps);
-          const p = radPos(aa, INNER_R);
-          if (s === 0) ctx.moveTo(p.x, p.y);
-          else ctx.lineTo(p.x, p.y);
-        }
-        for (let s = 0; s <= steps; s++) {
-          const aa = aR - (aR - aL) * (s / steps);
-          const p = radPos(aa, rOut);
-          ctx.lineTo(p.x, p.y);
-        }
-        ctx.closePath();
-        ctx.fill();
-      }
-      ctx.restore();
-
-      ctx.save();
-      ctx.strokeStyle = C.tip;
-      ctx.globalAlpha = 0.65;
-      ctx.lineWidth = Math.max(1, minDim * 0.0014);
-      ctx.lineCap = 'round';
-      ctx.shadowColor = C.glow;
-      ctx.shadowBlur = minDim * 0.015;
-      for (let i = 0; i < numBars; i++) {
-        const a = angleAt(i);
-        const rOut = INNER_R + barLen[i];
-        const aL = a - barHalfSpan;
-        const aR = a + barHalfSpan;
-        ctx.beginPath();
-        for (let s = 0; s <= 5; s++) {
-          const aa = aL + (aR - aL) * (s / 5);
-          const p = radPos(aa, rOut);
-          if (s === 0) ctx.moveTo(p.x, p.y);
-          else ctx.lineTo(p.x, p.y);
-        }
-        ctx.stroke();
-      }
-      ctx.restore();
-
-      const coreR = INNER_R * (0.9 + bassSmooth * 0.15);
+      const coreR = INNER_R * (2.2 + bassSmooth * 1.2);
       const coreGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, coreR);
-      coreGrad.addColorStop(0, 'rgba(255,255,255,0.92)');
-      coreGrad.addColorStop(0.25, C.coreBright(0.9));
-      coreGrad.addColorStop(0.6, C.coreMain(0.75));
-      coreGrad.addColorStop(1, C.coreMain(0));
+      coreGrad.addColorStop(0, C.coreBright(0.85 + bassSmooth * 0.15));
+      coreGrad.addColorStop(0.3, C.coreMain(0.5 + bassSmooth * 0.2));
+      coreGrad.addColorStop(0.7, C.halo(0.2));
+      coreGrad.addColorStop(1, C.halo(0));
       ctx.fillStyle = coreGrad;
       ctx.beginPath();
       ctx.arc(cx, cy, coreR, 0, Math.PI * 2);
       ctx.fill();
 
-      ctx.save();
-      ctx.strokeStyle = C.glass;
-      ctx.lineWidth = Math.max(1, minDim * 0.002);
-      ctx.shadowColor = C.glow;
-      ctx.shadowBlur = minDim * 0.015;
-      ctx.beginPath();
-      ctx.arc(cx, cy, INNER_R, 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.restore();
+      const NUM_RINGS = 5;
+      const halfBars = NUM_BARS / 2;
 
-      ctx.save();
-      ctx.strokeStyle = 'rgba(255,255,255,0.3)';
-      ctx.lineWidth = Math.max(0.8, minDim * 0.001);
-      ctx.beginPath();
-      ctx.arc(cx, cy, INNER_R - minDim * 0.006, 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.restore();
+      for (let ring = 0; ring < NUM_RINGS; ring++) {
+        const baseR = INNER_R + (MAX_R - INNER_R) * ((ring + 1) / NUM_RINGS);
+        const phase = ring * 0.8;
+        const alpha = 0.75 - ring * 0.12;
 
-      ctx.save();
-      ctx.strokeStyle = C.glass;
-      ctx.globalAlpha = 0.2;
-      ctx.lineWidth = Math.max(0.5, minDim * 0.0006);
-      ctx.setLineDash([minDim * 0.005, minDim * 0.009]);
+        ctx.save();
+        ctx.strokeStyle = `hsla(${hexToHsl(accentRef.current)[0] + ring * 8}, 80%, ${68 - ring * 4}%, ${alpha})`;
+        ctx.lineWidth = Math.max(1.2, minDim * (0.0024 - ring * 0.0003));
+        ctx.shadowColor = C.glow;
+        ctx.shadowBlur = minDim * (0.02 - ring * 0.003);
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+
+        ctx.beginPath();
+        const STEPS = 180;
+        for (let s = 0; s <= STEPS; s++) {
+          const angle = (s / STEPS) * Math.PI * 2;
+          const dNorm = Math.abs(Math.sin(angle));
+          const freqIdx = Math.min(NUM_BARS - 1, Math.floor(dNorm * NUM_BARS));
+          const breathe = (Math.sin(tNow * 1.4 + angle * 3 + phase) * 0.5 + 0.5) * 0.06;
+          const value = hasData ? Math.max(smooth[freqIdx], breathe) : 0.04 + breathe;
+          const wave = Math.sin(tNow * 2.2 - ring * 0.6 + angle * 5) * 0.15;
+          const amp = value * (MAX_R - INNER_R) * 0.18 * (hasData ? 1 : 0.4);
+          const r = baseR + amp + wave * minDim * 0.008;
+          const x = cx + Math.cos(angle) * r;
+          const y = cy + Math.sin(angle) * r;
+          if (s === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        }
+        ctx.closePath();
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      const outerGrad = ctx.createRadialGradient(cx, cy, MAX_R * 0.7, cx, cy, MAX_R);
+      outerGrad.addColorStop(0, C.halo(0));
+      outerGrad.addColorStop(0.7, C.halo(0.04 + bassSmooth * 0.03));
+      outerGrad.addColorStop(1, C.halo(0));
+      ctx.fillStyle = outerGrad;
       ctx.beginPath();
-      ctx.arc(cx, cy, MAX_OUTER, 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.restore();
+      ctx.arc(cx, cy, MAX_R, 0, Math.PI * 2);
+      ctx.fill();
+
+      const sparkR = INNER_R * (0.6 + bassSmooth * 0.5);
+      const sparkGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, sparkR);
+      sparkGrad.addColorStop(0, 'rgba(255,255,255,0.9)');
+      sparkGrad.addColorStop(0.5, C.coreBright(0.5));
+      sparkGrad.addColorStop(1, C.coreBright(0));
+      ctx.fillStyle = sparkGrad;
+      ctx.beginPath();
+      ctx.arc(cx, cy, sparkR, 0, Math.PI * 2);
+      ctx.fill();
     };
 
     const drawWave = (spectrum, hasData) => {
       const C = palette();
+      const data = spectrum;
+
       const smooth = smoothRef.current;
       for (let i = 0; i < NUM_BARS; i++) {
-        const target = spectrum[i];
-        const k = target > smooth[i] ? 0.5 : 0.2;
-        smooth[i] += (target - smooth[i]) * k;
+        smooth[i] += (data[i] - smooth[i]) * 0.32;
       }
 
       const midY = cy;
       const maxAmp = h * 0.34;
       const barW = w / NUM_BARS;
-      const gap = Math.max(1, barW * 0.2);
+      const gap = Math.max(1, barW * 0.18);
       const innerW = Math.max(1, barW - gap);
 
       ctx.strokeStyle = 'rgba(255,255,255,0.08)';
@@ -293,8 +237,6 @@ export default function Visualizer({ isPlaying, mode = 'ring', accent = '#4FC3F7
       ctx.lineWidth = Math.max(1, minDim * 0.0012);
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
-      ctx.shadowColor = C.glow;
-      ctx.shadowBlur = minDim * 0.015;
       ctx.beginPath();
       if (waveHasData) {
         const step = wave.length / w;
@@ -335,7 +277,7 @@ export default function Visualizer({ isPlaying, mode = 'ring', accent = '#4FC3F7
       if (mode === 'wave') {
         drawWave(data, hasData);
       } else {
-        drawRing(data, hasData);
+        drawRadialWave(data, hasData);
       }
       rafRef.current = requestAnimationFrame(draw);
     };
