@@ -1,5 +1,6 @@
-const express = require('express');
 const axios = require('axios');
+const express = require('express');
+const QRCode = require('qrcode');
 const router = express.Router();
 
 // 伪装国内 IP，部分平台对海外 IP 有限制
@@ -34,29 +35,24 @@ async function neteaseQrUnikey() {
   return data?.unikey || '';
 }
 
-// 生成二维码（返回 base64 图片，保证带 data 前缀）
+// 生成二维码（后端用 qrcode 库根据 unikey 生成图片）
 async function neteaseQrCreate(unikey) {
-  const url = 'https://music.163.com/api/login/qrcode/client/login';
-  const { data } = await axios.get(url, {
-    params: { key: unikey, qrimg: 'true', type: 1 },
-    headers: { ...COMMON_HEADERS, Referer: 'https://music.163.com/' },
-    timeout: 10000,
-  });
-  // 网易云返回 qrimg 可能带或不带 data:image 前缀，统一补齐
-  let qrimg = data?.qrimg || '';
-  if (qrimg && !qrimg.startsWith('data:image')) {
-    qrimg = 'data:image/png;base64,' + qrimg;
-  }
-  // 兜底：如果没图片只有 qrurl，用 qrurl 让前端自行生成
-  return { code: data?.code, qrurl: data?.qrurl || '', qrimg };
+  // 网易云二维码内容：固定 URL + unikey
+  const qrUrl = `https://music.163.com/m/login?codekey=${unikey}`;
+  const qrimg = await QRCode.toDataURL(qrUrl, { margin: 1, width: 280 });
+  return { qrimg, qrurl: qrUrl };
 }
 
 // 轮询登录状态，成功时从 set-cookie 提取 MUSIC_U
 async function neteaseQrCheck(unikey, res) {
   const url = 'https://music.163.com/api/login/qrcode/client/login';
-  const resp = await axios.get(url, {
-    params: { key: unikey, type: 1 },
-    headers: { ...COMMON_HEADERS, Referer: 'https://music.163.com/' },
+  // 用 POST 避免触发风控验证（GET 会返回 code:-462 验证页面）
+  const resp = await axios.post(url, `key=${unikey}&type=1`, {
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      ...COMMON_HEADERS,
+      Referer: 'https://music.163.com/',
+    },
     timeout: 10000,
   });
   const data = resp.data || {};
