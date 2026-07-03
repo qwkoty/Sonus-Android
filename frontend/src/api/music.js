@@ -64,6 +64,8 @@ export const music = {
     get(`/api/music/login/qq/check?qrsig=${encodeURIComponent(qrsig)}`),
   loginByCookie: (cookie) =>
     post(`/api/music/login/qq/cookie`, { cookie }),
+  loginByRedirect: (redirectUrl, qrsig) =>
+    post(`/api/music/login/qq/redirect`, { redirectUrl, qrsig }),
 
   // ===== 用户 =====
   userInfo: (cookie, uin) =>

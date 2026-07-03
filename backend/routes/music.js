@@ -550,6 +550,78 @@ router.post('/login/qq/cookie', async (req, res) => {
   }
 });
 
+// 前端 JSONP 拿到 redirectUrl 后，后端跟随重定向收集 cookie
+router.post('/login/qq/redirect', async (req, res) => {
+  try {
+    const { redirectUrl, qrsig } = req.body || {};
+    if (!redirectUrl || !qrsig) return res.status(400).json({ error: 'redirectUrl and qrsig required' });
+
+    const jar = { qrsig };
+    let currentUrl = redirectUrl;
+
+    for (let hop = 0; hop < 10; hop++) {
+      const hopResp = await axios.get(currentUrl, {
+        headers: { 'User-Agent': UA, Cookie: cookieToString(jar) },
+        timeout: 8000,
+        maxRedirects: 0,
+        validateStatus: () => true,
+      });
+      Object.assign(jar, parseSetCookies(hopResp.headers?.['set-cookie']));
+
+      if (hopResp.status >= 300 && hopResp.status < 400 && hopResp.headers?.location) {
+        currentUrl = hopResp.headers.location;
+        continue;
+      }
+
+      const body = typeof hopResp.data === 'string' ? hopResp.data : '';
+      const jsMatch = body.match(/window\.location(?:\.href)?\s*=\s*["']([^"']+)["']/);
+      const metaMatch = body.match(/<meta[^>]*url=([^"'>]+)["']/i);
+      const nextUrl = jsMatch?.[1] || metaMatch?.[1];
+      if (nextUrl) {
+        currentUrl = nextUrl.startsWith('http') ? nextUrl : new URL(nextUrl, currentUrl).href;
+        continue;
+      }
+      break;
+    }
+
+    // 补充访问 QQ 音乐主页获取 qqmusic_key
+    if (!jar.qqmusic_key) {
+      try {
+        const homeResp = await axios.get('https://y.qq.com/', {
+          headers: { 'User-Agent': UA, Cookie: cookieToString(jar) },
+          timeout: 8000,
+          maxRedirects: 5,
+          validateStatus: () => true,
+        });
+        Object.assign(jar, parseSetCookies(homeResp.headers?.['set-cookie']));
+      } catch (e) {}
+    }
+
+    // uin 解析：优先 jar，兜底从 cookie 字符串正则提取
+    let uin = (jar.uin || jar.wxuin || '').toString().replace(/^o0*/, '');
+    if (!uin) {
+      const m = cookieToString(jar).match(/(?:^|;\s*)(?:uin|wxuin)=o?(\d+)/);
+      if (m) uin = m[1];
+    }
+
+    if (!uin) {
+      return res.json({ code: 200, data: { code: 800, msg: 'Cookie 收集失败：未找到 uin' } });
+    }
+
+    const key = jar.qqmusic_key || jar.p_skey || jar.skey || '';
+    res.json({ code: 200, data: {
+      code: 0,
+      msg: '登录成功',
+      cookie: cookieToString(jar),
+      uin,
+      key,
+      nickname: 'QQ音乐用户',
+    }});
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // 用户信息
 router.get('/user/qq/info', async (req, res) => {
   try {
