@@ -199,6 +199,10 @@ async function qqQrCheck(qrsig) {
     });
 
     const text = typeof resp.data === 'string' ? resp.data : '';
+    console.log('[qqQrCheck] ptqrlogin resp:', JSON.stringify({
+      status: resp.status,
+      body: text.slice(0, 300),
+    }));
     // 宽松正则：不硬编码第 2/4 参数为 '0'，兼容 QQ 格式变动
     let match = text.match(/ptuiCB\('(\d+)','[^']*','([^']*)','[^']*','([^']*)','([^']*)'\)/);
     // fallback：严格正则（老格式）
@@ -208,6 +212,7 @@ async function qqQrCheck(qrsig) {
     if (!match) {
       // 正则都没匹配，返回诊断信息帮助定位
       const preview = text.slice(0, 200).replace(/[\r\n]+/g, ' ');
+      console.warn('[qqQrCheck] ptuiCB 正则未匹配，原始响应:', preview);
       return { code: 66, msg: '等待扫码', _diag: `status=${resp.status} body="${preview}"` };
     }
 
