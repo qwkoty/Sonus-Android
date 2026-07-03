@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { RefreshCw, Loader2, Music } from 'lucide-react';
+import { RefreshCw, Loader2, Music, ArrowLeft } from 'lucide-react';
 import { music } from '../api/music';
 import { useAuthStore } from '../store/useAuthStore';
 import { qqQrCheckJsonp } from '../utils/qqLogin';
@@ -11,7 +11,7 @@ const STATUS = {
   0:  { text: '登录成功，正在进入…', color: 'var(--accent-dynamic)' },
 };
 
-export default function Login() {
+export default function Login({ onBack }) {
   const setAuth = useAuthStore((s) => s.setAuth);
 
   const [qrcode, setQrcode] = useState('');
@@ -117,6 +117,19 @@ export default function Login() {
         top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
         pointerEvents: 'none',
       }} />
+
+      {/* 左上角返回按钮（不登录也能用） */}
+      {onBack && (
+        <button onClick={onBack} style={{
+          position: 'absolute', top: 'calc(16px + env(safe-area-inset-top))', left: 16,
+          width: 40, height: 40, borderRadius: 12, cursor: 'pointer',
+          background: 'rgba(255,255,255,0.06)', border: '1px solid var(--border)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          color: 'var(--text-primary)', zIndex: 2,
+        }} title="返回播放器">
+          <ArrowLeft size={18} />
+        </button>
+      )}
 
       {/* Logo + 标题 */}
       <div style={{

@@ -125,7 +125,7 @@ export default function Player({ onProfile }) {
     lyrics, currentLyric, isLoadingUrl, error, clearError, setError,
   } = usePlayerStore();
 
-  const { userInfo } = useAuthStore();
+  const { userInfo, isLoggedIn } = useAuthStore();
 
   // 面板状态
   const [searchOpen, setSearchOpen] = useState(false);
@@ -313,13 +313,13 @@ export default function Player({ onProfile }) {
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         zIndex: 100, gap: 10,
       }}>
-        {/* 左：头像，点击进入个人页（独立页面） */}
+        {/* 左：头像，点击进入个人页（未登录则进登录页） */}
         <button
           onClick={onProfile}
           style={{ ...floatBtn, padding: 0, overflow: 'hidden' }}
-          title="我的音乐"
+          title={isLoggedIn ? '我的音乐' : '登录 QQ 音乐'}
         >
-          {avatar
+          {isLoggedIn && avatar
             ? <img src={music.cover(avatar)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
             : <User size={18} />
           }

@@ -8,21 +8,28 @@ export default function App() {
   const isLoggedIn = useAuthStore((s) => s.isLoggedIn);
   const fetchUserInfo = useAuthStore((s) => s.fetchUserInfo);
 
-  // 已登录后，在 Player 与 Profile 两个独立页面间切换
-  const [page, setPage] = useState('player');
+  // 默认进播放器（不强制登录）
+  // 已登录点头像 → Profile；未登录点头像 → Login
+  const [view, setView] = useState('player'); // 'player' | 'profile' | 'login'
 
   useEffect(() => {
-    if (isLoggedIn) fetchUserInfo();
+    if (isLoggedIn) {
+      fetchUserInfo();
+      // 登录成功后确保回到播放器
+      setView('player');
+    }
   }, [isLoggedIn, fetchUserInfo]);
 
-  // 未登录退出到登录页；登录后默认进 Player
-  if (!isLoggedIn) return <Login />;
+  // 未登录且主动打开登录页时，全屏显示 Login（可返回）
+  if (view === 'login' && !isLoggedIn) {
+    return <Login onBack={() => setView('player')} />;
+  }
 
   return (
     <div style={{ height: '100%', position: 'relative', background: 'var(--bg-primary)' }}>
-      {page === 'profile'
-        ? <Profile onBack={() => setPage('player')} />
-        : <Player onProfile={() => setPage('profile')} />}
+      {view === 'profile' && isLoggedIn
+        ? <Profile onBack={() => setView('player')} />
+        : <Player onProfile={() => setView(isLoggedIn ? 'profile' : 'login')} />}
     </div>
   );
 }
