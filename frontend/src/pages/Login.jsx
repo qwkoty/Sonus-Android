@@ -211,8 +211,17 @@ export default function Login({ onBack }) {
         {collecting ? '正在获取登录信息…' : statusInfo.text}
       </div>
 
-      {/* 错误提示 + 刷新按钮 */}
+      {/* 错误提示 */}
       {errorMsg && status !== 0 && !collecting && (
+        <div style={{
+          marginTop: 10, fontSize: 12, color: '#F87171', textAlign: 'center', zIndex: 1,
+        }}>
+          {errorMsg}
+        </div>
+      )}
+
+      {/* 刷新二维码按钮：除了登录中和加载二维码中，始终显示 */}
+      {!loadingQr && !collecting && status !== 0 && (
         <button onClick={fetchQr} style={{
           marginTop: 16, display: 'inline-flex', alignItems: 'center', gap: 8,
           padding: '10px 20px', borderRadius: 12, cursor: 'pointer',
