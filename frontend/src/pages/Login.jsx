@@ -1,106 +1,95 @@
 import { useState, useRef, useEffect } from 'react';
-import { RefreshCw, Loader2, Music, ArrowLeft } from 'lucide-react';
+import { RefreshCw, Loader2, Music, ArrowLeft, CheckCircle2 } from 'lucide-react';
 import { music } from '../api/music';
 import { useAuthStore } from '../store/useAuthStore';
 import { qqQrCheckJsonp } from '../utils/qqLogin';
 
-// 扫码状态：66 等待扫码 / 67 已扫码待确认 / 0 成功 / 65 失效
-const STATUS = {
-  66: { text: '请使用 QQ 扫描二维码', color: 'var(--text-secondary)' },
-  67: { text: '扫描成功，请在手机上确认登录', color: 'var(--accent-dynamic)' },
-  0:  { text: '登录成功，正在进入…', color: 'var(--accent-dynamic)' },
-};
-
+// 流程：
+// 1. 进入页面 → 显示二维码 + "请使用 QQ 扫描二维码"
+// 2. 用户去手机 QQ 扫码 + 确认登录
+// 3. 用户点"我已扫码"按钮 → 一次性请求 ptqrlogin 检查
+//    - code 0：后端收集 cookie → setAuth → 拉取昵称/头像 → 进播放器（歌单在 Profile 页拉）
+//    - code 67：提示"已扫码，请在手机上确认登录后再次点击"
+//    - code 66：提示"还未检测到扫码"
+//    - code 65：二维码过期
 export default function Login({ onBack }) {
   const setAuth = useAuthStore((s) => s.setAuth);
 
   const [qrcode, setQrcode] = useState('');
-  const [qrsig, setQrsig] = useState('');
-  const [status, setStatus] = useState(66);
-  const [errorMsg, setErrorMsg] = useState('');
   const [loadingQr, setLoadingQr] = useState(true);
-  const [collecting, setCollecting] = useState(false);
-  const pollRef = useRef(null);
+  // 'idle'：等待用户扫码+点按钮；'logging'：点了按钮后的登录流程中
+  const [phase, setPhase] = useState('idle');
+  const [tip, setTip] = useState('请使用 QQ 扫描二维码');
+  const [errorMsg, setErrorMsg] = useState('');
   const qrsigRef = useRef('');
-
-  const stopPolling = () => {
-    if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
-  };
 
   const fetchQr = async () => {
     setLoadingQr(true);
     setErrorMsg('');
-    setStatus(66);
-    setCollecting(false);
-    stopPolling();
+    setPhase('idle');
+    setTip('请使用 QQ 扫描二维码');
     try {
       const data = await music.loginQrCode();
       if (!data?.qrsig || !data?.qrcode) throw new Error('二维码获取失败');
       qrsigRef.current = data.qrsig;
-      setQrsig(data.qrsig);
       setQrcode(data.qrcode);
-      startPolling(data.qrsig);
     } catch (e) {
       setErrorMsg(e.message || '获取二维码失败');
+      setQrcode('');
     } finally {
       setLoadingQr(false);
     }
   };
 
-  const startPolling = () => {
-    stopPolling();
-    pollRef.current = setInterval(async () => {
-      if (!qrsigRef.current) return;
-      try {
-        const res = await qqQrCheckJsonp(qrsigRef.current);
-
-        if (res.code === 66) {
-          setStatus(66);
-        } else if (res.code === 67) {
-          setStatus(67);
-        } else if (res.code === 0 && res.redirectUrl) {
-          stopPolling();
-          setStatus(0);
-          setCollecting(true);
-          try {
-            const loginRes = await music.loginByRedirect(res.redirectUrl, qrsigRef.current);
-            if (Number(loginRes?.code) === 0 && loginRes?.cookie && loginRes?.uin) {
-              setAuth({
-                cookie: loginRes.cookie,
-                uin: loginRes.uin,
-                key: loginRes.key,
-                nickname: res.nickname || loginRes.nickname || 'QQ音乐用户',
-              });
-              // setAuth 会触发 App 切换到 Player，无需在此处理跳转
-            } else {
-              setErrorMsg(loginRes?.msg || '登录信息收集失败，请刷新重试');
-              setStatus(66);
-              setCollecting(false);
-            }
-          } catch (e) {
-            setErrorMsg('登录信息收集失败：' + (e.message || '网络错误'));
-            setStatus(66);
-            setCollecting(false);
-          }
-        } else if (res.code === 65) {
-          stopPolling();
-          setErrorMsg('二维码已过期');
-          setStatus(66);
-        }
-        // code === -1（网络错误）：静默继续轮询
-      } catch (e) {
-        // 网络抖动忽略
-      }
-    }, 2000);
-  };
-
   useEffect(() => {
     fetchQr();
-    return () => stopPolling();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const statusInfo = STATUS[status] || STATUS[66];
+  // 用户点"我已扫码"：一次性检查 + 登录
+  const onScanned = async () => {
+    if (!qrsigRef.current || phase === 'logging') return;
+    setPhase('logging');
+    setErrorMsg('');
+    setTip('正在登录…');
+    try {
+      const res = await qqQrCheckJsonp(qrsigRef.current);
+
+      if (res.code === 0 && res.redirectUrl) {
+        // 检查通过，后端收集 cookie
+        const loginRes = await music.loginByRedirect(res.redirectUrl, qrsigRef.current);
+        if (Number(loginRes?.code) === 0 && loginRes?.cookie && loginRes?.uin) {
+          setAuth({
+            cookie: loginRes.cookie,
+            uin: loginRes.uin,
+            key: loginRes.key,
+            nickname: res.nickname || loginRes.nickname || 'QQ音乐用户',
+          });
+          // setAuth 触发 fetchUserInfo（拉昵称+头像）+ App 自动切到播放器
+          // 歌单在 Profile 页加载
+          return;
+        }
+        setErrorMsg(loginRes?.msg || '登录信息收集失败，请刷新重试');
+        setTip('请使用 QQ 扫描二维码');
+      } else if (res.code === 67) {
+        setErrorMsg('已扫码，请在手机上确认登录后再次点击');
+        setTip('请使用 QQ 扫描二维码');
+      } else if (res.code === 66) {
+        setErrorMsg('还未检测到扫码，请先用 QQ 扫描二维码');
+        setTip('请使用 QQ 扫描二维码');
+      } else if (res.code === 65) {
+        setErrorMsg('二维码已过期，请刷新');
+        setTip('二维码已过期');
+      } else {
+        setErrorMsg(res.msg || '登录失败，请重试');
+        setTip('请使用 QQ 扫描二维码');
+      }
+    } catch (e) {
+      setErrorMsg('网络错误：' + (e.message || ''));
+      setTip('请使用 QQ 扫描二维码');
+    }
+    setPhase('idle');
+  };
 
   return (
     <div style={{
@@ -178,11 +167,11 @@ export default function Login({ onBack }) {
                 imageRendering: 'pixelated',
                 background: '#fff', padding: 10,
                 display: 'block',
-                filter: (status === 0 || collecting) ? 'blur(6px) opacity(0.4)' : 'none',
+                filter: phase === 'logging' ? 'blur(6px) opacity(0.4)' : 'none',
                 transition: 'filter 0.3s ease',
               }}
             />
-            {(status === 0 || collecting) && (
+            {phase === 'logging' && (
               <div style={{
                 position: 'absolute', inset: 0,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -204,32 +193,46 @@ export default function Login({ onBack }) {
 
       {/* 状态文案 */}
       <div style={{
-        marginTop: 28, fontSize: 15, fontWeight: 600, textAlign: 'center',
-        color: statusInfo.color, zIndex: 1,
-        transition: 'color 0.3s ease',
+        marginTop: 24, fontSize: 15, fontWeight: 600, textAlign: 'center',
+        color: 'var(--text-secondary)', zIndex: 1,
       }}>
-        {collecting ? '正在获取登录信息…' : statusInfo.text}
+        {tip}
       </div>
 
       {/* 错误提示 */}
-      {errorMsg && status !== 0 && !collecting && (
+      {errorMsg && (
         <div style={{
-          marginTop: 10, fontSize: 12, color: '#F87171', textAlign: 'center', zIndex: 1,
+          marginTop: 8, fontSize: 12, color: '#F87171', textAlign: 'center', zIndex: 1,
+          maxWidth: 280, lineHeight: 1.5,
         }}>
           {errorMsg}
         </div>
       )}
 
-      {/* 刷新二维码按钮：除了登录中和加载二维码中，始终显示 */}
-      {!loadingQr && !collecting && status !== 0 && (
-        <button onClick={fetchQr} style={{
-          marginTop: 16, display: 'inline-flex', alignItems: 'center', gap: 8,
-          padding: '10px 20px', borderRadius: 12, cursor: 'pointer',
-          fontSize: 13, fontWeight: 600,
-          background: 'rgba(79,195,247,0.1)', border: '1px solid var(--accent-dynamic)',
-          color: 'var(--accent-dynamic)', zIndex: 1,
+      {/* "我已扫码"按钮：登录流程中隐藏 */}
+      {qrcode && phase === 'idle' && (
+        <button onClick={onScanned} style={{
+          marginTop: 18, display: 'inline-flex', alignItems: 'center', gap: 8,
+          padding: '12px 28px', borderRadius: 14, cursor: 'pointer',
+          fontSize: 14, fontWeight: 700,
+          background: 'var(--accent-dynamic)', color: '#0A0A0A',
+          border: 'none', zIndex: 1,
+          boxShadow: '0 8px 24px rgba(79,195,247,0.35)',
         }}>
-          <RefreshCw size={14} /> 刷新二维码
+          <CheckCircle2 size={16} /> 我已扫码
+        </button>
+      )}
+
+      {/* 刷新二维码按钮：登录流程中隐藏 */}
+      {!loadingQr && phase !== 'logging' && (
+        <button onClick={fetchQr} style={{
+          marginTop: 14, display: 'inline-flex', alignItems: 'center', gap: 6,
+          padding: '8px 16px', borderRadius: 10, cursor: 'pointer',
+          fontSize: 12, fontWeight: 500,
+          background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border)',
+          color: 'var(--text-secondary)', zIndex: 1,
+        }}>
+          <RefreshCw size={13} /> 刷新二维码
         </button>
       )}
 
@@ -237,8 +240,9 @@ export default function Login({ onBack }) {
       <div style={{
         position: 'absolute', bottom: 'calc(20px + env(safe-area-inset-bottom))',
         fontSize: 11, color: 'var(--text-muted)', textAlign: 'center', zIndex: 1,
+        padding: '0 24px',
       }}>
-        请使用已安装 QQ 的手机扫码 · 仅用于解锁 VIP 与同步歌单
+        请使用已安装 QQ 的手机扫码并确认登录 · 仅用于解锁 VIP 与同步歌单
       </div>
     </div>
   );
