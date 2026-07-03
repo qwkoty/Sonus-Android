@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, lazy, Suspense } from 'react';
 import {
   Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Repeat1,
   ListMusic, Volume2, Search, X, Loader2, SlidersHorizontal,
-  User,
+  User, Palette,
 } from 'lucide-react';
 import { usePlayerStore } from '../store/usePlayerStore';
 import { useAuthStore } from '../store/useAuthStore';
@@ -28,8 +28,8 @@ const VIZ_MODES = [
 ];
 
 const ACCENT_PRESETS = [
-  '#4FC3F7', '#9F87C0', '#FF6B9D', '#4ADE80',
-  '#FB923C', '#F87171', '#A78BFA', '#FFFFFF',
+  '#4FC3F7', '#A78BFA', '#FF6B9D', '#4ADE80',
+  '#FB923C', '#FFFFFF',
 ];
 
 function TrackRow({ track, active, onPlay }) {
@@ -252,7 +252,7 @@ export default function Player({ onProfile }) {
   const modeColor = playMode === 'list' ? 'var(--text-secondary)' : 'var(--accent-dynamic)';
 
   return (
-    <div style={{ height: '100%', background: 'var(--bg-primary)', position: 'relative', overflow: 'hidden' }}>
+    <div style={{ height: '100%', background: 'transparent', position: 'relative', overflow: 'hidden' }}>
       {/* 全屏可视化 */}
       <div style={{ position: 'absolute', inset: 0 }}>
         <FloatingLyrics lyrics={lyrics} isPlaying={isPlaying} />
@@ -509,10 +509,10 @@ export default function Player({ onProfile }) {
       </Sheet>
 
       {/* 可视化设置 */}
-      <Sheet open={vizOpen} onClose={() => setVizOpen(false)} title="可视化设置" height="auto">
+      <Sheet open={vizOpen} onClose={() => setVizOpen(false)} title="设置" height="auto">
         <div style={{ display: 'flex', flexDirection: 'column', gap: 18, padding: '8px 4px' }}>
           <div>
-            <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 10 }}>可视化模式</div>
+            <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 10 }}>可视化</div>
             <div style={{ display: 'flex', gap: 10 }}>
               {VIZ_MODES.map((m) => (
                 <button key={m.key} onClick={() => changeVizMode(m.key)} className={`glass-button ${vizMode === m.key ? 'is-active' : ''}`} style={{
@@ -527,8 +527,10 @@ export default function Player({ onProfile }) {
             </div>
           </div>
           <div>
-            <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 10 }}>主题色</div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, padding: '4px 2px' }}>
+            <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
+              <Palette size={13} /> 主题色
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
               {ACCENT_PRESETS.map((c) => (
                 <button key={c} onClick={() => changeAccent(c)} style={{
                   width: 30, height: 30, borderRadius: '50%', cursor: 'pointer',
@@ -536,6 +538,21 @@ export default function Player({ onProfile }) {
                   boxShadow: accentColor === c ? `0 0 12px ${c}` : 'none', transition: 'all 0.2s ease',
                 }} />
               ))}
+              {/* 调色盘 */}
+              <label style={{
+                width: 30, height: 30, borderRadius: '50%', cursor: 'pointer',
+                background: 'conic-gradient(red, orange, yellow, green, cyan, blue, purple, red)',
+                border: '2px solid rgba(255,255,255,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                position: 'relative', overflow: 'hidden',
+              }}>
+                <input
+                  type="color"
+                  value={accentColor}
+                  onChange={(e) => changeAccent(e.target.value)}
+                  style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer' }}
+                />
+                <span style={{ fontSize: 10, color: '#fff', textShadow: '0 0 2px rgba(0,0,0,0.8)', pointerEvents: 'none' }}>+</span>
+              </label>
             </div>
           </div>
         </div>

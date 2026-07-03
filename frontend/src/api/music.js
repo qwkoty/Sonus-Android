@@ -233,6 +233,35 @@ export const music = {
     return `${BASE}/api/music/stream?id=${encodeURIComponent(id)}&cookie=${encodeURIComponent(cookie)}&uin=${encodeURIComponent(uin)}`;
   },
 
+  // 下载音频为 Blob URL（APK 模式，绕过 CORS）
+  streamBlob: async (id, cookie = '', uin = '0') => {
+    if (!USE_DIRECT) return null;
+    const directUrl = await urlDirect(id, cookie, uin);
+    if (!directUrl) return '';
+    try {
+      const response = await CapacitorHttp.request({
+        method: 'GET',
+        url: directUrl,
+        headers: { ...HEADERS, Range: 'bytes=0-' },
+        responseType: 'arraybuffer',
+        connectTimeout: 30000,
+        readTimeout: 30000,
+      });
+      // CapacitorHttp arraybuffer 返回 base64
+      if (response.data) {
+        const binary = atob(response.data);
+        const bytes = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+        const blob = new Blob([bytes], { type: 'audio/mpeg' });
+        return URL.createObjectURL(blob);
+      }
+      return '';
+    } catch (e) {
+      // Blob 下载失败，回退到直链
+      return directUrl;
+    }
+  },
+
   cover: (url) => url, // APK 模式直接用原 URL（Capacitor 不受 CORS 限制）
 
   lyric: (id) =>
