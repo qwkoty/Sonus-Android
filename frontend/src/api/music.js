@@ -49,18 +49,21 @@ async function searchAPK(keyword, limit = 30) {
 // ==================== 播放链接 ====================
 async function urlAPK(id, cookie = '', uin = '0') {
   const rawId = String(id).replace(/^qq_/, '');
+  // filename 格式：C400<songmid>.m4a（标准音质），QQ 音乐 vkey 接口传 filename 命中率更高
+  const filename = `C400${rawId}.m4a`;
   const d = await nativeGet(qqUrl({
     req_0: {
       module: 'music.vkey.GetVkeyServer',
       method: 'CgiGetVkey',
       param: {
         guid: '10000',
-        songmid: rawId,
-        songtype: 0,
+        songmid: [rawId],
+        songtype: [0],
         uin: String(uin),
         loginflag: cookie ? 1 : 0,
         platform: '23',
         h5to: 'speed',
+        filename: [filename],
       },
     },
     comm: { uin: String(uin), format: 'json', ct: 24, cv: 0 },
@@ -69,10 +72,10 @@ async function urlAPK(id, cookie = '', uin = '0') {
   const sip = d?.req_0?.data?.sip?.[0];
   if (item?.purl && sip) return sip + item.purl;
 
-  // fallback
+  // fallback：旧版 mobile express 接口
   try {
     const fb = await nativeGet(
-      `https://c.y.qq.com/base/fcgi-bin/fcg_music_express_mobile3.fcg?format=json205361747&songmid=${rawId}&guid=10000&uin=${String(uin)}&platform=yqq&cid=205361747`
+      `https://c.y.qq.com/base/fcgi-bin/fcg_music_express_mobile3.fcg?format=json205361747&songmid=${rawId}&filename=${filename}&guid=10000&uin=${String(uin)}&platform=yqq&cid=205361747`
     );
     const fi = fb?.data?.items?.[0];
     if (fi?.url) return fi.url;

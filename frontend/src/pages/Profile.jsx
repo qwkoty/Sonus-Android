@@ -112,13 +112,13 @@ export default function Profile({ onBack }) {
   return (
     <div style={{
       position: 'fixed', inset: 0,
-      background: 'var(--bg-primary)',
+      background: 'radial-gradient(ellipse at 30% 20%, rgba(79,195,247,0.08) 0%, rgba(0,0,0,0.5) 50%, rgba(0,0,0,0.85) 100%)',
       display: 'flex', flexDirection: 'column',
       overflow: 'hidden',
     }}>
-      {/* 顶部导航栏 - 液态玻璃 */}
+      {/* 顶部导航栏 - 玻璃 */}
       <div className="glass-panel" style={{
-        padding: 'calc(12px + env(safe-area-inset-top)) 16px 12px',
+        padding: 'calc(10px + env(safe-area-inset-top)) 16px 10px',
         display: 'flex', alignItems: 'center', gap: 12,
         borderRadius: 0, borderLeft: 'none', borderRight: 'none', borderTop: 'none',
         flexShrink: 0,
@@ -142,143 +142,175 @@ export default function Profile({ onBack }) {
         </button>
       </div>
 
-      {/* 内容区 */}
-      <div style={{
-        flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch',
-        padding: '16px',
-      }}>
-        {playlistDetail ? (
-          /* 歌单详情 */
-          <div>
-            <button onClick={() => setPlaylistDetail(null)} className="glass-button" style={{
-              display: 'inline-flex', alignItems: 'center', gap: 4, marginBottom: 12,
-              fontSize: 13, color: 'var(--text-secondary)', padding: '6px 10px',
-              borderRadius: 8,
-            }}>
-              <ArrowLeft size={15} /> 返回歌单
-            </button>
-
-            {loadingDetail ? (
-              <div style={{ display: 'flex', justifyContent: 'center', padding: 40 }}>
-                <Loader2 size={24} className="spin-icon" style={{ color: 'var(--accent-dynamic)' }} />
-              </div>
-            ) : playlistDetail.tracks.length > 0 ? (
-              <>
-                <button onClick={playAll} className="glass-button-accent" style={{
-                  display: 'flex', alignItems: 'center', gap: 8, width: '100%',
-                  padding: '12px 14px', marginBottom: 12, borderRadius: 12,
-                  fontSize: 13,
-                }}>
-                  <Play size={16} fill="currentColor" /> 播放全部 ({playlistDetail.tracks.length})
-                </button>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                  {playlistDetail.tracks.map((t, i) => (
-                    <TrackRow key={t.id || i} track={t} index={i}
-                      active={currentTrack?.id === t.id}
-                      onPlay={playFromPlaylist} />
-                  ))}
-                </div>
-              </>
-            ) : (
-              <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)', fontSize: 13 }}>
-                歌单为空
-              </div>
-            )}
-          </div>
-        ) : (
-          /* 个人主页 */
-          <div>
-            {/* 用户信息卡 - 液态玻璃 */}
-            <div className="glass-panel" style={{
-              display: 'flex', alignItems: 'center', gap: 14, padding: '16px 14px', marginBottom: 16,
-              borderRadius: 16,
-            }}>
-              <div style={{
-                width: 64, height: 64, borderRadius: '50%', overflow: 'hidden', flexShrink: 0,
-                background: 'rgba(255,255,255,0.08)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-              }}>
-                {avatar
-                  ? <img src={music.cover(avatar)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                  : <UserIcon size={26} color="var(--text-muted)" />
-                }
-              </div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <span style={{
-                  fontSize: 18, fontWeight: 700,
-                  whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-                  display: 'block',
-                }}>
-                  {loadingInfo && !nickname ? '加载中…' : nickname}
-                </span>
-              </div>
-            </div>
-
-            {/* 歌单标题 */}
+      {/* 横版双栏内容区 */}
+      <div style={{ flex: 1, display: 'flex', overflow: 'hidden', gap: 12, padding: 12 }}>
+        {/* 左栏：用户信息 + 歌单列表 */}
+        <div className="glass-panel" style={{
+          width: 340, flexShrink: 0, display: 'flex', flexDirection: 'column',
+          borderRadius: 16, overflow: 'hidden',
+        }}>
+          {/* 用户信息卡 */}
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 14, padding: '14px',
+            borderBottom: '1px solid rgba(255,255,255,0.06)', flexShrink: 0,
+          }}>
             <div style={{
-              fontSize: 13, fontWeight: 600, color: 'var(--text-secondary)',
-              padding: '4px 4px 10px',
-              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              width: 56, height: 56, borderRadius: '50%', overflow: 'hidden', flexShrink: 0,
+              background: 'rgba(255,255,255,0.08)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
             }}>
-              <span>我的歌单</span>
-              <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-                {playlists.length} 个
-              </span>
+              {avatar
+                ? <img src={music.cover(avatar)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                : <UserIcon size={24} color="var(--text-muted)" />
+              }
             </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <span style={{
+                fontSize: 17, fontWeight: 700,
+                whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                display: 'block',
+              }}>
+                {loadingInfo && !nickname ? '加载中…' : nickname}
+              </span>
+              {userInfo?.vipLevel > 0 && (
+                <span style={{
+                  fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 6, marginTop: 4,
+                  background: 'linear-gradient(135deg, #FFD700, #FFA500)', color: '#1a1a2e',
+                  display: 'inline-block',
+                }}>
+                  VIP{userInfo.vipLevel}
+                </span>
+              )}
+            </div>
+          </div>
 
-            {/* 歌单列表 - 玻璃行 */}
+          {/* 歌单标题 */}
+          <div style={{
+            fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)',
+            padding: '10px 14px 6px',
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0,
+          }}>
+            <span>我的歌单</span>
+            <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+              {playlists.length} 个
+            </span>
+          </div>
+
+          {/* 歌单列表 */}
+          <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch', padding: '0 8px 8px' }}>
             {loadingPlaylists ? (
-              <div style={{ display: 'flex', justifyContent: 'center', padding: 40 }}>
-                <Loader2 size={24} className="spin-icon" style={{ color: 'var(--accent-dynamic)' }} />
+              <div style={{ display: 'flex', justifyContent: 'center', padding: 30 }}>
+                <Loader2 size={22} className="spin-icon" style={{ color: 'var(--accent-dynamic)' }} />
               </div>
             ) : playlists.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)', fontSize: 13 }}>
+              <div style={{ textAlign: 'center', padding: 30, color: 'var(--text-muted)', fontSize: 12 }}>
                 暂无歌单
               </div>
             ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                 {playlists.map((pl) => (
-                  <button key={pl.id} onClick={() => openPlaylistDetail(pl)} className="glass-row" style={{
-                    display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px',
-                    borderRadius: 14, textAlign: 'left',
+                  <button key={pl.id} onClick={() => openPlaylistDetail(pl)} className={`glass-row ${playlistDetail?.name === pl.name ? 'is-active' : ''}`} style={{
+                    display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px',
+                    borderRadius: 12, textAlign: 'left',
                   }}>
                     <div style={{
-                      width: 52, height: 52, borderRadius: 12, overflow: 'hidden', flexShrink: 0,
+                      width: 44, height: 44, borderRadius: 10, overflow: 'hidden', flexShrink: 0,
                       background: 'rgba(255,255,255,0.06)',
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
                     }}>
                       {pl.cover
                         ? <img src={music.cover(pl.cover)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                        : <Music2 size={20} color="var(--text-secondary)" />
+                        : <Music2 size={18} color="var(--text-secondary)" />
                       }
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{
-                        fontSize: 14, fontWeight: 600,
+                        fontSize: 13, fontWeight: 600,
                         whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
                       }}>
                         {pl.name}
                       </div>
-                      <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 3 }}>
+                      <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 2 }}>
                         {pl.songCount ?? 0} 首
                       </div>
                     </div>
-                    <ChevronRight size={16} color="var(--text-muted)" />
+                    <ChevronRight size={15} color="var(--text-muted)" />
                   </button>
                 ))}
               </div>
             )}
-
-            {/* 退出登录 - 玻璃危险按钮 */}
-            <button onClick={logout} className="glass-button-danger" style={{
-              marginTop: 24, width: '100%', padding: '13px', borderRadius: 14,
-              fontSize: 13, fontWeight: 600,
-              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-            }}>
-              <LogOut size={15} /> 退出登录
-            </button>
           </div>
-        )}
+
+          {/* 退出登录 */}
+          <button onClick={logout} className="glass-button" style={{
+            margin: '8px', padding: '11px', borderRadius: 12,
+            fontSize: 13, fontWeight: 600, color: '#F87171',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, flexShrink: 0,
+          }}>
+            <LogOut size={15} /> 退出登录
+          </button>
+        </div>
+
+        {/* 右栏：歌单详情 */}
+        <div className="glass-panel" style={{
+          flex: 1, display: 'flex', flexDirection: 'column',
+          borderRadius: 16, overflow: 'hidden',
+        }}>
+          {!playlistDetail ? (
+            <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: 14 }}>
+              <div style={{ textAlign: 'center' }}>
+                <Music2 size={48} style={{ opacity: 0.3, marginBottom: 12 }} />
+                <div>从左侧选择歌单查看歌曲</div>
+              </div>
+            </div>
+          ) : (
+            <>
+              <div style={{
+                padding: '12px 16px', borderBottom: '1px solid rgba(255,255,255,0.06)',
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0,
+              }}>
+                <button onClick={() => setPlaylistDetail(null)} className="glass-button" style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 4,
+                  fontSize: 12, color: 'var(--text-secondary)', padding: '6px 10px',
+                  borderRadius: 8,
+                }}>
+                  <ArrowLeft size={14} /> 关闭
+                </button>
+                <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                  {playlistDetail.tracks.length} 首
+                </span>
+              </div>
+              <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch', padding: '8px 10px' }}>
+                {loadingDetail ? (
+                  <div style={{ display: 'flex', justifyContent: 'center', padding: 40 }}>
+                    <Loader2 size={24} className="spin-icon" style={{ color: 'var(--accent-dynamic)' }} />
+                  </div>
+                ) : playlistDetail.tracks.length > 0 ? (
+                  <>
+                    <button onClick={playAll} className="glass-button-accent" style={{
+                      display: 'flex', alignItems: 'center', gap: 8, width: '100%',
+                      padding: '11px 14px', marginBottom: 10, borderRadius: 12,
+                      fontSize: 13,
+                    }}>
+                      <Play size={16} fill="currentColor" /> 播放全部 ({playlistDetail.tracks.length})
+                    </button>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                      {playlistDetail.tracks.map((t, i) => (
+                        <TrackRow key={t.id || i} track={t} index={i}
+                          active={currentTrack?.id === t.id}
+                          onPlay={playFromPlaylist} />
+                      ))}
+                    </div>
+                  </>
+                ) : (
+                  <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)', fontSize: 13 }}>
+                    歌单为空
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+        </div>
       </div>
     </div>
   );

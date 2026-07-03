@@ -5,6 +5,7 @@
   "server": {
     "androidScheme": "https"
   },
+  "orientation": "landscape",
   "plugins": {
     "CapacitorCookies": {
       "enabled": true

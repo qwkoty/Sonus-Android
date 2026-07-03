@@ -2,12 +2,14 @@ import { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import { getSpectrumBars } from '../audio/engine';
 
-const GRID = 96;              // 粒子网格边数（96x96 ≈ 9216 粒子，手机流畅）
+const GRID = 142;             // 142x142 = 20164 ≈ 2 万粒子
 const FOV = 55;
 
-// 3D 封面粒子画：粒子在 X-Y 平面排满封面图像（每粒子颜色 = 封面对应像素）
-// Z 轴随音频能量起伏（中心强、边缘衰减为 0，保证边缘撑满不溢出）
-// 缓慢摇摆旋转增强 3D 感。完全自适应容器尺寸并撑满页面。
+// 3D 封面粒子画：2 万粒子在 X-Y 平面排满封面图像（每粒子颜色 = 封面对应像素）
+// 电影镜头：相机缓慢推拉 + 轨道旋转 + 微俯仰，营造电影感
+// 呼吸动画：整体 scale 随时间正弦呼吸
+// 待机动画：无音频时粒子做径向涟漪 + 波浪起伏
+// 音频响应：中心 = 低频（bass），向外依次 mid / treble，频率随距中心距离递增
 export default function Visualizer3D({ accent = '#4FC3F7', cover = '', onReady }) {
   const containerRef = useRef(null);
   const accentRef = useRef(accent);
@@ -54,14 +56,15 @@ export default function Visualizer3D({ accent = '#4FC3F7', cover = '', onReady }
     const container = containerRef.current;
     if (!container) return;
 
-    const dpr = Math.min(window.devicePixelRatio || 1, 1.5);  // 手机限 1.5 省性能
+    // 安卓原生 GPU 性能充足，使用完整 dpr + 抗锯齿
+    const dpr = window.devicePixelRatio || 1;
     let W = container.offsetWidth;
     let H = container.offsetHeight;
 
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(FOV, W / H, 0.1, 5000);
 
-    const renderer = new THREE.WebGLRenderer({ antialias: false, alpha: true });  // 关抗锯齿省性能
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     renderer.setSize(W, H);
     renderer.setPixelRatio(dpr);
     renderer.domElement.style.width = '100%';
@@ -69,7 +72,7 @@ export default function Visualizer3D({ accent = '#4FC3F7', cover = '', onReady }
     container.appendChild(renderer.domElement);
 
     const FILL = 1.0;            // 平面占可见区比例，1.0 = 撑满短边
-    const MAX_Z_RATIO = 0.18;    // Z 起伏最大占可见半边比例（仅中心，边缘衰减为 0）
+    const MAX_Z_RATIO = 0.22;    // Z 起伏最大占可见半边比例（仅中心，边缘衰减为 0）
 
     let planeSize, cameraZ;
 
@@ -168,6 +171,8 @@ export default function Visualizer3D({ accent = '#4FC3F7', cover = '', onReady }
 
     let firstFrame = true;
     let bassSmooth = 0;
+    let midSmooth = 0;
+    let trebleSmooth = 0;
 
     const animate = () => {
       const { data, hasData } = getSpectrumBars(64);
@@ -182,15 +187,20 @@ export default function Visualizer3D({ accent = '#4FC3F7', cover = '', onReady }
         for (let i = 32; i < 64; i++) treble += data[i];
         treble /= 32;
       } else {
+        // 待机动画：缓慢呼吸的能量起伏
         const t = Date.now() * 0.001;
-        bass = 0.08 + Math.sin(t) * 0.04;
-        mid = 0.05;
-        treble = 0.03;
+        bass = 0.10 + Math.sin(t * 0.7) * 0.05;
+        mid = 0.06 + Math.sin(t * 1.1 + 1) * 0.03;
+        treble = 0.04 + Math.sin(t * 1.5 + 2) * 0.02;
       }
-      bassSmooth += (bass - bassSmooth) * 0.2;
-      const breathe = 1 + Math.min(bass, 1) * 0.06;
-      const zAmp = planeSize * MAX_Z_RATIO;
+      bassSmooth += (bass - bassSmooth) * 0.18;
+      midSmooth += (mid - midSmooth) * 0.18;
+      trebleSmooth += (treble - trebleSmooth) * 0.18;
+
+      // 整体呼吸缩放：基础呼吸 + bass 增强
       const time = Date.now() * 0.001;
+      const breath = 1 + Math.sin(time * 0.6) * 0.025 + bassSmooth * 0.10;
+      const zAmp = planeSize * MAX_Z_RATIO;
       const hasCover = hasCoverRef.current;
 
       // 封面就绪后应用一次颜色
@@ -209,34 +219,55 @@ export default function Visualizer3D({ accent = '#4FC3F7', cover = '', onReady }
 
         // 边缘衰减：中心 1，边缘趋近 0 —— 保证边缘粒子不动，撑满不溢出
         const falloff = Math.pow(1 - dc, 1.6);
-        const bFreq = Math.max(0, 1 - dc * 1.8);
-        const mFreq = Math.max(0, 1 - Math.abs(dc - 0.4) * 2.5);
-        const tFreq = Math.max(0, 1 - Math.abs(dc - 0.85) * 3);
-        let localEnergy = bass * bFreq + mid * mFreq * 0.7 + treble * tFreq * 0.5;
 
-        // 独立呼吸相位，保证频谱为 0 也起伏
+        // 音频响应：中心 = bass（低频），向外依次 mid、treble（高频）
+        // 用三个钟形分布叠加，分别覆盖中心、中圈、外圈
+        const bFreq = Math.max(0, 1 - dc * 1.8);                       // 中心强
+        const mFreq = Math.max(0, 1 - Math.abs(dc - 0.45) * 2.5);      // 中圈强
+        const tFreq = Math.max(0, 1 - Math.abs(dc - 0.85) * 3);        // 外圈强
+        let localEnergy = bassSmooth * bFreq + midSmooth * mFreq * 0.8 + trebleSmooth * tFreq * 0.6;
+
+        // 独立呼吸相位，保证频谱为 0 也起伏（待机动画）
         const phase = u * 21.5 + v * 17.3 + dc * 9;
-        const baseBreathe = (Math.sin(time * 1.8 + phase) * 0.5 + 0.5) * 0.2;
+        const baseBreathe = (Math.sin(time * 1.6 + phase) * 0.5 + 0.5) * 0.18;
         localEnergy = Math.max(localEnergy, baseBreathe);
 
-        const ripple = Math.sin(dc * 12 - time * 2.5) * 0.08 * (0.3 + mid);
-        const z = (localEnergy * 0.85 + ripple) * zAmp * falloff * breathe;
+        // 径向涟漪：从中心向外扩散的波纹（待机时也持续）
+        const ripple = Math.sin(dc * 14 - time * 2.2) * 0.10 * (0.4 + midSmooth);
+        const z = (localEnergy * 0.9 + ripple) * zAmp * falloff * breath;
         posAttr.array[i * 3 + 2] = z;
 
         if (needColorUpdate) {
-          const intensity = 0.3 + localEnergy * 0.7;
-          colorAttr.array[i * 3]     = 0.3 * intensity;
-          colorAttr.array[i * 3 + 1] = 0.6 * intensity;
-          colorAttr.array[i * 3 + 2] = 1.0 * intensity;
+          // 无封面时：中心冷蓝 → 外圈紫红，随能量增亮
+          const intensity = 0.3 + localEnergy * 0.8;
+          const r = (0.25 + dc * 0.55) * intensity;
+          const g = (0.45 + (1 - dc) * 0.25) * intensity;
+          const b = (0.85 - dc * 0.35) * intensity;
+          colorAttr.array[i * 3]     = r;
+          colorAttr.array[i * 3 + 1] = g;
+          colorAttr.array[i * 3 + 2] = b;
         }
       }
       posAttr.needsUpdate = true;
       if (needColorUpdate) colorAttr.needsUpdate = true;
 
-      // 缓慢摇摆增强 3D 感（幅度小，避免边缘溢出）
-      points.rotation.y = Math.sin(time * 0.25) * 0.25;
-      points.rotation.x = -0.28 + Math.sin(time * 0.35) * 0.06;
-      const sc = breathe;
+      // ===== 电影镜头：缓慢推拉 + 轨道旋转 + 微俯仰 =====
+      // 推拉：相机沿 Z 轴在 cameraZ * 0.85 ~ cameraZ * 1.15 之间缓慢移动
+      const zoomPhase = Math.sin(time * 0.18) * 0.5 + 0.5;   // 0..1
+      const zoom = cameraZ * (0.88 + zoomPhase * 0.20);
+      // 轨道旋转：相机绕 Y 轴缓慢公转（幅度小，避免边缘溢出）
+      const orbitAngle = time * 0.12;
+      const orbitR = planeSize * 0.18;
+      camera.position.x = Math.sin(orbitAngle) * orbitR;
+      camera.position.y = Math.sin(time * 0.22) * planeSize * 0.10;
+      camera.position.z = zoom;
+      // 微俯仰
+      camera.lookAt(0, 0, 0);
+
+      // 粒子整体缓慢摇摆增强 3D 感
+      points.rotation.y = Math.sin(time * 0.25) * 0.28;
+      points.rotation.x = -0.30 + Math.sin(time * 0.35) * 0.07;
+      const sc = breath;
       points.scale.set(sc, sc, 1);
 
       renderer.render(scene, camera);

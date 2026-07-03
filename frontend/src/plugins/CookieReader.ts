@@ -17,6 +17,16 @@ export interface CookieReaderPlugin {
 const Native = registerPlugin<CookieReaderPlugin>('CookieReader');
 const IS_CAP = () => typeof window !== 'undefined' && window.Capacitor?.isNativePlatform?.();
 
+// 从请求 URL 提取 origin（scheme://host），用于匹配 CookieManager 中的 Cookie 域
+function deriveOrigin(url: string): string {
+  try {
+    const u = new URL(url);
+    return `${u.protocol}//${u.host}`;
+  } catch {
+    return '';
+  }
+}
+
 export const CookieReader = {
   isAvailable: IS_CAP,
   getCookiesForUrl: async (url: string): Promise<CookieReaderResult> => {
@@ -25,9 +35,11 @@ export const CookieReader = {
   },
   clearCookiesForUrl: async (url: string) => { if (IS_CAP()) return Native.clearCookiesForUrl({ url }); },
   // 原生 HTTP GET：自动注入 CookieManager 里对应域的 Cookie，零 CORS 限制
-  httpGet: async (url: string, cookieDomain = 'https://y.qq.com'): Promise<HttpGetResult> => {
+  // cookieDomain 省略时自动从请求 URL 提取 origin，保证 Cookie 域匹配
+  httpGet: async (url: string, cookieDomain?: string): Promise<HttpGetResult> => {
     if (!IS_CAP()) throw new Error('Not in Capacitor');
-    return Native.httpGet({ url, cookieDomain });
+    const domain = cookieDomain || deriveOrigin(url) || 'https://y.qq.com';
+    return Native.httpGet({ url, cookieDomain: domain });
   },
   openLoginWebView: async () => {
     if (!IS_CAP()) throw new Error('Not in Capacitor');
