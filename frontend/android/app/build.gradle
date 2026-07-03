@@ -5,7 +5,7 @@ def sonusKeystorePath = System.getenv('SONUS_KEYSTORE_PATH') ?: ''
 def sonusKeystorePass = System.getenv('SONUS_KEYSTORE_PASS') ?: 'sonus123456'
 def sonusKeyAlias = System.getenv('SONUS_KEY_ALIAS') ?: 'sonus'
 def sonusKeyPass = System.getenv('SONUS_KEY_PASS') ?: 'sonus123456'
-def hasReleaseKeystore = sonusKeystorePath != '' && new File(sonusKeystorePath).exists()
+def hasReleaseKeystore = sonusKeystorePath != '' && file(sonusKeystorePath).exists()
 
 android {
     namespace = "com.sonus.app"

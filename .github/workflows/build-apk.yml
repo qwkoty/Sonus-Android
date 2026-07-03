@@ -65,10 +65,13 @@ jobs:
       - name: Rename APK
         id: apk
         run: |
-          SRC="frontend/android/app/build/outputs/apk/release/app-release.apk"
+          mkdir -p /tmp/apk-out
+          # 查找 release APK（可能名为 app-release.apk 或 app-release-unsigned.apk）
+          SRC=$(find frontend/android/app/build/outputs/apk/release -name "*.apk" | head -1)
+          echo "Found APK: $SRC"
           DEST="sonus-v1.0.${{ github.run_number }}.apk"
-          cp "$SRC" "$DEST"
-          echo "path=$DEST" >> "$GITHUB_OUTPUT"
+          cp "$SRC" "/tmp/apk-out/$DEST"
+          echo "path=/tmp/apk-out/$DEST" >> "$GITHUB_OUTPUT"
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
