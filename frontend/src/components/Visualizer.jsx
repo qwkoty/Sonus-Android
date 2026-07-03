@@ -23,13 +23,16 @@ const hexToHsl = (hex) => {
   return [h * 360, s * 100, l * 100];
 };
 
+// 2D 径向频谱（环）/ 横向频谱（波）
+// 网页端高表现力版本：多层径向填充 + 辐射波环 + bass 冲击波 + 中心音核
+// 安卓优化：dpr 限 1.5、shadowBlur 仅关键层使用、对象池复用
 export default function Visualizer({ isPlaying, mode = 'ring', accent = '#4FC3F7' }) {
   const canvasRef = useRef(null);
   const rafRef = useRef(null);
   const smoothRef = useRef(new Float32Array(NUM_BARS));
   const bassSmoothRef = useRef(0);
   const bassPrevRef = useRef(0);          // bass 峰值检测
-  const shockwavesRef = useRef([]);       // bass 冲击波池（手机限 3 个）
+  const shockwavesRef = useRef([]);       // bass 冲击波池（5 个）
   const accentRef = useRef(accent);
 
   useEffect(() => { accentRef.current = accent; }, [accent]);
@@ -41,7 +44,7 @@ export default function Visualizer({ isPlaying, mode = 'ring', accent = '#4FC3F7
     let w, h, cx, cy, dpr, minDim;
 
     const resize = () => {
-      dpr = Math.min(window.devicePixelRatio || 1, 2);
+      dpr = Math.min(window.devicePixelRatio || 1, 1.5);   // 安卓限 1.5
       w = canvas.width = canvas.offsetWidth * dpr;
       h = canvas.height = canvas.offsetHeight * dpr;
       cx = w / 2;
@@ -98,7 +101,7 @@ export default function Visualizer({ isPlaying, mode = 'ring', accent = '#4FC3F7
       bassSmoothRef.current += (bass - bassSmoothRef.current) * 0.18;
       const bassSmooth = bassSmoothRef.current;
 
-      // ===== bass 峰值检测 → 生成冲击波（手机限 3 个，避免堆积）=====
+      // ===== bass 峰值检测 → 生成冲击波（5 个上限）=====
       const bassDelta = bass - bassPrevRef.current;
       bassPrevRef.current = bass;
       if (hasData && bass > 0.4 && bassDelta > 0.1) {
@@ -109,8 +112,8 @@ export default function Visualizer({ isPlaying, mode = 'ring', accent = '#4FC3F7
           width: Math.max(2, minDim * 0.003),
         });
       }
-      if (shockwavesRef.current.length > 3) {
-        shockwavesRef.current.splice(0, shockwavesRef.current.length - 3);
+      if (shockwavesRef.current.length > 5) {
+        shockwavesRef.current.splice(0, shockwavesRef.current.length - 5);
       }
 
       // ===== 整体呼吸缩放（表现力增强，待机也活）=====
@@ -120,9 +123,9 @@ export default function Visualizer({ isPlaying, mode = 'ring', accent = '#4FC3F7
       const MAX_R = minDim * 0.5 * 0.88 * breathScale;
 
       // === 1. 中心填充：径向频谱（低频在中心，向外渐变到高频）===
-      // 性能优化：层数 24→10，步数 120→64，手机带得动
-      const FILL_STEPS = 64;
-      const FILL_RINGS = 10;
+      // 网页端表现力：层数 14，步数 80
+      const FILL_STEPS = 80;
+      const FILL_RINGS = 14;
       for (let layer = FILL_RINGS - 1; layer >= 0; layer--) {
         const layerProgress = layer / FILL_RINGS; // 0=中心, 1=边缘
         const layerR = INNER_R + (MAX_R * 0.65 - INNER_R) * layerProgress;
@@ -164,14 +167,14 @@ export default function Visualizer({ isPlaying, mode = 'ring', accent = '#4FC3F7
       ctx.arc(cx, cy, coreR, 0, Math.PI * 2);
       ctx.fill();
 
-      // === 3. 中心波形线（实时波形穿过中心，shadowBlur 减半省性能）===
+      // === 3. 中心波形线（实时波形穿过中心）===
       const wave = readTimeDomainData();
       const waveHasData = wave.length > 0 && isPlaying;
       ctx.save();
       ctx.strokeStyle = `hsla(${H}, 85%, 75%, ${hasData ? 0.6 : 0.25})`;
       ctx.lineWidth = Math.max(1, minDim * 0.0015);
       ctx.shadowColor = C.glow;
-      ctx.shadowBlur = minDim * 0.008;
+      ctx.shadowBlur = minDim * 0.01;
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
       ctx.beginPath();
@@ -205,8 +208,8 @@ export default function Visualizer({ isPlaying, mode = 'ring', accent = '#4FC3F7
       ctx.restore();
 
       // === 4. 辐射波浪环：内圈=低频，外圈=高频 ===
-      // 性能优化：环数 5→3，步数 180→96，shadowBlur 减半
-      const NUM_RINGS = 3;
+      // 网页端表现力：环数 4，步数 120
+      const NUM_RINGS = 4;
       for (let ring = 0; ring < NUM_RINGS; ring++) {
         const ringProgress = (ring + 1) / NUM_RINGS;
         const baseR = MAX_R * 0.35 + (MAX_R - MAX_R * 0.35) * ringProgress;
@@ -222,12 +225,12 @@ export default function Visualizer({ isPlaying, mode = 'ring', accent = '#4FC3F7
         ctx.strokeStyle = `hsla(${H + ring * 12}, 80%, ${70 - ring * 5}%, ${alpha})`;
         ctx.lineWidth = Math.max(1.0, minDim * (0.0025 - ring * 0.0003));
         ctx.shadowColor = C.glow;
-        ctx.shadowBlur = minDim * (0.008 - ring * 0.001);
+        ctx.shadowBlur = minDim * (0.01 - ring * 0.0015);
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
 
         ctx.beginPath();
-        const STEPS = 96;
+        const STEPS = 120;
         for (let s = 0; s <= STEPS; s++) {
           const angle = (s / STEPS) * Math.PI * 2;
           const angleFreq = Math.abs(Math.sin(angle)) * freqRange;
@@ -249,7 +252,7 @@ export default function Visualizer({ isPlaying, mode = 'ring', accent = '#4FC3F7
         ctx.restore();
       }
 
-      // === 5. bass 冲击波（扩散环，表现力增强）===
+      // === 5. bass 冲击波（扩散环）===
       const shocks = shockwavesRef.current;
       for (let i = shocks.length - 1; i >= 0; i--) {
         const sw = shocks[i];
@@ -278,9 +281,9 @@ export default function Visualizer({ isPlaying, mode = 'ring', accent = '#4FC3F7
       ctx.arc(cx, cy, MAX_R, 0, Math.PI * 2);
       ctx.fill();
 
-      // === 7. 待机时的扩散涟漪（性能：3→2）===
+      // === 7. 待机时的扩散涟漪（3 个）===
       if (!hasData) {
-        for (let i = 0; i < 2; i++) {
+        for (let i = 0; i < 3; i++) {
           const ripplePhase = (tNow * 0.3 + i * 0.33) % 1;
           const rippleR = INNER_R + (MAX_R - INNER_R) * ripplePhase;
           const rippleAlpha = (1 - ripplePhase) * 0.15;
@@ -321,6 +324,7 @@ export default function Visualizer({ isPlaying, mode = 'ring', accent = '#4FC3F7
       const gap = Math.max(1, barW * 0.18);
       const innerW = Math.max(1, barW - gap);
 
+      // 中线
       ctx.strokeStyle = 'rgba(255,255,255,0.08)';
       ctx.lineWidth = 1;
       ctx.beginPath();
@@ -328,6 +332,7 @@ export default function Visualizer({ isPlaying, mode = 'ring', accent = '#4FC3F7
       ctx.lineTo(w, midY);
       ctx.stroke();
 
+      // 频段背景带
       const bandH = h * 0.16;
       const bandGrad = ctx.createLinearGradient(0, midY - bandH, 0, midY + bandH);
       bandGrad.addColorStop(0, C.halo(0));
@@ -348,6 +353,7 @@ export default function Visualizer({ isPlaying, mode = 'ring', accent = '#4FC3F7
         const amp = Math.max(2, value * maxAmp * (hasData ? 1 : 0.4));
         const x = i * barW + gap / 2;
 
+        // 上半部分柱
         const gUp = ctx.createLinearGradient(0, midY - amp, 0, midY);
         gUp.addColorStop(0, C.outer);
         gUp.addColorStop(0.5, C.mid);
@@ -355,6 +361,7 @@ export default function Visualizer({ isPlaying, mode = 'ring', accent = '#4FC3F7
         ctx.fillStyle = gUp;
         roundRectFill(ctx, x, midY - amp, innerW, amp, innerW * 0.35);
 
+        // 下半部分柱（镜像，半透明）
         const gDown = ctx.createLinearGradient(0, midY, 0, midY + amp);
         gDown.addColorStop(0, C.inner);
         gDown.addColorStop(0.5, C.mid);
@@ -364,8 +371,21 @@ export default function Visualizer({ isPlaying, mode = 'ring', accent = '#4FC3F7
         ctx.fillStyle = gDown;
         roundRectFill(ctx, x, midY, innerW, amp, innerW * 0.35);
         ctx.restore();
+
+        // 柱顶发光点（高能量时）
+        if (value > 0.35) {
+          ctx.save();
+          ctx.fillStyle = C.tip;
+          ctx.shadowColor = C.glow;
+          ctx.shadowBlur = minDim * 0.012;
+          ctx.beginPath();
+          ctx.arc(x + innerW / 2, midY - amp, innerW * 0.45, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.restore();
+        }
       }
 
+      // 中线发光
       ctx.save();
       ctx.shadowColor = C.glow;
       ctx.shadowBlur = minDim * 0.012;
@@ -377,6 +397,7 @@ export default function Visualizer({ isPlaying, mode = 'ring', accent = '#4FC3F7
       ctx.stroke();
       ctx.restore();
 
+      // 实时波形线
       const wave = readTimeDomainData();
       const waveHasData = wave.length > 0 && isPlaying;
       ctx.save();

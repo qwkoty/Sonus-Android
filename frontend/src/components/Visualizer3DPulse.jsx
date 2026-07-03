@@ -1,16 +1,14 @@
 import { useEffect, useRef } from 'react';
 import * as THREE from 'three';
-import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
-import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
-import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
-import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 import { getSpectrumBars } from '../audio/engine';
 
-const NUM_BARS = 64;
+const NUM_BARS = 56;        // 柱阵数量（56 兼顾表现力与安卓性能）
 const FOV = 55;
 
-// 3D 辐射频谱柱阵 + 中心音核 + Bloom 发光
-// 表现力核心：bass 命中时音核脉冲膨胀 + 柱顶粒子喷射 + 冲击波环
+// 3D 辐射频谱柱阵 + 中心音核 + 粒子喷射
+// 网页端原版用 UnrealBloomPass 后处理实现发光，但 Bloom 在安卓 GPU 上基本跑不动。
+// 本版本移除 Bloom，改用 AdditiveBlending + 多层发光球 + 柱顶光点 实现伪 Bloom 发光效果，
+// 视觉上接近原版且安卓端流畅。
 export default function Visualizer3DPulse({ accent = '#4FC3F7', onReady }) {
   const containerRef = useRef(null);
   const accentRef = useRef(accent);
@@ -22,14 +20,14 @@ export default function Visualizer3DPulse({ accent = '#4FC3F7', onReady }) {
     const container = containerRef.current;
     if (!container) return;
 
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const dpr = Math.min(window.devicePixelRatio || 1, 1.5);   // 安卓限 1.5
     let W = container.offsetWidth;
     let H = container.offsetHeight;
 
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(FOV, W / H, 0.1, 3000);
 
-    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    const renderer = new THREE.WebGLRenderer({ antialias: false, alpha: true });  // 关抗锯齿省性能
     renderer.setSize(W, H);
     renderer.setPixelRatio(dpr);
     renderer.domElement.style.width = '100%';
@@ -68,7 +66,7 @@ export default function Visualizer3DPulse({ accent = '#4FC3F7', onReady }) {
       return [h * 360, s * 100, l * 100];
     };
 
-    // ===== 中心音核：线框二十面体 + 内部实体 =====
+    // ===== 中心音核：线框二十面体 + 内部实体 + 发光球 =====
     const coreGroup = new THREE.Group();
     scene.add(coreGroup);
 
@@ -95,7 +93,7 @@ export default function Visualizer3DPulse({ accent = '#4FC3F7', onReady }) {
     );
     coreGroup.add(coreSolid);
 
-    // 音核中心发光球（随 bass 脉冲）
+    // 音核中心发光球（随 bass 脉冲）—— 伪 Bloom 的核心
     const coreGlowMat = new THREE.MeshBasicMaterial({
       color: new THREE.Color('#ffffff'),
       transparent: true,
@@ -109,12 +107,28 @@ export default function Visualizer3DPulse({ accent = '#4FC3F7', onReady }) {
     );
     coreGroup.add(coreGlow);
 
-    // ===== 64 根频谱柱（环形辐射）=====
+    // 外层柔光球（更大、更透明，模拟 Bloom 弥散光晕）
+    const coreHaloMat = new THREE.MeshBasicMaterial({
+      color: new THREE.Color(accent),
+      transparent: true,
+      opacity: 0.18,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    });
+    const coreHalo = new THREE.Mesh(
+      new THREE.SphereGeometry(CORE_R * 1.6, 24, 24),
+      coreHaloMat
+    );
+    coreGroup.add(coreHalo);
+
+    // ===== 频谱柱（环形辐射）=====
     const bars = [];
     const barGeo = new THREE.BoxGeometry(SCENE_R * 0.025, 1, SCENE_R * 0.025);
+    // 柱顶发光小球（共享几何体，伪 Bloom 柱顶高光）
+    const tipGeo = new THREE.SphereGeometry(SCENE_R * 0.022, 10, 10);
     for (let i = 0; i < NUM_BARS; i++) {
       const angle = (i / NUM_BARS) * Math.PI * 2;
-      // 颜色：低频暖色（H 偏红），高频冷色（H 偏蓝）
+      // 颜色：低频暖色，高频冷色
       const [aH] = hexToHsl(accent);
       const hueShift = (i / NUM_BARS) * 80;
       const hue = (aH + hueShift) % 360;
@@ -132,14 +146,26 @@ export default function Visualizer3DPulse({ accent = '#4FC3F7', onReady }) {
         0,
         Math.sin(angle) * RING_R
       );
-      // 柱子从底向上长（position.y = scale.y/2）
       bar.scale.y = 0.1;
-      bars.push({ mesh: bar, mat, angle, baseColor: color.clone() });
       scene.add(bar);
+
+      // 柱顶发光球
+      const tipMat = new THREE.MeshBasicMaterial({
+        color: color.clone().multiplyScalar(1.6),
+        transparent: true,
+        opacity: 0.0,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+      });
+      const tip = new THREE.Mesh(tipGeo, tipMat);
+      tip.position.set(Math.cos(angle) * RING_R, 0, Math.sin(angle) * RING_R);
+      scene.add(tip);
+
+      bars.push({ mesh: bar, mat, tip, tipMat, angle, baseColor: color.clone() });
     }
 
-    // ===== 底盘光环（地面投影感）=====
-    const ringGeo = new THREE.RingGeometry(RING_R * 0.98, RING_R * 1.02, 128);
+    // ===== 底盘光环（3 圈，地面投影感）=====
+    const ringGeo = new THREE.RingGeometry(RING_R * 0.98, RING_R * 1.02, 96);
     const ringMat = new THREE.MeshBasicMaterial({
       color: new THREE.Color(accent),
       transparent: true,
@@ -152,8 +178,7 @@ export default function Visualizer3DPulse({ accent = '#4FC3F7', onReady }) {
     baseRing.rotation.x = -Math.PI / 2;
     scene.add(baseRing);
 
-    // 第二圈外环
-    const outerRingGeo = new THREE.RingGeometry(RING_R * 1.25, RING_R * 1.27, 128);
+    const outerRingGeo = new THREE.RingGeometry(RING_R * 1.25, RING_R * 1.27, 96);
     const outerRingMat = new THREE.MeshBasicMaterial({
       color: new THREE.Color(accent),
       transparent: true,
@@ -166,22 +191,34 @@ export default function Visualizer3DPulse({ accent = '#4FC3F7', onReady }) {
     outerRing.rotation.x = -Math.PI / 2;
     scene.add(outerRing);
 
+    const innerRingGeo = new THREE.RingGeometry(RING_R * 0.7, RING_R * 0.71, 96);
+    const innerRingMat = new THREE.MeshBasicMaterial({
+      color: new THREE.Color(accent),
+      transparent: true,
+      opacity: 0.25,
+      side: THREE.DoubleSide,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    });
+    const innerRing = new THREE.Mesh(innerRingGeo, innerRingMat);
+    innerRing.rotation.x = -Math.PI / 2;
+    scene.add(innerRing);
+
     // ===== 粒子喷射池（bass 命中时柱顶喷发）=====
-    const PARTICLE_COUNT = 600;
+    const PARTICLE_COUNT = 400;   // 安卓端 400 粒子流畅
     const pPositions = new Float32Array(PARTICLE_COUNT * 3);
     const pColors = new Float32Array(PARTICLE_COUNT * 3);
     const pVelocities = new Float32Array(PARTICLE_COUNT * 3);
     const pLife = new Float32Array(PARTICLE_COUNT);       // 0..1 剩余生命
-    const pStartIdx = new Int32Array(PARTICLE_COUNT);     // 来自哪根柱
     for (let i = 0; i < PARTICLE_COUNT; i++) {
-      pLife[i] = 0; // 初始全死
-      pStartIdx[i] = -1;
+      pLife[i] = 0;
+      pPositions[i * 3 + 1] = -9999;   // 初始隐藏到画面外
     }
     const pGeo = new THREE.BufferGeometry();
     pGeo.setAttribute('position', new THREE.BufferAttribute(pPositions, 3));
     pGeo.setAttribute('color', new THREE.BufferAttribute(pColors, 3));
     const pMat = new THREE.PointsMaterial({
-      size: SCENE_R * 0.018,
+      size: SCENE_R * 0.02,
       vertexColors: true,
       transparent: true,
       opacity: 0.9,
@@ -212,20 +249,7 @@ export default function Visualizer3DPulse({ accent = '#4FC3F7', onReady }) {
       pColors[i * 3 + 1] = color.g;
       pColors[i * 3 + 2] = color.b;
       pLife[i] = 1;
-      pStartIdx[i] = barIdx;
     };
-
-    // ===== Bloom 后处理 =====
-    const composer = new EffectComposer(renderer);
-    composer.addPass(new RenderPass(scene, camera));
-    const bloomPass = new UnrealBloomPass(
-      new THREE.Vector2(W, H),
-      1.1,    // strength
-      0.7,    // radius
-      0.15    // threshold
-    );
-    composer.addPass(bloomPass);
-    composer.addPass(new OutputPass());
 
     // ===== 动画循环 =====
     let raf;
@@ -241,10 +265,10 @@ export default function Visualizer3DPulse({ accent = '#4FC3F7', onReady }) {
       if (hasData) {
         for (let i = 0; i < 8; i++) bass += data[i];
         bass /= 8;
-        for (let i = 8; i < 32; i++) mid += data[i];
-        mid /= 24;
-        for (let i = 32; i < NUM_BARS; i++) treble += data[i];
-        treble /= (NUM_BARS - 32);
+        for (let i = 8; i < 28; i++) mid += data[i];
+        mid /= 20;
+        for (let i = 28; i < NUM_BARS; i++) treble += data[i];
+        treble /= (NUM_BARS - 28);
       } else {
         const t = Date.now() * 0.001;
         bass = 0.08 + Math.sin(t * 1.4) * 0.05;
@@ -257,7 +281,6 @@ export default function Visualizer3DPulse({ accent = '#4FC3F7', onReady }) {
       const bassDelta = bass - bassPrev;
       bassPrev = bass;
       if (hasData && bass > 0.4 && bassDelta > 0.1) {
-        // 高能量柱子优先喷射
         for (let i = 0; i < NUM_BARS; i++) {
           if (data[i] > 0.5) {
             emitParticle(i, data[i], bars[i].baseColor);
@@ -272,10 +295,12 @@ export default function Visualizer3DPulse({ accent = '#4FC3F7', onReady }) {
       coreWire.rotation.y += 0.006;
       coreSolid.rotation.x -= 0.003;
       coreSolid.rotation.y -= 0.005;
-      // 线框透明度随能量
       coreWireMat.opacity = 0.6 + bassSmooth * 0.4;
       coreGlowMat.opacity = 0.4 + bassSmooth * 0.5;
       coreGlow.scale.setScalar(1 + bassSmooth * 1.2);
+      // 外层光晕随 bass 弥散膨胀（伪 Bloom 弥散感）
+      coreHaloMat.opacity = 0.1 + bassSmooth * 0.25;
+      coreHalo.scale.setScalar(1 + bassSmooth * 0.8);
 
       // ===== 柱子更新 =====
       for (let i = 0; i < NUM_BARS; i++) {
@@ -288,17 +313,23 @@ export default function Visualizer3DPulse({ accent = '#4FC3F7', onReady }) {
         const intensity = 0.5 + v * 0.8;
         bar.mat.color.copy(bar.baseColor).multiplyScalar(intensity);
         bar.mat.opacity = 0.7 + v * 0.3;
+
+        // 柱顶发光球：位置跟随柱顶，能量越高越亮
+        bar.tip.position.y = h;
+        bar.tipMat.opacity = Math.min(0.9, v * 1.4);
+        bar.tip.scale.setScalar(0.6 + v * 0.8);
       }
 
       // ===== 底盘光环 =====
       ringMat.opacity = 0.25 + bassSmooth * 0.4;
       outerRing.rotation.z += 0.001;
       outerRingMat.opacity = 0.1 + mid * 0.2;
+      innerRing.rotation.z -= 0.0015;
+      innerRingMat.opacity = 0.1 + treble * 0.25;
 
       // ===== 粒子更新 =====
       for (let i = 0; i < PARTICLE_COUNT; i++) {
         if (pLife[i] <= 0) {
-          // 隐藏死亡粒子（移到远处）
           pPositions[i * 3 + 1] = -9999;
           continue;
         }
@@ -311,13 +342,9 @@ export default function Visualizer3DPulse({ accent = '#4FC3F7', onReady }) {
         pVelocities[i * 3 + 2] *= 0.98;
         pLife[i] -= 0.012;
         // 颜色随生命衰减
-        const fade = Math.max(0, pLife[i]);
         pColors[i * 3] *= 0.995;
         pColors[i * 3 + 1] *= 0.995;
         pColors[i * 3 + 2] *= 0.995;
-        if (fade < 0.3) {
-          // 接近死亡时压暗
-        }
       }
       pGeo.attributes.position.needsUpdate = true;
       pGeo.attributes.color.needsUpdate = true;
@@ -329,10 +356,7 @@ export default function Visualizer3DPulse({ accent = '#4FC3F7', onReady }) {
       camera.position.x = Math.sin(t * 0.15) * SCENE_R * 0.15;
       camera.lookAt(0, 0, 0);
 
-      // Bloom 强度随 bass
-      bloomPass.strength = 0.9 + bassSmooth * 0.8;
-
-      composer.render();
+      renderer.render(scene, camera);
 
       if (firstFrame) {
         firstFrame = false;
@@ -347,16 +371,18 @@ export default function Visualizer3DPulse({ accent = '#4FC3F7', onReady }) {
       const color = new THREE.Color(accentRef.current);
       coreWireMat.color.copy(color);
       coreSolidMat.color.copy(color);
+      coreHaloMat.color.copy(color);
       ringMat.color.copy(color);
       outerRingMat.color.copy(color);
+      innerRingMat.color.copy(color);
       const [aH] = hexToHsl(accentRef.current);
       for (let i = 0; i < NUM_BARS; i++) {
         const hueShift = (i / NUM_BARS) * 80;
         const hue = (aH + hueShift) % 360;
         bars[i].baseColor.setHSL(hue / 360, 0.9, 0.55);
+        bars[i].tipMat.color.copy(bars[i].baseColor).multiplyScalar(1.6);
       }
     };
-    // 每 200ms 检查一次主题色变化（避免每帧字符串比较）
     const accentTimer = setInterval(updateAccent, 200);
     updateAccent();
 
@@ -367,7 +393,6 @@ export default function Visualizer3DPulse({ accent = '#4FC3F7', onReady }) {
       camera.aspect = W / H;
       camera.updateProjectionMatrix();
       renderer.setSize(W, H);
-      composer.setSize(W, H);
     };
     window.addEventListener('resize', handleResize);
 
@@ -375,21 +400,23 @@ export default function Visualizer3DPulse({ accent = '#4FC3F7', onReady }) {
       cancelAnimationFrame(raf);
       clearInterval(accentTimer);
       window.removeEventListener('resize', handleResize);
-      composer.dispose();
       renderer.dispose();
       coreGeo.dispose();
       barGeo.dispose();
+      tipGeo.dispose();
       ringGeo.dispose();
       outerRingGeo.dispose();
+      innerRingGeo.dispose();
       pGeo.dispose();
       coreWireMat.dispose();
       coreSolidMat.dispose();
       coreGlowMat.dispose();
+      coreHaloMat.dispose();
       ringMat.dispose();
       outerRingMat.dispose();
+      innerRingMat.dispose();
       pMat.dispose();
-      bars.forEach((b) => b.mat.dispose());
-      bloomPass.dispose();
+      bars.forEach((b) => { b.mat.dispose(); b.tipMat.dispose(); });
       if (renderer.domElement.parentNode) {
         renderer.domElement.parentNode.removeChild(renderer.domElement);
       }
