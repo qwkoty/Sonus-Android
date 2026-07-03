@@ -266,3 +266,3977 @@ export default function Player({ onProfile }) {
     </div>
   );
 }
+import { useState, useRef, useimport { useState, useRef, useEffect, lazy, Suspense } from 'react';
+import { Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Repeat1, Volume2, Search, Maximize2, User, MoreHorizontal, X } from 'lucide-react';
+import { usePlayerStore } from '../store/usePlayerStore';
+import { useAuthStore } from '../import { useState, useRef, useEffect, lazy, Suspense } from 'react';
+import { Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Repeat1, Volume2, Search, Maximize2, User, MoreHorizontal, X } from 'lucide-react';
+import { usePlayerStore } from '../store/usePlayerStore';
+import { useAuthStore } from '../store/useAuthStore';
+import { music } from '../api/music';
+import Visualimport { useState, useRef, useEffect, lazy, Suspense } from 'react';
+import { Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Repeat1, Volume2, Search, Maximize2, User, MoreHorizontal, X } from 'lucide-react';
+import { usePlayerStore } from '../store/usePlayerStore';
+import { useAuthStore } from '../store/useAuthStore';
+import { music } from '../api/music';
+import Visualizer from '../components/Visualizer';
+import FloatingLyrics from '../components/FloatingLyrics';
+
+const Visualizer3D = lazy(() => import('../components/Visualizer3D'));
+
+function fmt(s) { if (!s || isNaN(s)) return '0:00'; const m = Math.floor(s / 60), sec = Math.floor(s % 60); return `${m}:${sec.toString().padStart(2, '0')}`; }
+
+const VIZ_MODES = [{ key: 'ring', label: '环', icon: '◯' }, { key:import { useState, useRef, useEffect, lazy, Suspense } from 'react';
+import { Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Repeat1, Volume2, Search, Maximize2, User, MoreHorizontal, X } from 'lucide-react';
+import { usePlayerStore } from '../store/usePlayerStore';
+import { useAuthStore } from '../store/useAuthStore';
+import { music } from '../api/music';
+import Visualizer from '../components/Visualizer';
+import FloatingLyrics from '../components/FloatingLyrics';
+
+const Visualizer3D = lazy(() => import('../components/Visualizer3D'));
+
+function fmt(s) { if (!s || isNaN(s)) return '0:00'; const m = Math.floor(s / 60), sec = Math.floor(s % 60); return `${m}:${sec.toString().padStart(2, '0')}`; }
+
+const VIZ_MODES = [{ key: 'ring', label: '环', icon: '◯' }, { key: 'wave', label: '波', icon: '〜' }, { key: '3dimport { useState, useRef, useEffect, lazy, Suspense } from 'react';
+import { Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Repeat1, Volume2, Search, Maximize2, User, MoreHorizontal, X } from 'lucide-react';
+import { usePlayerStore } from '../store/usePlayerStore';
+import { useAuthStore } from '../store/useAuthStore';
+import { music } from '../api/music';
+import Visualizer from '../components/Visualizer';
+import FloatingLyrics from '../components/FloatingLyrics';
+
+const Visualizer3D = lazy(() => import('../components/Visualizer3D'));
+
+function fmt(s) { if (!s || isNaN(s)) return '0:00'; const m = Math.floor(s / 60), sec = Math.floor(s % 60); return `${m}:${sec.toString().padStart(2, '0')}`; }
+
+const VIZ_MODES = [{ key: 'ring', label: '环', icon: '◯' }, { key: 'wave', label: '波', icon: '〜' }, { key: '3d', label: '3D', icon: '◆' }];
+const PRESETS = ['import { useState, useRef, useEffect, lazy, Suspense } from 'react';
+import { Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Repeat1, Volume2, Search, Maximize2, User, MoreHorizontal, X } from 'lucide-react';
+import { usePlayerStore } from '../store/usePlayerStore';
+import { useAuthStore } from '../store/useAuthStore';
+import { music } from '../api/music';
+import Visualizer from '../components/Visualizer';
+import FloatingLyrics from '../components/FloatingLyrics';
+
+const Visualizer3D = lazy(() => import('../components/Visualizer3D'));
+
+function fmt(s) { if (!s || isNaN(s)) return '0:00'; const m = Math.floor(s / 60), sec = Math.floor(s % 60); return `${m}:${sec.toString().padStart(2, '0')}`; }
+
+const VIZ_MODES = [{ key: 'ring', label: '环', icon: '◯' }, { key: 'wave', label: '波', icon: '〜' }, { key: '3d', label: '3D', icon: '◆' }];
+const PRESETS = ['#4FC3F7', '#A78BFA', '#FF6B9D', '#4ADE80', '#FB923C',import { useState, useRef, useEffect, lazy, Suspense } from 'react';
+import { Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Repeat1, Volume2, Search, Maximize2, User, MoreHorizontal, X } from 'lucide-react';
+import { usePlayerStore } from '../store/usePlayerStore';
+import { useAuthStore } from '../store/useAuthStore';
+import { music } from '../api/music';
+import Visualizer from '../components/Visualizer';
+import FloatingLyrics from '../components/FloatingLyrics';
+
+const Visualizer3D = lazy(() => import('../components/Visualizer3D'));
+
+function fmt(s) { if (!s || isNaN(s)) return '0:00'; const m = Math.floor(s / 60), sec = Math.floor(s % 60); return `${m}:${sec.toString().padStart(2, '0')}`; }
+
+const VIZ_MODES = [{ key: 'ring', label: '环', icon: '◯' }, { key: 'wave', label: '波', icon: '〜' }, { key: '3d', label: '3D', icon: '◆' }];
+const PRESETS = ['#4FC3F7', '#A78BFA', '#FF6B9D', '#4ADE80', '#FB923C', '#C0C0C0'];
+import { useState, useRef, useEffect, lazy, Suspense } from 'react';
+import { Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Repeat1, Volume2, Search, Maximize2, User, MoreHorizontal, X } from 'lucide-react';
+import { usePlayerStore } from '../store/usePlayerStore';
+import { useAuthStore } from '../store/useAuthStore';
+import { music } from '../api/music';
+import Visualizer from '../components/Visualizer';
+import FloatingLyrics from '../components/FloatingLyrics';
+
+const Visualizer3D = lazy(() => import('../components/Visualizer3D'));
+
+function fmt(s) { if (!s || isNaN(s)) return '0:00'; const m = Math.floor(s / 60), sec = Math.floor(s % 60); return `${m}:${sec.toString().padStart(2, '0')}`; }
+
+const VIZ_MODES = [{ key: 'ring', label: '环', icon: '◯' }, { key: 'wave', label: '波', icon: '〜' }, { key: '3d', label: '3D', icon: '◆' }];
+const PRESETS = ['#4FC3F7', '#A78BFA', '#FF6B9D', '#4ADE80', '#FB923C', '#C0C0C0'];
+
+function hexToRgb(hex) {
+  const s = hex.replace('#', '');
+  const bigint = parseInt(s.length ===import { useState, useRef, useEffect, lazy, Suspense } from 'react';
+import { Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Repeat1, Volume2, Search, Maximize2, User, MoreHorizontal, X } from 'lucide-react';
+import { usePlayerStore } from '../store/usePlayerStore';
+import { useAuthStore } from '../store/useAuthStore';
+import { music } from '../api/music';
+import Visualizer from '../components/Visualizer';
+import FloatingLyrics from '../components/FloatingLyrics';
+
+const Visualizer3D = lazy(() => import('../components/Visualizer3D'));
+
+function fmt(s) { if (!s || isNaN(s)) return '0:00'; const m = Math.floor(s / 60), sec = Math.floor(s % 60); return `${m}:${sec.toString().padStart(2, '0')}`; }
+
+const VIZ_MODES = [{ key: 'ring', label: '环', icon: '◯' }, { key: 'wave', label: '波', icon: '〜' }, { key: '3d', label: '3D', icon: '◆' }];
+const PRESETS = ['#4FC3F7', '#A78BFA', '#FF6B9D', '#4ADE80', '#FB923C', '#C0C0C0'];
+
+function hexToRgb(hex) {
+  const s = hex.replace('#', '');
+  const bigint = parseInt(s.length === 3 ? s.split('').map(c => c + c).join('') : s,import { useState, useRef, useEffect, lazy, Suspense } from 'react';
+import { Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Repeat1, Volume2, Search, Maximize2, User, MoreHorizontal, X } from 'lucide-react';
+import { usePlayerStore } from '../store/usePlayerStore';
+import { useAuthStore } from '../store/useAuthStore';
+import { music } from '../api/music';
+import Visualizer from '../components/Visualizer';
+import FloatingLyrics from '../components/FloatingLyrics';
+
+const Visualizer3D = lazy(() => import('../components/Visualizer3D'));
+
+function fmt(s) { if (!s || isNaN(s)) return '0:00'; const m = Math.floor(s / 60), sec = Math.floor(s % 60); return `${m}:${sec.toString().padStart(2, '0')}`; }
+
+const VIZ_MODES = [{ key: 'ring', label: '环', icon: '◯' }, { key: 'wave', label: '波', icon: '〜' }, { key: '3d', label: '3D', icon: '◆' }];
+const PRESETS = ['#4FC3F7', '#A78BFA', '#FF6B9D', '#4ADE80', '#FB923C', '#C0C0C0'];
+
+function hexToRgb(hex) {
+  const s = hex.replace('#', '');
+  const bigint = parseInt(s.length === 3 ? s.split('').map(c => c + c).join('') : s, 16);
+  return { r: (bigint >> 16) & 255, g:import { useState, useRef, useEffect, lazy, Suspense } from 'react';
+import { Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Repeat1, Volume2, Search, Maximize2, User, MoreHorizontal, X } from 'lucide-react';
+import { usePlayerStore } from '../store/usePlayerStore';
+import { useAuthStore } from '../store/useAuthStore';
+import { music } from '../api/music';
+import Visualizer from '../components/Visualizer';
+import FloatingLyrics from '../components/FloatingLyrics';
+
+const Visualizer3D = lazy(() => import('../components/Visualizer3D'));
+
+function fmt(s) { if (!s || isNaN(s)) return '0:00'; const m = Math.floor(s / 60), sec = Math.floor(s % 60); return `${m}:${sec.toString().padStart(2, '0')}`; }
+
+const VIZ_MODES = [{ key: 'ring', label: '环', icon: '◯' }, { key: 'wave', label: '波', icon: '〜' }, { key: '3d', label: '3D', icon: '◆' }];
+const PRESETS = ['#4FC3F7', '#A78BFA', '#FF6B9D', '#4ADE80', '#FB923C', '#C0C0C0'];
+
+function hexToRgb(hex) {
+  const s = hex.replace('#', '');
+  const bigint = parseInt(s.length === 3 ? s.split('').map(c => c + c).join('') : s, 16);
+  return { r: (bigint >> 16) & 255, g: (bigint >> 8) & 255, b: bigint & 255 };
+}
+
+function Row({ track, active, onimport { useState, useRef, useEffect, lazy, Suspense } from 'react';
+import { Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Repeat1, Volume2, Search, Maximize2, User, MoreHorizontal, X } from 'lucide-react';
+import { usePlayerStore } from '../store/usePlayerStore';
+import { useAuthStore } from '../store/useAuthStore';
+import { music } from '../api/music';
+import Visualizer from '../components/Visualizer';
+import FloatingLyrics from '../components/FloatingLyrics';
+
+const Visualizer3D = lazy(() => import('../components/Visualizer3D'));
+
+function fmt(s) { if (!s || isNaN(s)) return '0:00'; const m = Math.floor(s / 60), sec = Math.floor(s % 60); return `${m}:${sec.toString().padStart(2, '0')}`; }
+
+const VIZ_MODES = [{ key: 'ring', label: '环', icon: '◯' }, { key: 'wave', label: '波', icon: '〜' }, { key: '3d', label: '3D', icon: '◆' }];
+const PRESETS = ['#4FC3F7', '#A78BFA', '#FF6B9D', '#4ADE80', '#FB923C', '#C0C0C0'];
+
+function hexToRgb(hex) {
+  const s = hex.replace('#', '');
+  const bigint = parseInt(s.length === 3 ? s.split('').map(c => c + c).join('') : s, 16);
+  return { r: (bigint >> 16) & 255, g: (bigint >> 8) & 255, b: bigint & 255 };
+}
+
+function Row({ track, active, onPlay }) {
+  const c = track.cover || `https://picsum.photos/import { useState, useRef, useEffect, lazy, Suspense } from 'react';
+import { Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Repeat1, Volume2, Search, Maximize2, User, MoreHorizontal, X } from 'lucide-react';
+import { usePlayerStore } from '../store/usePlayerStore';
+import { useAuthStore } from '../store/useAuthStore';
+import { music } from '../api/music';
+import Visualizer from '../components/Visualizer';
+import FloatingLyrics from '../components/FloatingLyrics';
+
+const Visualizer3D = lazy(() => import('../components/Visualizer3D'));
+
+function fmt(s) { if (!s || isNaN(s)) return '0:00'; const m = Math.floor(s / 60), sec = Math.floor(s % 60); return `${m}:${sec.toString().padStart(2, '0')}`; }
+
+const VIZ_MODES = [{ key: 'ring', label: '环', icon: '◯' }, { key: 'wave', label: '波', icon: '〜' }, { key: '3d', label: '3D', icon: '◆' }];
+const PRESETS = ['#4FC3F7', '#A78BFA', '#FF6B9D', '#4ADE80', '#FB923C', '#C0C0C0'];
+
+function hexToRgb(hex) {
+  const s = hex.replace('#', '');
+  const bigint = parseInt(s.length === 3 ? s.split('').map(c => c + c).join('') : s, 16);
+  return { r: (bigint >> 16) & 255, g: (bigint >> 8) & 255, b: bigint & 255 };
+}
+
+function Row({ track, active, onPlay }) {
+  const c = track.cover || `https://picsum.photos/seed/${track.id}/400/400`;
+  return (
+    <div className={`glass-row ${active ? 'is-active'import { useState, useRef, useEffect, lazy, Suspense } from 'react';
+import { Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Repeat1, Volume2, Search, Maximize2, User, MoreHorizontal, X } from 'lucide-react';
+import { usePlayerStore } from '../store/usePlayerStore';
+import { useAuthStore } from '../store/useAuthStore';
+import { music } from '../api/music';
+import Visualizer from '../components/Visualizer';
+import FloatingLyrics from '../components/FloatingLyrics';
+
+const Visualizer3D = lazy(() => import('../components/Visualizer3D'));
+
+function fmt(s) { if (!s || isNaN(s)) return '0:00'; const m = Math.floor(s / 60), sec = Math.floor(s % 60); return `${m}:${sec.toString().padStart(2, '0')}`; }
+
+const VIZ_MODES = [{ key: 'ring', label: '环', icon: '◯' }, { key: 'wave', label: '波', icon: '〜' }, { key: '3d', label: '3D', icon: '◆' }];
+const PRESETS = ['#4FC3F7', '#A78BFA', '#FF6B9D', '#4ADE80', '#FB923C', '#C0C0C0'];
+
+function hexToRgb(hex) {
+  const s = hex.replace('#', '');
+  const bigint = parseInt(s.length === 3 ? s.split('').map(c => c + c).join('') : s, 16);
+  return { r: (bigint >> 16) & 255, g: (bigint >> 8) & 255, b: bigint & 255 };
+}
+
+function Row({ track, active, onPlay }) {
+  const c = track.cover || `https://picsum.photos/seed/${track.id}/400/400`;
+  return (
+    <div className={`glass-row ${active ? 'is-active' : ''}`} onClick={() => onPlayimport { useState, useRef, useEffect, lazy, Suspense } from 'react';
+import { Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Repeat1, Volume2, Search, Maximize2, User, MoreHorizontal, X } from 'lucide-react';
+import { usePlayerStore } from '../store/usePlayerStore';
+import { useAuthStore } from '../store/useAuthStore';
+import { music } from '../api/music';
+import Visualizer from '../components/Visualizer';
+import FloatingLyrics from '../components/FloatingLyrics';
+
+const Visualizer3D = lazy(() => import('../components/Visualizer3D'));
+
+function fmt(s) { if (!s || isNaN(s)) return '0:00'; const m = Math.floor(s / 60), sec = Math.floor(s % 60); return `${m}:${sec.toString().padStart(2, '0')}`; }
+
+const VIZ_MODES = [{ key: 'ring', label: '环', icon: '◯' }, { key: 'wave', label: '波', icon: '〜' }, { key: '3d', label: '3D', icon: '◆' }];
+const PRESETS = ['#4FC3F7', '#A78BFA', '#FF6B9D', '#4ADE80', '#FB923C', '#C0C0C0'];
+
+function hexToRgb(hex) {
+  const s = hex.replace('#', '');
+  const bigint = parseInt(s.length === 3 ? s.split('').map(c => c + c).join('') : s, 16);
+  return { r: (bigint >> 16) & 255, g: (bigint >> 8) & 255, b: bigint & 255 };
+}
+
+function Row({ track, active, onPlay }) {
+  const c = track.cover || `https://picsum.photos/seed/${track.id}/400/400`;
+  return (
+    <div className={`glass-row ${active ? 'is-active' : ''}`} onClick={() => onPlay(track)}>
+      <div style={{ width: 42, height: 42, borderimport { useState, useRef, useEffect, lazy, Suspense } from 'react';
+import { Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Repeat1, Volume2, Search, Maximize2, User, MoreHorizontal, X } from 'lucide-react';
+import { usePlayerStore } from '../store/usePlayerStore';
+import { useAuthStore } from '../store/useAuthStore';
+import { music } from '../api/music';
+import Visualizer from '../components/Visualizer';
+import FloatingLyrics from '../components/FloatingLyrics';
+
+const Visualizer3D = lazy(() => import('../components/Visualizer3D'));
+
+function fmt(s) { if (!s || isNaN(s)) return '0:00'; const m = Math.floor(s / 60), sec = Math.floor(s % 60); return `${m}:${sec.toString().padStart(2, '0')}`; }
+
+const VIZ_MODES = [{ key: 'ring', label: '环', icon: '◯' }, { key: 'wave', label: '波', icon: '〜' }, { key: '3d', label: '3D', icon: '◆' }];
+const PRESETS = ['#4FC3F7', '#A78BFA', '#FF6B9D', '#4ADE80', '#FB923C', '#C0C0C0'];
+
+function hexToRgb(hex) {
+  const s = hex.replace('#', '');
+  const bigint = parseInt(s.length === 3 ? s.split('').map(c => c + c).join('') : s, 16);
+  return { r: (bigint >> 16) & 255, g: (bigint >> 8) & 255, b: bigint & 255 };
+}
+
+function Row({ track, active, onPlay }) {
+  const c = track.cover || `https://picsum.photos/seed/${track.id}/400/400`;
+  return (
+    <div className={`glass-row ${active ? 'is-active' : ''}`} onClick={() => onPlay(track)}>
+      <div style={{ width: 42, height: 42, borderRadius: 8, overflow: 'hidden', flexShrink: 0, background: active ? '#222' : '#111' }}>
+        <img src={c} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 13, fontWeight: 600import { useState, useRef, useEffect, lazy, Suspense } from 'react';
+import { Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Repeat1, Volume2, Search, Maximize2, User, MoreHorizontal, X } from 'lucide-react';
+import { usePlayerStore } from '../store/usePlayerStore';
+import { useAuthStore } from '../store/useAuthStore';
+import { music } from '../api/music';
+import Visualizer from '../components/Visualizer';
+import FloatingLyrics from '../components/FloatingLyrics';
+
+const Visualizer3D = lazy(() => import('../components/Visualizer3D'));
+
+function fmt(s) { if (!s || isNaN(s)) return '0:00'; const m = Math.floor(s / 60), sec = Math.floor(s % 60); return `${m}:${sec.toString().padStart(2, '0')}`; }
+
+const VIZ_MODES = [{ key: 'ring', label: '环', icon: '◯' }, { key: 'wave', label: '波', icon: '〜' }, { key: '3d', label: '3D', icon: '◆' }];
+const PRESETS = ['#4FC3F7', '#A78BFA', '#FF6B9D', '#4ADE80', '#FB923C', '#C0C0C0'];
+
+function hexToRgb(hex) {
+  const s = hex.replace('#', '');
+  const bigint = parseInt(s.length === 3 ? s.split('').map(c => c + c).join('') : s, 16);
+  return { r: (bigint >> 16) & 255, g: (bigint >> 8) & 255, b: bigint & 255 };
+}
+
+function Row({ track, active, onPlay }) {
+  const c = track.cover || `https://picsum.photos/seed/${track.id}/400/400`;
+  return (
+    <div className={`glass-row ${active ? 'is-active' : ''}`} onClick={() => onPlay(track)}>
+      <div style={{ width: 42, height: 42, borderRadius: 8, overflow: 'hidden', flexShrink: 0, background: active ? '#222' : '#111' }}>
+        <img src={c} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'import { useState, useRef, useEffect, lazy, Suspense } from 'react';
+import { Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Repeat1, Volume2, Search, Maximize2, User, MoreHorizontal, X } from 'lucide-react';
+import { usePlayerStore } from '../store/usePlayerStore';
+import { useAuthStore } from '../store/useAuthStore';
+import { music } from '../api/music';
+import Visualizer from '../components/Visualizer';
+import FloatingLyrics from '../components/FloatingLyrics';
+
+const Visualizer3D = lazy(() => import('../components/Visualizer3D'));
+
+function fmt(s) { if (!s || isNaN(s)) return '0:00'; const m = Math.floor(s / 60), sec = Math.floor(s % 60); return `${m}:${sec.toString().padStart(2, '0')}`; }
+
+const VIZ_MODES = [{ key: 'ring', label: '环', icon: '◯' }, { key: 'wave', label: '波', icon: '〜' }, { key: '3d', label: '3D', icon: '◆' }];
+const PRESETS = ['#4FC3F7', '#A78BFA', '#FF6B9D', '#4ADE80', '#FB923C', '#C0C0C0'];
+
+function hexToRgb(hex) {
+  const s = hex.replace('#', '');
+  const bigint = parseInt(s.length === 3 ? s.split('').map(c => c + c).join('') : s, 16);
+  return { r: (bigint >> 16) & 255, g: (bigint >> 8) & 255, b: bigint & 255 };
+}
+
+function Row({ track, active, onPlay }) {
+  const c = track.cover || `https://picsum.photos/seed/${track.id}/400/400`;
+  return (
+    <div className={`glass-row ${active ? 'is-active' : ''}`} onClick={() => onPlay(track)}>
+      <div style={{ width: 42, height: 42, borderRadius: 8, overflow: 'hidden', flexShrink: 0, background: active ? '#222' : '#111' }}>
+        <img src={c} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: active ? 'var(--accent-dynamic)' : 'import { useState, useRef, useEffect, lazy, Suspense } from 'react';
+import { Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Repeat1, Volume2, Search, Maximize2, User, MoreHorizontal, X } from 'lucide-react';
+import { usePlayerStore } from '../store/usePlayerStore';
+import { useAuthStore } from '../store/useAuthStore';
+import { music } from '../api/music';
+import Visualizer from '../components/Visualizer';
+import FloatingLyrics from '../components/FloatingLyrics';
+
+const Visualizer3D = lazy(() => import('../components/Visualizer3D'));
+
+function fmt(s) { if (!s || isNaN(s)) return '0:00'; const m = Math.floor(s / 60), sec = Math.floor(s % 60); return `${m}:${sec.toString().padStart(2, '0')}`; }
+
+const VIZ_MODES = [{ key: 'ring', label: '环', icon: '◯' }, { key: 'wave', label: '波', icon: '〜' }, { key: '3d', label: '3D', icon: '◆' }];
+const PRESETS = ['#4FC3F7', '#A78BFA', '#FF6B9D', '#4ADE80', '#FB923C', '#C0C0C0'];
+
+function hexToRgb(hex) {
+  const s = hex.replace('#', '');
+  const bigint = parseInt(s.length === 3 ? s.split('').map(c => c + c).join('') : s, 16);
+  return { r: (bigint >> 16) & 255, g: (bigint >> 8) & 255, b: bigint & 255 };
+}
+
+function Row({ track, active, onPlay }) {
+  const c = track.cover || `https://picsum.photos/seed/${track.id}/400/400`;
+  return (
+    <div className={`glass-row ${active ? 'is-active' : ''}`} onClick={() => onPlay(track)}>
+      <div style={{ width: 42, height: 42, borderRadius: 8, overflow: 'hidden', flexShrink: 0, background: active ? '#222' : '#111' }}>
+        <img src={c} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: active ? 'var(--accent-dynamic)' : 'var(--text-primary)' }}>{track.title}</import { useState, useRef, useEffect, lazy, Suspense } from 'react';
+import { Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Repeat1, Volume2, Search, Maximize2, User, MoreHorizontal, X } from 'lucide-react';
+import { usePlayerStore } from '../store/usePlayerStore';
+import { useAuthStore } from '../store/useAuthStore';
+import { music } from '../api/music';
+import Visualizer from '../components/Visualizer';
+import FloatingLyrics from '../components/FloatingLyrics';
+
+const Visualizer3D = lazy(() => import('../components/Visualizer3D'));
+
+function fmt(s) { if (!s || isNaN(s)) return '0:00'; const m = Math.floor(s / 60), sec = Math.floor(s % 60); return `${m}:${sec.toString().padStart(2, '0')}`; }
+
+const VIZ_MODES = [{ key: 'ring', label: '环', icon: '◯' }, { key: 'wave', label: '波', icon: '〜' }, { key: '3d', label: '3D', icon: '◆' }];
+const PRESETS = ['#4FC3F7', '#A78BFA', '#FF6B9D', '#4ADE80', '#FB923C', '#C0C0C0'];
+
+function hexToRgb(hex) {
+  const s = hex.replace('#', '');
+  const bigint = parseInt(s.length === 3 ? s.split('').map(c => c + c).join('') : s, 16);
+  return { r: (bigint >> 16) & 255, g: (bigint >> 8) & 255, b: bigint & 255 };
+}
+
+function Row({ track, active, onPlay }) {
+  const c = track.cover || `https://picsum.photos/seed/${track.id}/400/400`;
+  return (
+    <div className={`glass-row ${active ? 'is-active' : ''}`} onClick={() => onPlay(track)}>
+      <div style={{ width: 42, height: 42, borderRadius: 8, overflow: 'hidden', flexShrink: 0, background: active ? '#222' : '#111' }}>
+        <img src={c} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: active ? 'var(--accent-dynamic)' : 'var(--text-primary)' }}>{track.title}</div>
+        <div style={{ fontSizeimport { useState, useRef, useEffect, lazy, Suspense } from 'react';
+import { Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Repeat1, Volume2, Search, Maximize2, User, MoreHorizontal, X } from 'lucide-react';
+import { usePlayerStore } from '../store/usePlayerStore';
+import { useAuthStore } from '../store/useAuthStore';
+import { music } from '../api/music';
+import Visualizer from '../components/Visualizer';
+import FloatingLyrics from '../components/FloatingLyrics';
+
+const Visualizer3D = lazy(() => import('../components/Visualizer3D'));
+
+function fmt(s) { if (!s || isNaN(s)) return '0:00'; const m = Math.floor(s / 60), sec = Math.floor(s % 60); return `${m}:${sec.toString().padStart(2, '0')}`; }
+
+const VIZ_MODES = [{ key: 'ring', label: '环', icon: '◯' }, { key: 'wave', label: '波', icon: '〜' }, { key: '3d', label: '3D', icon: '◆' }];
+const PRESETS = ['#4FC3F7', '#A78BFA', '#FF6B9D', '#4ADE80', '#FB923C', '#C0C0C0'];
+
+function hexToRgb(hex) {
+  const s = hex.replace('#', '');
+  const bigint = parseInt(s.length === 3 ? s.split('').map(c => c + c).join('') : s, 16);
+  return { r: (bigint >> 16) & 255, g: (bigint >> 8) & 255, b: bigint & 255 };
+}
+
+function Row({ track, active, onPlay }) {
+  const c = track.cover || `https://picsum.photos/seed/${track.id}/400/400`;
+  return (
+    <div className={`glass-row ${active ? 'is-active' : ''}`} onClick={() => onPlay(track)}>
+      <div style={{ width: 42, height: 42, borderRadius: 8, overflow: 'hidden', flexShrink: 0, background: active ? '#222' : '#111' }}>
+        <img src={c} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: active ? 'var(--accent-dynamic)' : 'var(--text-primary)' }}>{track.title}</div>
+        <div style={{ fontSize: 11, color: 'var(--textimport { useState, useRef, useEffect, lazy, Suspense } from 'react';
+import { Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Repeat1, Volume2, Search, Maximize2, User, MoreHorizontal, X } from 'lucide-react';
+import { usePlayerStore } from '../store/usePlayerStore';
+import { useAuthStore } from '../store/useAuthStore';
+import { music } from '../api/music';
+import Visualizer from '../components/Visualizer';
+import FloatingLyrics from '../components/FloatingLyrics';
+
+const Visualizer3D = lazy(() => import('../components/Visualizer3D'));
+
+function fmt(s) { if (!s || isNaN(s)) return '0:00'; const m = Math.floor(s / 60), sec = Math.floor(s % 60); return `${m}:${sec.toString().padStart(2, '0')}`; }
+
+const VIZ_MODES = [{ key: 'ring', label: '环', icon: '◯' }, { key: 'wave', label: '波', icon: '〜' }, { key: '3d', label: '3D', icon: '◆' }];
+const PRESETS = ['#4FC3F7', '#A78BFA', '#FF6B9D', '#4ADE80', '#FB923C', '#C0C0C0'];
+
+function hexToRgb(hex) {
+  const s = hex.replace('#', '');
+  const bigint = parseInt(s.length === 3 ? s.split('').map(c => c + c).join('') : s, 16);
+  return { r: (bigint >> 16) & 255, g: (bigint >> 8) & 255, b: bigint & 255 };
+}
+
+function Row({ track, active, onPlay }) {
+  const c = track.cover || `https://picsum.photos/seed/${track.id}/400/400`;
+  return (
+    <div className={`glass-row ${active ? 'is-active' : ''}`} onClick={() => onPlay(track)}>
+      <div style={{ width: 42, height: 42, borderRadius: 8, overflow: 'hidden', flexShrink: 0, background: active ? '#222' : '#111' }}>
+        <img src={c} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: active ? 'var(--accent-dynamic)' : 'var(--text-primary)' }}>{track.title}</div>
+        <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 1 }}>{track.artist}{track.album ? ` · ${import { useState, useRef, useEffect, lazy, Suspense } from 'react';
+import { Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Repeat1, Volume2, Search, Maximize2, User, MoreHorizontal, X } from 'lucide-react';
+import { usePlayerStore } from '../store/usePlayerStore';
+import { useAuthStore } from '../store/useAuthStore';
+import { music } from '../api/music';
+import Visualizer from '../components/Visualizer';
+import FloatingLyrics from '../components/FloatingLyrics';
+
+const Visualizer3D = lazy(() => import('../components/Visualizer3D'));
+
+function fmt(s) { if (!s || isNaN(s)) return '0:00'; const m = Math.floor(s / 60), sec = Math.floor(s % 60); return `${m}:${sec.toString().padStart(2, '0')}`; }
+
+const VIZ_MODES = [{ key: 'ring', label: '环', icon: '◯' }, { key: 'wave', label: '波', icon: '〜' }, { key: '3d', label: '3D', icon: '◆' }];
+const PRESETS = ['#4FC3F7', '#A78BFA', '#FF6B9D', '#4ADE80', '#FB923C', '#C0C0C0'];
+
+function hexToRgb(hex) {
+  const s = hex.replace('#', '');
+  const bigint = parseInt(s.length === 3 ? s.split('').map(c => c + c).join('') : s, 16);
+  return { r: (bigint >> 16) & 255, g: (bigint >> 8) & 255, b: bigint & 255 };
+}
+
+function Row({ track, active, onPlay }) {
+  const c = track.cover || `https://picsum.photos/seed/${track.id}/400/400`;
+  return (
+    <div className={`glass-row ${active ? 'is-active' : ''}`} onClick={() => onPlay(track)}>
+      <div style={{ width: 42, height: 42, borderRadius: 8, overflow: 'hidden', flexShrink: 0, background: active ? '#222' : '#111' }}>
+        <img src={c} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: active ? 'var(--accent-dynamic)' : 'var(--text-primary)' }}>{track.title}</div>
+        <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 1 }}>{track.artist}{track.album ? ` · ${track.album}` : ''}</div>
+      </div>
+      <span style={{ fontSize: 11, color: 'varimport { useState, useRef, useEffect, lazy, Suspense } from 'react';
+import { Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Repeat1, Volume2, Search, Maximize2, User, MoreHorizontal, X } from 'lucide-react';
+import { usePlayerStore } from '../store/usePlayerStore';
+import { useAuthStore } from '../store/useAuthStore';
+import { music } from '../api/music';
+import Visualizer from '../components/Visualizer';
+import FloatingLyrics from '../components/FloatingLyrics';
+
+const Visualizer3D = lazy(() => import('../components/Visualizer3D'));
+
+function fmt(s) { if (!s || isNaN(s)) return '0:00'; const m = Math.floor(s / 60), sec = Math.floor(s % 60); return `${m}:${sec.toString().padStart(2, '0')}`; }
+
+const VIZ_MODES = [{ key: 'ring', label: '环', icon: '◯' }, { key: 'wave', label: '波', icon: '〜' }, { key: '3d', label: '3D', icon: '◆' }];
+const PRESETS = ['#4FC3F7', '#A78BFA', '#FF6B9D', '#4ADE80', '#FB923C', '#C0C0C0'];
+
+function hexToRgb(hex) {
+  const s = hex.replace('#', '');
+  const bigint = parseInt(s.length === 3 ? s.split('').map(c => c + c).join('') : s, 16);
+  return { r: (bigint >> 16) & 255, g: (bigint >> 8) & 255, b: bigint & 255 };
+}
+
+function Row({ track, active, onPlay }) {
+  const c = track.cover || `https://picsum.photos/seed/${track.id}/400/400`;
+  return (
+    <div className={`glass-row ${active ? 'is-active' : ''}`} onClick={() => onPlay(track)}>
+      <div style={{ width: 42, height: 42, borderRadius: 8, overflow: 'hidden', flexShrink: 0, background: active ? '#222' : '#111' }}>
+        <img src={c} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: active ? 'var(--accent-dynamic)' : 'var(--text-primary)' }}>{track.title}</div>
+        <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 1 }}>{track.artist}{track.album ? ` · ${track.album}` : ''}</div>
+      </div>
+      <span style={{ fontSize: 11, color: 'var(--text-muted)', flexShrink: 0 }}>{track.duration ? fmt(track.duration) : ''import { useState, useRef, useEffect, lazy, Suspense } from 'react';
+import { Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Repeat1, Volume2, Search, Maximize2, User, MoreHorizontal, X } from 'lucide-react';
+import { usePlayerStore } from '../store/usePlayerStore';
+import { useAuthStore } from '../store/useAuthStore';
+import { music } from '../api/music';
+import Visualizer from '../components/Visualizer';
+import FloatingLyrics from '../components/FloatingLyrics';
+
+const Visualizer3D = lazy(() => import('../components/Visualizer3D'));
+
+function fmt(s) { if (!s || isNaN(s)) return '0:00'; const m = Math.floor(s / 60), sec = Math.floor(s % 60); return `${m}:${sec.toString().padStart(2, '0')}`; }
+
+const VIZ_MODES = [{ key: 'ring', label: '环', icon: '◯' }, { key: 'wave', label: '波', icon: '〜' }, { key: '3d', label: '3D', icon: '◆' }];
+const PRESETS = ['#4FC3F7', '#A78BFA', '#FF6B9D', '#4ADE80', '#FB923C', '#C0C0C0'];
+
+function hexToRgb(hex) {
+  const s = hex.replace('#', '');
+  const bigint = parseInt(s.length === 3 ? s.split('').map(c => c + c).join('') : s, 16);
+  return { r: (bigint >> 16) & 255, g: (bigint >> 8) & 255, b: bigint & 255 };
+}
+
+function Row({ track, active, onPlay }) {
+  const c = track.cover || `https://picsum.photos/seed/${track.id}/400/400`;
+  return (
+    <div className={`glass-row ${active ? 'is-active' : ''}`} onClick={() => onPlay(track)}>
+      <div style={{ width: 42, height: 42, borderRadius: 8, overflow: 'hidden', flexShrink: 0, background: active ? '#222' : '#111' }}>
+        <img src={c} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: active ? 'var(--accent-dynamic)' : 'var(--text-primary)' }}>{track.title}</div>
+        <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 1 }}>{track.artist}{track.album ? ` · ${track.album}` : ''}</div>
+      </div>
+      <span style={{ fontSize: 11, color: 'var(--text-muted)', flexShrink: 0 }}>{track.duration ? fmt(track.duration) : ''}</span>
+    </div>
+  );
+}
+
+function Sheet({ openimport { useState, useRef, useEffect, lazy, Suspense } from 'react';
+import { Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Repeat1, Volume2, Search, Maximize2, User, MoreHorizontal, X } from 'lucide-react';
+import { usePlayerStore } from '../store/usePlayerStore';
+import { useAuthStore } from '../store/useAuthStore';
+import { music } from '../api/music';
+import Visualizer from '../components/Visualizer';
+import FloatingLyrics from '../components/FloatingLyrics';
+
+const Visualizer3D = lazy(() => import('../components/Visualizer3D'));
+
+function fmt(s) { if (!s || isNaN(s)) return '0:00'; const m = Math.floor(s / 60), sec = Math.floor(s % 60); return `${m}:${sec.toString().padStart(2, '0')}`; }
+
+const VIZ_MODES = [{ key: 'ring', label: '环', icon: '◯' }, { key: 'wave', label: '波', icon: '〜' }, { key: '3d', label: '3D', icon: '◆' }];
+const PRESETS = ['#4FC3F7', '#A78BFA', '#FF6B9D', '#4ADE80', '#FB923C', '#C0C0C0'];
+
+function hexToRgb(hex) {
+  const s = hex.replace('#', '');
+  const bigint = parseInt(s.length === 3 ? s.split('').map(c => c + c).join('') : s, 16);
+  return { r: (bigint >> 16) & 255, g: (bigint >> 8) & 255, b: bigint & 255 };
+}
+
+function Row({ track, active, onPlay }) {
+  const c = track.cover || `https://picsum.photos/seed/${track.id}/400/400`;
+  return (
+    <div className={`glass-row ${active ? 'is-active' : ''}`} onClick={() => onPlay(track)}>
+      <div style={{ width: 42, height: 42, borderRadius: 8, overflow: 'hidden', flexShrink: 0, background: active ? '#222' : '#111' }}>
+        <img src={c} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: active ? 'var(--accent-dynamic)' : 'var(--text-primary)' }}>{track.title}</div>
+        <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 1 }}>{track.artist}{track.album ? ` · ${track.album}` : ''}</div>
+      </div>
+      <span style={{ fontSize: 11, color: 'var(--text-muted)', flexShrink: 0 }}>{track.duration ? fmt(track.duration) : ''}</span>
+    </div>
+  );
+}
+
+function Sheet({ open, onClose, title, children, h = '80vh' }) {
+  if (!open) return null;
+  return (
+import { useState, useRef, useEffect, lazy, Suspense } from 'react';
+import { Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Repeat1, Volume2, Search, Maximize2, User, MoreHorizontal, X } from 'lucide-react';
+import { usePlayerStore } from '../store/usePlayerStore';
+import { useAuthStore } from '../store/useAuthStore';
+import { music } from '../api/music';
+import Visualizer from '../components/Visualizer';
+import FloatingLyrics from '../components/FloatingLyrics';
+
+const Visualizer3D = lazy(() => import('../components/Visualizer3D'));
+
+function fmt(s) { if (!s || isNaN(s)) return '0:00'; const m = Math.floor(s / 60), sec = Math.floor(s % 60); return `${m}:${sec.toString().padStart(2, '0')}`; }
+
+const VIZ_MODES = [{ key: 'ring', label: '环', icon: '◯' }, { key: 'wave', label: '波', icon: '〜' }, { key: '3d', label: '3D', icon: '◆' }];
+const PRESETS = ['#4FC3F7', '#A78BFA', '#FF6B9D', '#4ADE80', '#FB923C', '#C0C0C0'];
+
+function hexToRgb(hex) {
+  const s = hex.replace('#', '');
+  const bigint = parseInt(s.length === 3 ? s.split('').map(c => c + c).join('') : s, 16);
+  return { r: (bigint >> 16) & 255, g: (bigint >> 8) & 255, b: bigint & 255 };
+}
+
+function Row({ track, active, onPlay }) {
+  const c = track.cover || `https://picsum.photos/seed/${track.id}/400/400`;
+  return (
+    <div className={`glass-row ${active ? 'is-active' : ''}`} onClick={() => onPlay(track)}>
+      <div style={{ width: 42, height: 42, borderRadius: 8, overflow: 'hidden', flexShrink: 0, background: active ? '#222' : '#111' }}>
+        <img src={c} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: active ? 'var(--accent-dynamic)' : 'var(--text-primary)' }}>{track.title}</div>
+        <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 1 }}>{track.artist}{track.album ? ` · ${track.album}` : ''}</div>
+      </div>
+      <span style={{ fontSize: 11, color: 'var(--text-muted)', flexShrink: 0 }}>{track.duration ? fmt(track.duration) : ''}</span>
+    </div>
+  );
+}
+
+function Sheet({ open, onClose, title, children, h = '80vh' }) {
+  if (!open) return null;
+  return (
+    <div style={{ position: 'absolute', inset: 0, zIndex: 200import { useState, useRef, useEffect, lazy, Suspense } from 'react';
+import { Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Repeat1, Volume2, Search, Maximize2, User, MoreHorizontal, X } from 'lucide-react';
+import { usePlayerStore } from '../store/usePlayerStore';
+import { useAuthStore } from '../store/useAuthStore';
+import { music } from '../api/music';
+import Visualizer from '../components/Visualizer';
+import FloatingLyrics from '../components/FloatingLyrics';
+
+const Visualizer3D = lazy(() => import('../components/Visualizer3D'));
+
+function fmt(s) { if (!s || isNaN(s)) return '0:00'; const m = Math.floor(s / 60), sec = Math.floor(s % 60); return `${m}:${sec.toString().padStart(2, '0')}`; }
+
+const VIZ_MODES = [{ key: 'ring', label: '环', icon: '◯' }, { key: 'wave', label: '波', icon: '〜' }, { key: '3d', label: '3D', icon: '◆' }];
+const PRESETS = ['#4FC3F7', '#A78BFA', '#FF6B9D', '#4ADE80', '#FB923C', '#C0C0C0'];
+
+function hexToRgb(hex) {
+  const s = hex.replace('#', '');
+  const bigint = parseInt(s.length === 3 ? s.split('').map(c => c + c).join('') : s, 16);
+  return { r: (bigint >> 16) & 255, g: (bigint >> 8) & 255, b: bigint & 255 };
+}
+
+function Row({ track, active, onPlay }) {
+  const c = track.cover || `https://picsum.photos/seed/${track.id}/400/400`;
+  return (
+    <div className={`glass-row ${active ? 'is-active' : ''}`} onClick={() => onPlay(track)}>
+      <div style={{ width: 42, height: 42, borderRadius: 8, overflow: 'hidden', flexShrink: 0, background: active ? '#222' : '#111' }}>
+        <img src={c} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: active ? 'var(--accent-dynamic)' : 'var(--text-primary)' }}>{track.title}</div>
+        <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 1 }}>{track.artist}{track.album ? ` · ${track.album}` : ''}</div>
+      </div>
+      <span style={{ fontSize: 11, color: 'var(--text-muted)', flexShrink: 0 }}>{track.duration ? fmt(track.duration) : ''}</span>
+    </div>
+  );
+}
+
+function Sheet({ open, onClose, title, children, h = '80vh' }) {
+  if (!open) return null;
+  return (
+    <div style={{ position: 'absolute', inset: 0, zIndex: 200, background: 'rgba(0,0,import { useState, useRef, useEffect, lazy, Suspense } from 'react';
+import { Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Repeat1, Volume2, Search, Maximize2, User, MoreHorizontal, X } from 'lucide-react';
+import { usePlayerStore } from '../store/usePlayerStore';
+import { useAuthStore } from '../store/useAuthStore';
+import { music } from '../api/music';
+import Visualizer from '../components/Visualizer';
+import FloatingLyrics from '../components/FloatingLyrics';
+
+const Visualizer3D = lazy(() => import('../components/Visualizer3D'));
+
+function fmt(s) { if (!s || isNaN(s)) return '0:00'; const m = Math.floor(s / 60), sec = Math.floor(s % 60); return `${m}:${sec.toString().padStart(2, '0')}`; }
+
+const VIZ_MODES = [{ key: 'ring', label: '环', icon: '◯' }, { key: 'wave', label: '波', icon: '〜' }, { key: '3d', label: '3D', icon: '◆' }];
+const PRESETS = ['#4FC3F7', '#A78BFA', '#FF6B9D', '#4ADE80', '#FB923C', '#C0C0C0'];
+
+function hexToRgb(hex) {
+  const s = hex.replace('#', '');
+  const bigint = parseInt(s.length === 3 ? s.split('').map(c => c + c).join('') : s, 16);
+  return { r: (bigint >> 16) & 255, g: (bigint >> 8) & 255, b: bigint & 255 };
+}
+
+function Row({ track, active, onPlay }) {
+  const c = track.cover || `https://picsum.photos/seed/${track.id}/400/400`;
+  return (
+    <div className={`glass-row ${active ? 'is-active' : ''}`} onClick={() => onPlay(track)}>
+      <div style={{ width: 42, height: 42, borderRadius: 8, overflow: 'hidden', flexShrink: 0, background: active ? '#222' : '#111' }}>
+        <img src={c} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: active ? 'var(--accent-dynamic)' : 'var(--text-primary)' }}>{track.title}</div>
+        <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 1 }}>{track.artist}{track.album ? ` · ${track.album}` : ''}</div>
+      </div>
+      <span style={{ fontSize: 11, color: 'var(--text-muted)', flexShrink: 0 }}>{track.duration ? fmt(track.duration) : ''}</span>
+    </div>
+  );
+}
+
+function Sheet({ open, onClose, title, children, h = '80vh' }) {
+  if (!open) return null;
+  return (
+    <div style={{ position: 'absolute', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.25)', backdropFilter: 'blur(12px)', WebkitBackdropFilter:import { useState, useRef, useEffect, lazy, Suspense } from 'react';
+import { Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Repeat1, Volume2, Search, Maximize2, User, MoreHorizontal, X } from 'lucide-react';
+import { usePlayerStore } from '../store/usePlayerStore';
+import { useAuthStore } from '../store/useAuthStore';
+import { music } from '../api/music';
+import Visualizer from '../components/Visualizer';
+import FloatingLyrics from '../components/FloatingLyrics';
+
+const Visualizer3D = lazy(() => import('../components/Visualizer3D'));
+
+function fmt(s) { if (!s || isNaN(s)) return '0:00'; const m = Math.floor(s / 60), sec = Math.floor(s % 60); return `${m}:${sec.toString().padStart(2, '0')}`; }
+
+const VIZ_MODES = [{ key: 'ring', label: '环', icon: '◯' }, { key: 'wave', label: '波', icon: '〜' }, { key: '3d', label: '3D', icon: '◆' }];
+const PRESETS = ['#4FC3F7', '#A78BFA', '#FF6B9D', '#4ADE80', '#FB923C', '#C0C0C0'];
+
+function hexToRgb(hex) {
+  const s = hex.replace('#', '');
+  const bigint = parseInt(s.length === 3 ? s.split('').map(c => c + c).join('') : s, 16);
+  return { r: (bigint >> 16) & 255, g: (bigint >> 8) & 255, b: bigint & 255 };
+}
+
+function Row({ track, active, onPlay }) {
+  const c = track.cover || `https://picsum.photos/seed/${track.id}/400/400`;
+  return (
+    <div className={`glass-row ${active ? 'is-active' : ''}`} onClick={() => onPlay(track)}>
+      <div style={{ width: 42, height: 42, borderRadius: 8, overflow: 'hidden', flexShrink: 0, background: active ? '#222' : '#111' }}>
+        <img src={c} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: active ? 'var(--accent-dynamic)' : 'var(--text-primary)' }}>{track.title}</div>
+        <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 1 }}>{track.artist}{track.album ? ` · ${track.album}` : ''}</div>
+      </div>
+      <span style={{ fontSize: 11, color: 'var(--text-muted)', flexShrink: 0 }}>{track.duration ? fmt(track.duration) : ''}</span>
+    </div>
+  );
+}
+
+function Sheet({ open, onClose, title, children, h = '80vh' }) {
+  if (!open) return null;
+  return (
+    <div style={{ position: 'absolute', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.25)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', animation: 'fadeIn .2s ease both', display: 'import { useState, useRef, useEffect, lazy, Suspense } from 'react';
+import { Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Repeat1, Volume2, Search, Maximize2, User, MoreHorizontal, X } from 'lucide-react';
+import { usePlayerStore } from '../store/usePlayerStore';
+import { useAuthStore } from '../store/useAuthStore';
+import { music } from '../api/music';
+import Visualizer from '../components/Visualizer';
+import FloatingLyrics from '../components/FloatingLyrics';
+
+const Visualizer3D = lazy(() => import('../components/Visualizer3D'));
+
+function fmt(s) { if (!s || isNaN(s)) return '0:00'; const m = Math.floor(s / 60), sec = Math.floor(s % 60); return `${m}:${sec.toString().padStart(2, '0')}`; }
+
+const VIZ_MODES = [{ key: 'ring', label: '环', icon: '◯' }, { key: 'wave', label: '波', icon: '〜' }, { key: '3d', label: '3D', icon: '◆' }];
+const PRESETS = ['#4FC3F7', '#A78BFA', '#FF6B9D', '#4ADE80', '#FB923C', '#C0C0C0'];
+
+function hexToRgb(hex) {
+  const s = hex.replace('#', '');
+  const bigint = parseInt(s.length === 3 ? s.split('').map(c => c + c).join('') : s, 16);
+  return { r: (bigint >> 16) & 255, g: (bigint >> 8) & 255, b: bigint & 255 };
+}
+
+function Row({ track, active, onPlay }) {
+  const c = track.cover || `https://picsum.photos/seed/${track.id}/400/400`;
+  return (
+    <div className={`glass-row ${active ? 'is-active' : ''}`} onClick={() => onPlay(track)}>
+      <div style={{ width: 42, height: 42, borderRadius: 8, overflow: 'hidden', flexShrink: 0, background: active ? '#222' : '#111' }}>
+        <img src={c} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: active ? 'var(--accent-dynamic)' : 'var(--text-primary)' }}>{track.title}</div>
+        <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 1 }}>{track.artist}{track.album ? ` · ${track.album}` : ''}</div>
+      </div>
+      <span style={{ fontSize: 11, color: 'var(--text-muted)', flexShrink: 0 }}>{track.duration ? fmt(track.duration) : ''}</span>
+    </div>
+  );
+}
+
+function Sheet({ open, onClose, title, children, h = '80vh' }) {
+  if (!open) return null;
+  return (
+    <div style={{ position: 'absolute', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.25)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', animation: 'fadeIn .2s ease both', display: 'flex', alignItems: 'center', justifyContentimport { useState, useRef, useEffect, lazy, Suspense } from 'react';
+import { Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Repeat1, Volume2, Search, Maximize2, User, MoreHorizontal, X } from 'lucide-react';
+import { usePlayerStore } from '../store/usePlayerStore';
+import { useAuthStore } from '../store/useAuthStore';
+import { music } from '../api/music';
+import Visualizer from '../components/Visualizer';
+import FloatingLyrics from '../components/FloatingLyrics';
+
+const Visualizer3D = lazy(() => import('../components/Visualizer3D'));
+
+function fmt(s) { if (!s || isNaN(s)) return '0:00'; const m = Math.floor(s / 60), sec = Math.floor(s % 60); return `${m}:${sec.toString().padStart(2, '0')}`; }
+
+const VIZ_MODES = [{ key: 'ring', label: '环', icon: '◯' }, { key: 'wave', label: '波', icon: '〜' }, { key: '3d', label: '3D', icon: '◆' }];
+const PRESETS = ['#4FC3F7', '#A78BFA', '#FF6B9D', '#4ADE80', '#FB923C', '#C0C0C0'];
+
+function hexToRgb(hex) {
+  const s = hex.replace('#', '');
+  const bigint = parseInt(s.length === 3 ? s.split('').map(c => c + c).join('') : s, 16);
+  return { r: (bigint >> 16) & 255, g: (bigint >> 8) & 255, b: bigint & 255 };
+}
+
+function Row({ track, active, onPlay }) {
+  const c = track.cover || `https://picsum.photos/seed/${track.id}/400/400`;
+  return (
+    <div className={`glass-row ${active ? 'is-active' : ''}`} onClick={() => onPlay(track)}>
+      <div style={{ width: 42, height: 42, borderRadius: 8, overflow: 'hidden', flexShrink: 0, background: active ? '#222' : '#111' }}>
+        <img src={c} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: active ? 'var(--accent-dynamic)' : 'var(--text-primary)' }}>{track.title}</div>
+        <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 1 }}>{track.artist}{track.album ? ` · ${track.album}` : ''}</div>
+      </div>
+      <span style={{ fontSize: 11, color: 'var(--text-muted)', flexShrink: 0 }}>{track.duration ? fmt(track.duration) : ''}</span>
+    </div>
+  );
+}
+
+function Sheet({ open, onClose, title, children, h = '80vh' }) {
+  if (!open) return null;
+  return (
+    <div style={{ position: 'absolute', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.25)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', animation: 'fadeIn .2s ease both', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={onClose}>
+      <div className="glassimport { useState, useRef, useEffect, lazy, Suspense } from 'react';
+import { Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Repeat1, Volume2, Search, Maximize2, User, MoreHorizontal, X } from 'lucide-react';
+import { usePlayerStore } from '../store/usePlayerStore';
+import { useAuthStore } from '../store/useAuthStore';
+import { music } from '../api/music';
+import Visualizer from '../components/Visualizer';
+import FloatingLyrics from '../components/FloatingLyrics';
+
+const Visualizer3D = lazy(() => import('../components/Visualizer3D'));
+
+function fmt(s) { if (!s || isNaN(s)) return '0:00'; const m = Math.floor(s / 60), sec = Math.floor(s % 60); return `${m}:${sec.toString().padStart(2, '0')}`; }
+
+const VIZ_MODES = [{ key: 'ring', label: '环', icon: '◯' }, { key: 'wave', label: '波', icon: '〜' }, { key: '3d', label: '3D', icon: '◆' }];
+const PRESETS = ['#4FC3F7', '#A78BFA', '#FF6B9D', '#4ADE80', '#FB923C', '#C0C0C0'];
+
+function hexToRgb(hex) {
+  const s = hex.replace('#', '');
+  const bigint = parseInt(s.length === 3 ? s.split('').map(c => c + c).join('') : s, 16);
+  return { r: (bigint >> 16) & 255, g: (bigint >> 8) & 255, b: bigint & 255 };
+}
+
+function Row({ track, active, onPlay }) {
+  const c = track.cover || `https://picsum.photos/seed/${track.id}/400/400`;
+  return (
+    <div className={`glass-row ${active ? 'is-active' : ''}`} onClick={() => onPlay(track)}>
+      <div style={{ width: 42, height: 42, borderRadius: 8, overflow: 'hidden', flexShrink: 0, background: active ? '#222' : '#111' }}>
+        <img src={c} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: active ? 'var(--accent-dynamic)' : 'var(--text-primary)' }}>{track.title}</div>
+        <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 1 }}>{track.artist}{track.album ? ` · ${track.album}` : ''}</div>
+      </div>
+      <span style={{ fontSize: 11, color: 'var(--text-muted)', flexShrink: 0 }}>{track.duration ? fmt(track.duration) : ''}</span>
+    </div>
+  );
+}
+
+function Sheet({ open, onClose, title, children, h = '80vh' }) {
+  if (!open) return null;
+  return (
+    <div style={{ position: 'absolute', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.25)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', animation: 'fadeIn .2s ease both', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={onClose}>
+      <div className="glass-panel-strong" onClick={e => e.stopPropagation()} style={{ width: '70%', maximport { useState, useRef, useEffect, lazy, Suspense } from 'react';
+import { Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Repeat1, Volume2, Search, Maximize2, User, MoreHorizontal, X } from 'lucide-react';
+import { usePlayerStore } from '../store/usePlayerStore';
+import { useAuthStore } from '../store/useAuthStore';
+import { music } from '../api/music';
+import Visualizer from '../components/Visualizer';
+import FloatingLyrics from '../components/FloatingLyrics';
+
+const Visualizer3D = lazy(() => import('../components/Visualizer3D'));
+
+function fmt(s) { if (!s || isNaN(s)) return '0:00'; const m = Math.floor(s / 60), sec = Math.floor(s % 60); return `${m}:${sec.toString().padStart(2, '0')}`; }
+
+const VIZ_MODES = [{ key: 'ring', label: '环', icon: '◯' }, { key: 'wave', label: '波', icon: '〜' }, { key: '3d', label: '3D', icon: '◆' }];
+const PRESETS = ['#4FC3F7', '#A78BFA', '#FF6B9D', '#4ADE80', '#FB923C', '#C0C0C0'];
+
+function hexToRgb(hex) {
+  const s = hex.replace('#', '');
+  const bigint = parseInt(s.length === 3 ? s.split('').map(c => c + c).join('') : s, 16);
+  return { r: (bigint >> 16) & 255, g: (bigint >> 8) & 255, b: bigint & 255 };
+}
+
+function Row({ track, active, onPlay }) {
+  const c = track.cover || `https://picsum.photos/seed/${track.id}/400/400`;
+  return (
+    <div className={`glass-row ${active ? 'is-active' : ''}`} onClick={() => onPlay(track)}>
+      <div style={{ width: 42, height: 42, borderRadius: 8, overflow: 'hidden', flexShrink: 0, background: active ? '#222' : '#111' }}>
+        <img src={c} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: active ? 'var(--accent-dynamic)' : 'var(--text-primary)' }}>{track.title}</div>
+        <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 1 }}>{track.artist}{track.album ? ` · ${track.album}` : ''}</div>
+      </div>
+      <span style={{ fontSize: 11, color: 'var(--text-muted)', flexShrink: 0 }}>{track.duration ? fmt(track.duration) : ''}</span>
+    </div>
+  );
+}
+
+function Sheet({ open, onClose, title, children, h = '80vh' }) {
+  if (!open) return null;
+  return (
+    <div style={{ position: 'absolute', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.25)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', animation: 'fadeIn .2s ease both', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={onClose}>
+      <div className="glass-panel-strong" onClick={e => e.stopPropagation()} style={{ width: '70%', maxWidth: 520, maxHeight: h,import { useState, useRef, useEffect, lazy, Suspense } from 'react';
+import { Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Repeat1, Volume2, Search, Maximize2, User, MoreHorizontal, X } from 'lucide-react';
+import { usePlayerStore } from '../store/usePlayerStore';
+import { useAuthStore } from '../store/useAuthStore';
+import { music } from '../api/music';
+import Visualizer from '../components/Visualizer';
+import FloatingLyrics from '../components/FloatingLyrics';
+
+const Visualizer3D = lazy(() => import('../components/Visualizer3D'));
+
+function fmt(s) { if (!s || isNaN(s)) return '0:00'; const m = Math.floor(s / 60), sec = Math.floor(s % 60); return `${m}:${sec.toString().padStart(2, '0')}`; }
+
+const VIZ_MODES = [{ key: 'ring', label: '环', icon: '◯' }, { key: 'wave', label: '波', icon: '〜' }, { key: '3d', label: '3D', icon: '◆' }];
+const PRESETS = ['#4FC3F7', '#A78BFA', '#FF6B9D', '#4ADE80', '#FB923C', '#C0C0C0'];
+
+function hexToRgb(hex) {
+  const s = hex.replace('#', '');
+  const bigint = parseInt(s.length === 3 ? s.split('').map(c => c + c).join('') : s, 16);
+  return { r: (bigint >> 16) & 255, g: (bigint >> 8) & 255, b: bigint & 255 };
+}
+
+function Row({ track, active, onPlay }) {
+  const c = track.cover || `https://picsum.photos/seed/${track.id}/400/400`;
+  return (
+    <div className={`glass-row ${active ? 'is-active' : ''}`} onClick={() => onPlay(track)}>
+      <div style={{ width: 42, height: 42, borderRadius: 8, overflow: 'hidden', flexShrink: 0, background: active ? '#222' : '#111' }}>
+        <img src={c} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: active ? 'var(--accent-dynamic)' : 'var(--text-primary)' }}>{track.title}</div>
+        <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 1 }}>{track.artist}{track.album ? ` · ${track.album}` : ''}</div>
+      </div>
+      <span style={{ fontSize: 11, color: 'var(--text-muted)', flexShrink: 0 }}>{track.duration ? fmt(track.duration) : ''}</span>
+    </div>
+  );
+}
+
+function Sheet({ open, onClose, title, children, h = '80vh' }) {
+  if (!open) return null;
+  return (
+    <div style={{ position: 'absolute', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.25)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', animation: 'fadeIn .2s ease both', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={onClose}>
+      <div className="glass-panel-strong" onClick={e => e.stopPropagation()} style={{ width: '70%', maxWidth: 520, maxHeight: h, borderRadius: 20, display: 'flex', flexDirection: 'column', overflow: 'import { useState, useRef, useEffect, lazy, Suspense } from 'react';
+import { Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Repeat1, Volume2, Search, Maximize2, User, MoreHorizontal, X } from 'lucide-react';
+import { usePlayerStore } from '../store/usePlayerStore';
+import { useAuthStore } from '../store/useAuthStore';
+import { music } from '../api/music';
+import Visualizer from '../components/Visualizer';
+import FloatingLyrics from '../components/FloatingLyrics';
+
+const Visualizer3D = lazy(() => import('../components/Visualizer3D'));
+
+function fmt(s) { if (!s || isNaN(s)) return '0:00'; const m = Math.floor(s / 60), sec = Math.floor(s % 60); return `${m}:${sec.toString().padStart(2, '0')}`; }
+
+const VIZ_MODES = [{ key: 'ring', label: '环', icon: '◯' }, { key: 'wave', label: '波', icon: '〜' }, { key: '3d', label: '3D', icon: '◆' }];
+const PRESETS = ['#4FC3F7', '#A78BFA', '#FF6B9D', '#4ADE80', '#FB923C', '#C0C0C0'];
+
+function hexToRgb(hex) {
+  const s = hex.replace('#', '');
+  const bigint = parseInt(s.length === 3 ? s.split('').map(c => c + c).join('') : s, 16);
+  return { r: (bigint >> 16) & 255, g: (bigint >> 8) & 255, b: bigint & 255 };
+}
+
+function Row({ track, active, onPlay }) {
+  const c = track.cover || `https://picsum.photos/seed/${track.id}/400/400`;
+  return (
+    <div className={`glass-row ${active ? 'is-active' : ''}`} onClick={() => onPlay(track)}>
+      <div style={{ width: 42, height: 42, borderRadius: 8, overflow: 'hidden', flexShrink: 0, background: active ? '#222' : '#111' }}>
+        <img src={c} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: active ? 'var(--accent-dynamic)' : 'var(--text-primary)' }}>{track.title}</div>
+        <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 1 }}>{track.artist}{track.album ? ` · ${track.album}` : ''}</div>
+      </div>
+      <span style={{ fontSize: 11, color: 'var(--text-muted)', flexShrink: 0 }}>{track.duration ? fmt(track.duration) : ''}</span>
+    </div>
+  );
+}
+
+function Sheet({ open, onClose, title, children, h = '80vh' }) {
+  if (!open) return null;
+  return (
+    <div style={{ position: 'absolute', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.25)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', animation: 'fadeIn .2s ease both', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={onClose}>
+      <div className="glass-panel-strong" onClick={e => e.stopPropagation()} style={{ width: '70%', maxWidth: 520, maxHeight: h, borderRadius: 20, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <div style={{ display: 'flex', alignItems: 'centerimport { useState, useRef, useEffect, lazy, Suspense } from 'react';
+import { Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Repeat1, Volume2, Search, Maximize2, User, MoreHorizontal, X } from 'lucide-react';
+import { usePlayerStore } from '../store/usePlayerStore';
+import { useAuthStore } from '../store/useAuthStore';
+import { music } from '../api/music';
+import Visualizer from '../components/Visualizer';
+import FloatingLyrics from '../components/FloatingLyrics';
+
+const Visualizer3D = lazy(() => import('../components/Visualizer3D'));
+
+function fmt(s) { if (!s || isNaN(s)) return '0:00'; const m = Math.floor(s / 60), sec = Math.floor(s % 60); return `${m}:${sec.toString().padStart(2, '0')}`; }
+
+const VIZ_MODES = [{ key: 'ring', label: '环', icon: '◯' }, { key: 'wave', label: '波', icon: '〜' }, { key: '3d', label: '3D', icon: '◆' }];
+const PRESETS = ['#4FC3F7', '#A78BFA', '#FF6B9D', '#4ADE80', '#FB923C', '#C0C0C0'];
+
+function hexToRgb(hex) {
+  const s = hex.replace('#', '');
+  const bigint = parseInt(s.length === 3 ? s.split('').map(c => c + c).join('') : s, 16);
+  return { r: (bigint >> 16) & 255, g: (bigint >> 8) & 255, b: bigint & 255 };
+}
+
+function Row({ track, active, onPlay }) {
+  const c = track.cover || `https://picsum.photos/seed/${track.id}/400/400`;
+  return (
+    <div className={`glass-row ${active ? 'is-active' : ''}`} onClick={() => onPlay(track)}>
+      <div style={{ width: 42, height: 42, borderRadius: 8, overflow: 'hidden', flexShrink: 0, background: active ? '#222' : '#111' }}>
+        <img src={c} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: active ? 'var(--accent-dynamic)' : 'var(--text-primary)' }}>{track.title}</div>
+        <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 1 }}>{track.artist}{track.album ? ` · ${track.album}` : ''}</div>
+      </div>
+      <span style={{ fontSize: 11, color: 'var(--text-muted)', flexShrink: 0 }}>{track.duration ? fmt(track.duration) : ''}</span>
+    </div>
+  );
+}
+
+function Sheet({ open, onClose, title, children, h = '80vh' }) {
+  if (!open) return null;
+  return (
+    <div style={{ position: 'absolute', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.25)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', animation: 'fadeIn .2s ease both', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={onClose}>
+      <div className="glass-panel-strong" onClick={e => e.stopPropagation()} style={{ width: '70%', maxWidth: 520, maxHeight: h, borderRadius: 20, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px 10px', borderBottom: '1px solid rgba(255import { useState, useRef, useEffect, lazy, Suspense } from 'react';
+import { Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Repeat1, Volume2, Search, Maximize2, User, MoreHorizontal, X } from 'lucide-react';
+import { usePlayerStore } from '../store/usePlayerStore';
+import { useAuthStore } from '../store/useAuthStore';
+import { music } from '../api/music';
+import Visualizer from '../components/Visualizer';
+import FloatingLyrics from '../components/FloatingLyrics';
+
+const Visualizer3D = lazy(() => import('../components/Visualizer3D'));
+
+function fmt(s) { if (!s || isNaN(s)) return '0:00'; const m = Math.floor(s / 60), sec = Math.floor(s % 60); return `${m}:${sec.toString().padStart(2, '0')}`; }
+
+const VIZ_MODES = [{ key: 'ring', label: '环', icon: '◯' }, { key: 'wave', label: '波', icon: '〜' }, { key: '3d', label: '3D', icon: '◆' }];
+const PRESETS = ['#4FC3F7', '#A78BFA', '#FF6B9D', '#4ADE80', '#FB923C', '#C0C0C0'];
+
+function hexToRgb(hex) {
+  const s = hex.replace('#', '');
+  const bigint = parseInt(s.length === 3 ? s.split('').map(c => c + c).join('') : s, 16);
+  return { r: (bigint >> 16) & 255, g: (bigint >> 8) & 255, b: bigint & 255 };
+}
+
+function Row({ track, active, onPlay }) {
+  const c = track.cover || `https://picsum.photos/seed/${track.id}/400/400`;
+  return (
+    <div className={`glass-row ${active ? 'is-active' : ''}`} onClick={() => onPlay(track)}>
+      <div style={{ width: 42, height: 42, borderRadius: 8, overflow: 'hidden', flexShrink: 0, background: active ? '#222' : '#111' }}>
+        <img src={c} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: active ? 'var(--accent-dynamic)' : 'var(--text-primary)' }}>{track.title}</div>
+        <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 1 }}>{track.artist}{track.album ? ` · ${track.album}` : ''}</div>
+      </div>
+      <span style={{ fontSize: 11, color: 'var(--text-muted)', flexShrink: 0 }}>{track.duration ? fmt(track.duration) : ''}</span>
+    </div>
+  );
+}
+
+function Sheet({ open, onClose, title, children, h = '80vh' }) {
+  if (!open) return null;
+  return (
+    <div style={{ position: 'absolute', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.25)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', animation: 'fadeIn .2s ease both', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={onClose}>
+      <div className="glass-panel-strong" onClick={e => e.stopPropagation()} style={{ width: '70%', maxWidth: 520, maxHeight: h, borderRadius: 20, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px 10px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}import { useState, useRef, useEffect, lazy, Suspense } from 'react';
+import { Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Repeat1, Volume2, Search, Maximize2, User, MoreHorizontal, X } from 'lucide-react';
+import { usePlayerStore } from '../store/usePlayerStore';
+import { useAuthStore } from '../store/useAuthStore';
+import { music } from '../api/music';
+import Visualizer from '../components/Visualizer';
+import FloatingLyrics from '../components/FloatingLyrics';
+
+const Visualizer3D = lazy(() => import('../components/Visualizer3D'));
+
+function fmt(s) { if (!s || isNaN(s)) return '0:00'; const m = Math.floor(s / 60), sec = Math.floor(s % 60); return `${m}:${sec.toString().padStart(2, '0')}`; }
+
+const VIZ_MODES = [{ key: 'ring', label: '环', icon: '◯' }, { key: 'wave', label: '波', icon: '〜' }, { key: '3d', label: '3D', icon: '◆' }];
+const PRESETS = ['#4FC3F7', '#A78BFA', '#FF6B9D', '#4ADE80', '#FB923C', '#C0C0C0'];
+
+function hexToRgb(hex) {
+  const s = hex.replace('#', '');
+  const bigint = parseInt(s.length === 3 ? s.split('').map(c => c + c).join('') : s, 16);
+  return { r: (bigint >> 16) & 255, g: (bigint >> 8) & 255, b: bigint & 255 };
+}
+
+function Row({ track, active, onPlay }) {
+  const c = track.cover || `https://picsum.photos/seed/${track.id}/400/400`;
+  return (
+    <div className={`glass-row ${active ? 'is-active' : ''}`} onClick={() => onPlay(track)}>
+      <div style={{ width: 42, height: 42, borderRadius: 8, overflow: 'hidden', flexShrink: 0, background: active ? '#222' : '#111' }}>
+        <img src={c} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: active ? 'var(--accent-dynamic)' : 'var(--text-primary)' }}>{track.title}</div>
+        <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 1 }}>{track.artist}{track.album ? ` · ${track.album}` : ''}</div>
+      </div>
+      <span style={{ fontSize: 11, color: 'var(--text-muted)', flexShrink: 0 }}>{track.duration ? fmt(track.duration) : ''}</span>
+    </div>
+  );
+}
+
+function Sheet({ open, onClose, title, children, h = '80vh' }) {
+  if (!open) return null;
+  return (
+    <div style={{ position: 'absolute', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.25)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', animation: 'fadeIn .2s ease both', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={onClose}>
+      <div className="glass-panel-strong" onClick={e => e.stopPropagation()} style={{ width: '70%', maxWidth: 520, maxHeight: h, borderRadius: 20, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px 10px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+          <span style={{ fontSize: 14, fontWeight: 700 }}>{import { useState, useRef, useEffect, lazy, Suspense } from 'react';
+import { Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Repeat1, Volume2, Search, Maximize2, User, MoreHorizontal, X } from 'lucide-react';
+import { usePlayerStore } from '../store/usePlayerStore';
+import { useAuthStore } from '../store/useAuthStore';
+import { music } from '../api/music';
+import Visualizer from '../components/Visualizer';
+import FloatingLyrics from '../components/FloatingLyrics';
+
+const Visualizer3D = lazy(() => import('../components/Visualizer3D'));
+
+function fmt(s) { if (!s || isNaN(s)) return '0:00'; const m = Math.floor(s / 60), sec = Math.floor(s % 60); return `${m}:${sec.toString().padStart(2, '0')}`; }
+
+const VIZ_MODES = [{ key: 'ring', label: '环', icon: '◯' }, { key: 'wave', label: '波', icon: '〜' }, { key: '3d', label: '3D', icon: '◆' }];
+const PRESETS = ['#4FC3F7', '#A78BFA', '#FF6B9D', '#4ADE80', '#FB923C', '#C0C0C0'];
+
+function hexToRgb(hex) {
+  const s = hex.replace('#', '');
+  const bigint = parseInt(s.length === 3 ? s.split('').map(c => c + c).join('') : s, 16);
+  return { r: (bigint >> 16) & 255, g: (bigint >> 8) & 255, b: bigint & 255 };
+}
+
+function Row({ track, active, onPlay }) {
+  const c = track.cover || `https://picsum.photos/seed/${track.id}/400/400`;
+  return (
+    <div className={`glass-row ${active ? 'is-active' : ''}`} onClick={() => onPlay(track)}>
+      <div style={{ width: 42, height: 42, borderRadius: 8, overflow: 'hidden', flexShrink: 0, background: active ? '#222' : '#111' }}>
+        <img src={c} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: active ? 'var(--accent-dynamic)' : 'var(--text-primary)' }}>{track.title}</div>
+        <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 1 }}>{track.artist}{track.album ? ` · ${track.album}` : ''}</div>
+      </div>
+      <span style={{ fontSize: 11, color: 'var(--text-muted)', flexShrink: 0 }}>{track.duration ? fmt(track.duration) : ''}</span>
+    </div>
+  );
+}
+
+function Sheet({ open, onClose, title, children, h = '80vh' }) {
+  if (!open) return null;
+  return (
+    <div style={{ position: 'absolute', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.25)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', animation: 'fadeIn .2s ease both', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={onClose}>
+      <div className="glass-panel-strong" onClick={e => e.stopPropagation()} style={{ width: '70%', maxWidth: 520, maxHeight: h, borderRadius: 20, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px 10px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+          <span style={{ fontSize: 14, fontWeight: 700 }}>{title}</span>
+          <button onClickimport { useState, useRef, useEffect, lazy, Suspense } from 'react';
+import { Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Repeat1, Volume2, Search, Maximize2, User, MoreHorizontal, X } from 'lucide-react';
+import { usePlayerStore } from '../store/usePlayerStore';
+import { useAuthStore } from '../store/useAuthStore';
+import { music } from '../api/music';
+import Visualizer from '../components/Visualizer';
+import FloatingLyrics from '../components/FloatingLyrics';
+
+const Visualizer3D = lazy(() => import('../components/Visualizer3D'));
+
+function fmt(s) { if (!s || isNaN(s)) return '0:00'; const m = Math.floor(s / 60), sec = Math.floor(s % 60); return `${m}:${sec.toString().padStart(2, '0')}`; }
+
+const VIZ_MODES = [{ key: 'ring', label: '环', icon: '◯' }, { key: 'wave', label: '波', icon: '〜' }, { key: '3d', label: '3D', icon: '◆' }];
+const PRESETS = ['#4FC3F7', '#A78BFA', '#FF6B9D', '#4ADE80', '#FB923C', '#C0C0C0'];
+
+function hexToRgb(hex) {
+  const s = hex.replace('#', '');
+  const bigint = parseInt(s.length === 3 ? s.split('').map(c => c + c).join('') : s, 16);
+  return { r: (bigint >> 16) & 255, g: (bigint >> 8) & 255, b: bigint & 255 };
+}
+
+function Row({ track, active, onPlay }) {
+  const c = track.cover || `https://picsum.photos/seed/${track.id}/400/400`;
+  return (
+    <div className={`glass-row ${active ? 'is-active' : ''}`} onClick={() => onPlay(track)}>
+      <div style={{ width: 42, height: 42, borderRadius: 8, overflow: 'hidden', flexShrink: 0, background: active ? '#222' : '#111' }}>
+        <img src={c} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: active ? 'var(--accent-dynamic)' : 'var(--text-primary)' }}>{track.title}</div>
+        <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 1 }}>{track.artist}{track.album ? ` · ${track.album}` : ''}</div>
+      </div>
+      <span style={{ fontSize: 11, color: 'var(--text-muted)', flexShrink: 0 }}>{track.duration ? fmt(track.duration) : ''}</span>
+    </div>
+  );
+}
+
+function Sheet({ open, onClose, title, children, h = '80vh' }) {
+  if (!open) return null;
+  return (
+    <div style={{ position: 'absolute', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.25)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', animation: 'fadeIn .2s ease both', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={onClose}>
+      <div className="glass-panel-strong" onClick={e => e.stopPropagation()} style={{ width: '70%', maxWidth: 520, maxHeight: h, borderRadius: 20, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px 10px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+          <span style={{ fontSize: 14, fontWeight: 700 }}>{title}</span>
+          <button onClick={onClose} className="glass-button" style={{ width: 30, height: 30, borderRadius: 9, display:import { useState, useRef, useEffect, lazy, Suspense } from 'react';
+import { Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Repeat1, Volume2, Search, Maximize2, User, MoreHorizontal, X } from 'lucide-react';
+import { usePlayerStore } from '../store/usePlayerStore';
+import { useAuthStore } from '../store/useAuthStore';
+import { music } from '../api/music';
+import Visualizer from '../components/Visualizer';
+import FloatingLyrics from '../components/FloatingLyrics';
+
+const Visualizer3D = lazy(() => import('../components/Visualizer3D'));
+
+function fmt(s) { if (!s || isNaN(s)) return '0:00'; const m = Math.floor(s / 60), sec = Math.floor(s % 60); return `${m}:${sec.toString().padStart(2, '0')}`; }
+
+const VIZ_MODES = [{ key: 'ring', label: '环', icon: '◯' }, { key: 'wave', label: '波', icon: '〜' }, { key: '3d', label: '3D', icon: '◆' }];
+const PRESETS = ['#4FC3F7', '#A78BFA', '#FF6B9D', '#4ADE80', '#FB923C', '#C0C0C0'];
+
+function hexToRgb(hex) {
+  const s = hex.replace('#', '');
+  const bigint = parseInt(s.length === 3 ? s.split('').map(c => c + c).join('') : s, 16);
+  return { r: (bigint >> 16) & 255, g: (bigint >> 8) & 255, b: bigint & 255 };
+}
+
+function Row({ track, active, onPlay }) {
+  const c = track.cover || `https://picsum.photos/seed/${track.id}/400/400`;
+  return (
+    <div className={`glass-row ${active ? 'is-active' : ''}`} onClick={() => onPlay(track)}>
+      <div style={{ width: 42, height: 42, borderRadius: 8, overflow: 'hidden', flexShrink: 0, background: active ? '#222' : '#111' }}>
+        <img src={c} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: active ? 'var(--accent-dynamic)' : 'var(--text-primary)' }}>{track.title}</div>
+        <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 1 }}>{track.artist}{track.album ? ` · ${track.album}` : ''}</div>
+      </div>
+      <span style={{ fontSize: 11, color: 'var(--text-muted)', flexShrink: 0 }}>{track.duration ? fmt(track.duration) : ''}</span>
+    </div>
+  );
+}
+
+function Sheet({ open, onClose, title, children, h = '80vh' }) {
+  if (!open) return null;
+  return (
+    <div style={{ position: 'absolute', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.25)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', animation: 'fadeIn .2s ease both', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={onClose}>
+      <div className="glass-panel-strong" onClick={e => e.stopPropagation()} style={{ width: '70%', maxWidth: 520, maxHeight: h, borderRadius: 20, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px 10px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+          <span style={{ fontSize: 14, fontWeight: 700 }}>{title}</span>
+          <button onClick={onClose} className="glass-button" style={{ width: 30, height: 30, borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><X size={import { useState, useRef, useEffect, lazy, Suspense } from 'react';
+import { Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Repeat1, Volume2, Search, Maximize2, User, MoreHorizontal, X } from 'lucide-react';
+import { usePlayerStore } from '../store/usePlayerStore';
+import { useAuthStore } from '../store/useAuthStore';
+import { music } from '../api/music';
+import Visualizer from '../components/Visualizer';
+import FloatingLyrics from '../components/FloatingLyrics';
+
+const Visualizer3D = lazy(() => import('../components/Visualizer3D'));
+
+function fmt(s) { if (!s || isNaN(s)) return '0:00'; const m = Math.floor(s / 60), sec = Math.floor(s % 60); return `${m}:${sec.toString().padStart(2, '0')}`; }
+
+const VIZ_MODES = [{ key: 'ring', label: '环', icon: '◯' }, { key: 'wave', label: '波', icon: '〜' }, { key: '3d', label: '3D', icon: '◆' }];
+const PRESETS = ['#4FC3F7', '#A78BFA', '#FF6B9D', '#4ADE80', '#FB923C', '#C0C0C0'];
+
+function hexToRgb(hex) {
+  const s = hex.replace('#', '');
+  const bigint = parseInt(s.length === 3 ? s.split('').map(c => c + c).join('') : s, 16);
+  return { r: (bigint >> 16) & 255, g: (bigint >> 8) & 255, b: bigint & 255 };
+}
+
+function Row({ track, active, onPlay }) {
+  const c = track.cover || `https://picsum.photos/seed/${track.id}/400/400`;
+  return (
+    <div className={`glass-row ${active ? 'is-active' : ''}`} onClick={() => onPlay(track)}>
+      <div style={{ width: 42, height: 42, borderRadius: 8, overflow: 'hidden', flexShrink: 0, background: active ? '#222' : '#111' }}>
+        <img src={c} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: active ? 'var(--accent-dynamic)' : 'var(--text-primary)' }}>{track.title}</div>
+        <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 1 }}>{track.artist}{track.album ? ` · ${track.album}` : ''}</div>
+      </div>
+      <span style={{ fontSize: 11, color: 'var(--text-muted)', flexShrink: 0 }}>{track.duration ? fmt(track.duration) : ''}</span>
+    </div>
+  );
+}
+
+function Sheet({ open, onClose, title, children, h = '80vh' }) {
+  if (!open) return null;
+  return (
+    <div style={{ position: 'absolute', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.25)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', animation: 'fadeIn .2s ease both', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={onClose}>
+      <div className="glass-panel-strong" onClick={e => e.stopPropagation()} style={{ width: '70%', maxWidth: 520, maxHeight: h, borderRadius: 20, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px 10px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+          <span style={{ fontSize: 14, fontWeight: 700 }}>{title}</span>
+          <button onClick={onClose} className="glass-button" style={{ width: 30, height: 30, borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><X size={15} color="var(--text-secondary)" /></button>
+        </div>
+import { useState, useRef, useEffect, lazy, Suspense } from 'react';
+import { Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Repeat1, Volume2, Search, Maximize2, User, MoreHorizontal, X } from 'lucide-react';
+import { usePlayerStore } from '../store/usePlayerStore';
+import { useAuthStore } from '../store/useAuthStore';
+import { music } from '../api/music';
+import Visualizer from '../components/Visualizer';
+import FloatingLyrics from '../components/FloatingLyrics';
+
+const Visualizer3D = lazy(() => import('../components/Visualizer3D'));
+
+function fmt(s) { if (!s || isNaN(s)) return '0:00'; const m = Math.floor(s / 60), sec = Math.floor(s % 60); return `${m}:${sec.toString().padStart(2, '0')}`; }
+
+const VIZ_MODES = [{ key: 'ring', label: '环', icon: '◯' }, { key: 'wave', label: '波', icon: '〜' }, { key: '3d', label: '3D', icon: '◆' }];
+const PRESETS = ['#4FC3F7', '#A78BFA', '#FF6B9D', '#4ADE80', '#FB923C', '#C0C0C0'];
+
+function hexToRgb(hex) {
+  const s = hex.replace('#', '');
+  const bigint = parseInt(s.length === 3 ? s.split('').map(c => c + c).join('') : s, 16);
+  return { r: (bigint >> 16) & 255, g: (bigint >> 8) & 255, b: bigint & 255 };
+}
+
+function Row({ track, active, onPlay }) {
+  const c = track.cover || `https://picsum.photos/seed/${track.id}/400/400`;
+  return (
+    <div className={`glass-row ${active ? 'is-active' : ''}`} onClick={() => onPlay(track)}>
+      <div style={{ width: 42, height: 42, borderRadius: 8, overflow: 'hidden', flexShrink: 0, background: active ? '#222' : '#111' }}>
+        <img src={c} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: active ? 'var(--accent-dynamic)' : 'var(--text-primary)' }}>{track.title}</div>
+        <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 1 }}>{track.artist}{track.album ? ` · ${track.album}` : ''}</div>
+      </div>
+      <span style={{ fontSize: 11, color: 'var(--text-muted)', flexShrink: 0 }}>{track.duration ? fmt(track.duration) : ''}</span>
+    </div>
+  );
+}
+
+function Sheet({ open, onClose, title, children, h = '80vh' }) {
+  if (!open) return null;
+  return (
+    <div style={{ position: 'absolute', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.25)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', animation: 'fadeIn .2s ease both', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={onClose}>
+      <div className="glass-panel-strong" onClick={e => e.stopPropagation()} style={{ width: '70%', maxWidth: 520, maxHeight: h, borderRadius: 20, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px 10px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+          <span style={{ fontSize: 14, fontWeight: 700 }}>{title}</span>
+          <button onClick={onClose} className="glass-button" style={{ width: 30, height: 30, borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><X size={15} color="var(--text-secondary)" /></button>
+        </div>
+        <div style={{ flex: 1, overflowY: 'auto', padding: '6pximport { useState, useRef, useEffect, lazy, Suspense } from 'react';
+import { Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Repeat1, Volume2, Search, Maximize2, User, MoreHorizontal, X } from 'lucide-react';
+import { usePlayerStore } from '../store/usePlayerStore';
+import { useAuthStore } from '../store/useAuthStore';
+import { music } from '../api/music';
+import Visualizer from '../components/Visualizer';
+import FloatingLyrics from '../components/FloatingLyrics';
+
+const Visualizer3D = lazy(() => import('../components/Visualizer3D'));
+
+function fmt(s) { if (!s || isNaN(s)) return '0:00'; const m = Math.floor(s / 60), sec = Math.floor(s % 60); return `${m}:${sec.toString().padStart(2, '0')}`; }
+
+const VIZ_MODES = [{ key: 'ring', label: '环', icon: '◯' }, { key: 'wave', label: '波', icon: '〜' }, { key: '3d', label: '3D', icon: '◆' }];
+const PRESETS = ['#4FC3F7', '#A78BFA', '#FF6B9D', '#4ADE80', '#FB923C', '#C0C0C0'];
+
+function hexToRgb(hex) {
+  const s = hex.replace('#', '');
+  const bigint = parseInt(s.length === 3 ? s.split('').map(c => c + c).join('') : s, 16);
+  return { r: (bigint >> 16) & 255, g: (bigint >> 8) & 255, b: bigint & 255 };
+}
+
+function Row({ track, active, onPlay }) {
+  const c = track.cover || `https://picsum.photos/seed/${track.id}/400/400`;
+  return (
+    <div className={`glass-row ${active ? 'is-active' : ''}`} onClick={() => onPlay(track)}>
+      <div style={{ width: 42, height: 42, borderRadius: 8, overflow: 'hidden', flexShrink: 0, background: active ? '#222' : '#111' }}>
+        <img src={c} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: active ? 'var(--accent-dynamic)' : 'var(--text-primary)' }}>{track.title}</div>
+        <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 1 }}>{track.artist}{track.album ? ` · ${track.album}` : ''}</div>
+      </div>
+      <span style={{ fontSize: 11, color: 'var(--text-muted)', flexShrink: 0 }}>{track.duration ? fmt(track.duration) : ''}</span>
+    </div>
+  );
+}
+
+function Sheet({ open, onClose, title, children, h = '80vh' }) {
+  if (!open) return null;
+  return (
+    <div style={{ position: 'absolute', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.25)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', animation: 'fadeIn .2s ease both', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={onClose}>
+      <div className="glass-panel-strong" onClick={e => e.stopPropagation()} style={{ width: '70%', maxWidth: 520, maxHeight: h, borderRadius: 20, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px 10px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+          <span style={{ fontSize: 14, fontWeight: 700 }}>{title}</span>
+          <button onClick={onClose} className="glass-button" style={{ width: 30, height: 30, borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><X size={15} color="var(--text-secondary)" /></button>
+        </div>
+        <div style={{ flex: 1, overflowY: 'auto', padding: '6px 10px 20px' }}>{children}</div>
+      </div>
+    </div>
+  );
+}
+import { useState, useRef, useEffect, lazy, Suspense } from 'react';
+import { Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Repeat1, Volume2, Search, Maximize2, User, MoreHorizontal, X } from 'lucide-react';
+import { usePlayerStore } from '../store/usePlayerStore';
+import { useAuthStore } from '../store/useAuthStore';
+import { music } from '../api/music';
+import Visualizer from '../components/Visualizer';
+import FloatingLyrics from '../components/FloatingLyrics';
+
+const Visualizer3D = lazy(() => import('../components/Visualizer3D'));
+
+function fmt(s) { if (!s || isNaN(s)) return '0:00'; const m = Math.floor(s / 60), sec = Math.floor(s % 60); return `${m}:${sec.toString().padStart(2, '0')}`; }
+
+const VIZ_MODES = [{ key: 'ring', label: '环', icon: '◯' }, { key: 'wave', label: '波', icon: '〜' }, { key: '3d', label: '3D', icon: '◆' }];
+const PRESETS = ['#4FC3F7', '#A78BFA', '#FF6B9D', '#4ADE80', '#FB923C', '#C0C0C0'];
+
+function hexToRgb(hex) {
+  const s = hex.replace('#', '');
+  const bigint = parseInt(s.length === 3 ? s.split('').map(c => c + c).join('') : s, 16);
+  return { r: (bigint >> 16) & 255, g: (bigint >> 8) & 255, b: bigint & 255 };
+}
+
+function Row({ track, active, onPlay }) {
+  const c = track.cover || `https://picsum.photos/seed/${track.id}/400/400`;
+  return (
+    <div className={`glass-row ${active ? 'is-active' : ''}`} onClick={() => onPlay(track)}>
+      <div style={{ width: 42, height: 42, borderRadius: 8, overflow: 'hidden', flexShrink: 0, background: active ? '#222' : '#111' }}>
+        <img src={c} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: active ? 'var(--accent-dynamic)' : 'var(--text-primary)' }}>{track.title}</div>
+        <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 1 }}>{track.artist}{track.album ? ` · ${track.album}` : ''}</div>
+      </div>
+      <span style={{ fontSize: 11, color: 'var(--text-muted)', flexShrink: 0 }}>{track.duration ? fmt(track.duration) : ''}</span>
+    </div>
+  );
+}
+
+function Sheet({ open, onClose, title, children, h = '80vh' }) {
+  if (!open) return null;
+  return (
+    <div style={{ position: 'absolute', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.25)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', animation: 'fadeIn .2s ease both', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={onClose}>
+      <div className="glass-panel-strong" onClick={e => e.stopPropagation()} style={{ width: '70%', maxWidth: 520, maxHeight: h, borderRadius: 20, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px 10px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+          <span style={{ fontSize: 14, fontWeight: 700 }}>{title}</span>
+          <button onClick={onClose} className="glass-button" style={{ width: 30, height: 30, borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><X size={15} color="var(--text-secondary)" /></button>
+        </div>
+        <div style={{ flex: 1, overflowY: 'auto', padding: '6px 10px 20px' }}>{children}</div>
+      </div>
+    </div>
+  );
+}
+
+// 独立悬浮小圆按钮（无import { useState, useRef, useEffect, lazy, Suspense } from 'react';
+import { Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Repeat1, Volume2, Search, Maximize2, User, MoreHorizontal, X } from 'lucide-react';
+import { usePlayerStore } from '../store/usePlayerStore';
+import { useAuthStore } from '../store/useAuthStore';
+import { music } from '../api/music';
+import Visualizer from '../components/Visualizer';
+import FloatingLyrics from '../components/FloatingLyrics';
+
+const Visualizer3D = lazy(() => import('../components/Visualizer3D'));
+
+function fmt(s) { if (!s || isNaN(s)) return '0:00'; const m = Math.floor(s / 60), sec = Math.floor(s % 60); return `${m}:${sec.toString().padStart(2, '0')}`; }
+
+const VIZ_MODES = [{ key: 'ring', label: '环', icon: '◯' }, { key: 'wave', label: '波', icon: '〜' }, { key: '3d', label: '3D', icon: '◆' }];
+const PRESETS = ['#4FC3F7', '#A78BFA', '#FF6B9D', '#4ADE80', '#FB923C', '#C0C0C0'];
+
+function hexToRgb(hex) {
+  const s = hex.replace('#', '');
+  const bigint = parseInt(s.length === 3 ? s.split('').map(c => c + c).join('') : s, 16);
+  return { r: (bigint >> 16) & 255, g: (bigint >> 8) & 255, b: bigint & 255 };
+}
+
+function Row({ track, active, onPlay }) {
+  const c = track.cover || `https://picsum.photos/seed/${track.id}/400/400`;
+  return (
+    <div className={`glass-row ${active ? 'is-active' : ''}`} onClick={() => onPlay(track)}>
+      <div style={{ width: 42, height: 42, borderRadius: 8, overflow: 'hidden', flexShrink: 0, background: active ? '#222' : '#111' }}>
+        <img src={c} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: active ? 'var(--accent-dynamic)' : 'var(--text-primary)' }}>{track.title}</div>
+        <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 1 }}>{track.artist}{track.album ? ` · ${track.album}` : ''}</div>
+      </div>
+      <span style={{ fontSize: 11, color: 'var(--text-muted)', flexShrink: 0 }}>{track.duration ? fmt(track.duration) : ''}</span>
+    </div>
+  );
+}
+
+function Sheet({ open, onClose, title, children, h = '80vh' }) {
+  if (!open) return null;
+  return (
+    <div style={{ position: 'absolute', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.25)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', animation: 'fadeIn .2s ease both', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={onClose}>
+      <div className="glass-panel-strong" onClick={e => e.stopPropagation()} style={{ width: '70%', maxWidth: 520, maxHeight: h, borderRadius: 20, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px 10px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+          <span style={{ fontSize: 14, fontWeight: 700 }}>{title}</span>
+          <button onClick={onClose} className="glass-button" style={{ width: 30, height: 30, borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><X size={15} color="var(--text-secondary)" /></button>
+        </div>
+        <div style={{ flex: 1, overflowY: 'auto', padding: '6px 10px 20px' }}>{children}</div>
+      </div>
+    </div>
+  );
+}
+
+// 独立悬浮小圆按钮（无大框）
+function FloatBtn({ children, onClick, title, style }) {
+import { useState, useRef, useEffect, lazy, Suspense } from 'react';
+import { Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Repeat1, Volume2, Search, Maximize2, User, MoreHorizontal, X } from 'lucide-react';
+import { usePlayerStore } from '../store/usePlayerStore';
+import { useAuthStore } from '../store/useAuthStore';
+import { music } from '../api/music';
+import Visualizer from '../components/Visualizer';
+import FloatingLyrics from '../components/FloatingLyrics';
+
+const Visualizer3D = lazy(() => import('../components/Visualizer3D'));
+
+function fmt(s) { if (!s || isNaN(s)) return '0:00'; const m = Math.floor(s / 60), sec = Math.floor(s % 60); return `${m}:${sec.toString().padStart(2, '0')}`; }
+
+const VIZ_MODES = [{ key: 'ring', label: '环', icon: '◯' }, { key: 'wave', label: '波', icon: '〜' }, { key: '3d', label: '3D', icon: '◆' }];
+const PRESETS = ['#4FC3F7', '#A78BFA', '#FF6B9D', '#4ADE80', '#FB923C', '#C0C0C0'];
+
+function hexToRgb(hex) {
+  const s = hex.replace('#', '');
+  const bigint = parseInt(s.length === 3 ? s.split('').map(c => c + c).join('') : s, 16);
+  return { r: (bigint >> 16) & 255, g: (bigint >> 8) & 255, b: bigint & 255 };
+}
+
+function Row({ track, active, onPlay }) {
+  const c = track.cover || `https://picsum.photos/seed/${track.id}/400/400`;
+  return (
+    <div className={`glass-row ${active ? 'is-active' : ''}`} onClick={() => onPlay(track)}>
+      <div style={{ width: 42, height: 42, borderRadius: 8, overflow: 'hidden', flexShrink: 0, background: active ? '#222' : '#111' }}>
+        <img src={c} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: active ? 'var(--accent-dynamic)' : 'var(--text-primary)' }}>{track.title}</div>
+        <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 1 }}>{track.artist}{track.album ? ` · ${track.album}` : ''}</div>
+      </div>
+      <span style={{ fontSize: 11, color: 'var(--text-muted)', flexShrink: 0 }}>{track.duration ? fmt(track.duration) : ''}</span>
+    </div>
+  );
+}
+
+function Sheet({ open, onClose, title, children, h = '80vh' }) {
+  if (!open) return null;
+  return (
+    <div style={{ position: 'absolute', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.25)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', animation: 'fadeIn .2s ease both', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={onClose}>
+      <div className="glass-panel-strong" onClick={e => e.stopPropagation()} style={{ width: '70%', maxWidth: 520, maxHeight: h, borderRadius: 20, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px 10px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+          <span style={{ fontSize: 14, fontWeight: 700 }}>{title}</span>
+          <button onClick={onClose} className="glass-button" style={{ width: 30, height: 30, borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><X size={15} color="var(--text-secondary)" /></button>
+        </div>
+        <div style={{ flex: 1, overflowY: 'auto', padding: '6px 10px 20px' }}>{children}</div>
+      </div>
+    </div>
+  );
+}
+
+// 独立悬浮小圆按钮（无大框）
+function FloatBtn({ children, onClick, title, style }) {
+  return (
+    <button
+      onimport { useState, useRef, useEffect, lazy, Suspense } from 'react';
+import { Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Repeat1, Volume2, Search, Maximize2, User, MoreHorizontal, X } from 'lucide-react';
+import { usePlayerStore } from '../store/usePlayerStore';
+import { useAuthStore } from '../store/useAuthStore';
+import { music } from '../api/music';
+import Visualizer from '../components/Visualizer';
+import FloatingLyrics from '../components/FloatingLyrics';
+
+const Visualizer3D = lazy(() => import('../components/Visualizer3D'));
+
+function fmt(s) { if (!s || isNaN(s)) return '0:00'; const m = Math.floor(s / 60), sec = Math.floor(s % 60); return `${m}:${sec.toString().padStart(2, '0')}`; }
+
+const VIZ_MODES = [{ key: 'ring', label: '环', icon: '◯' }, { key: 'wave', label: '波', icon: '〜' }, { key: '3d', label: '3D', icon: '◆' }];
+const PRESETS = ['#4FC3F7', '#A78BFA', '#FF6B9D', '#4ADE80', '#FB923C', '#C0C0C0'];
+
+function hexToRgb(hex) {
+  const s = hex.replace('#', '');
+  const bigint = parseInt(s.length === 3 ? s.split('').map(c => c + c).join('') : s, 16);
+  return { r: (bigint >> 16) & 255, g: (bigint >> 8) & 255, b: bigint & 255 };
+}
+
+function Row({ track, active, onPlay }) {
+  const c = track.cover || `https://picsum.photos/seed/${track.id}/400/400`;
+  return (
+    <div className={`glass-row ${active ? 'is-active' : ''}`} onClick={() => onPlay(track)}>
+      <div style={{ width: 42, height: 42, borderRadius: 8, overflow: 'hidden', flexShrink: 0, background: active ? '#222' : '#111' }}>
+        <img src={c} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: active ? 'var(--accent-dynamic)' : 'var(--text-primary)' }}>{track.title}</div>
+        <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 1 }}>{track.artist}{track.album ? ` · ${track.album}` : ''}</div>
+      </div>
+      <span style={{ fontSize: 11, color: 'var(--text-muted)', flexShrink: 0 }}>{track.duration ? fmt(track.duration) : ''}</span>
+    </div>
+  );
+}
+
+function Sheet({ open, onClose, title, children, h = '80vh' }) {
+  if (!open) return null;
+  return (
+    <div style={{ position: 'absolute', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.25)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', animation: 'fadeIn .2s ease both', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={onClose}>
+      <div className="glass-panel-strong" onClick={e => e.stopPropagation()} style={{ width: '70%', maxWidth: 520, maxHeight: h, borderRadius: 20, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px 10px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+          <span style={{ fontSize: 14, fontWeight: 700 }}>{title}</span>
+          <button onClick={onClose} className="glass-button" style={{ width: 30, height: 30, borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><X size={15} color="var(--text-secondary)" /></button>
+        </div>
+        <div style={{ flex: 1, overflowY: 'auto', padding: '6px 10px 20px' }}>{children}</div>
+      </div>
+    </div>
+  );
+}
+
+// 独立悬浮小圆按钮（无大框）
+function FloatBtn({ children, onClick, title, style }) {
+  return (
+    <button
+      onClick={onClick}
+      title={title}
+      className="glass-button"
+import { useState, useRef, useEffect, lazy, Suspense } from 'react';
+import { Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Repeat1, Volume2, Search, Maximize2, User, MoreHorizontal, X } from 'lucide-react';
+import { usePlayerStore } from '../store/usePlayerStore';
+import { useAuthStore } from '../store/useAuthStore';
+import { music } from '../api/music';
+import Visualizer from '../components/Visualizer';
+import FloatingLyrics from '../components/FloatingLyrics';
+
+const Visualizer3D = lazy(() => import('../components/Visualizer3D'));
+
+function fmt(s) { if (!s || isNaN(s)) return '0:00'; const m = Math.floor(s / 60), sec = Math.floor(s % 60); return `${m}:${sec.toString().padStart(2, '0')}`; }
+
+const VIZ_MODES = [{ key: 'ring', label: '环', icon: '◯' }, { key: 'wave', label: '波', icon: '〜' }, { key: '3d', label: '3D', icon: '◆' }];
+const PRESETS = ['#4FC3F7', '#A78BFA', '#FF6B9D', '#4ADE80', '#FB923C', '#C0C0C0'];
+
+function hexToRgb(hex) {
+  const s = hex.replace('#', '');
+  const bigint = parseInt(s.length === 3 ? s.split('').map(c => c + c).join('') : s, 16);
+  return { r: (bigint >> 16) & 255, g: (bigint >> 8) & 255, b: bigint & 255 };
+}
+
+function Row({ track, active, onPlay }) {
+  const c = track.cover || `https://picsum.photos/seed/${track.id}/400/400`;
+  return (
+    <div className={`glass-row ${active ? 'is-active' : ''}`} onClick={() => onPlay(track)}>
+      <div style={{ width: 42, height: 42, borderRadius: 8, overflow: 'hidden', flexShrink: 0, background: active ? '#222' : '#111' }}>
+        <img src={c} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: active ? 'var(--accent-dynamic)' : 'var(--text-primary)' }}>{track.title}</div>
+        <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 1 }}>{track.artist}{track.album ? ` · ${track.album}` : ''}</div>
+      </div>
+      <span style={{ fontSize: 11, color: 'var(--text-muted)', flexShrink: 0 }}>{track.duration ? fmt(track.duration) : ''}</span>
+    </div>
+  );
+}
+
+function Sheet({ open, onClose, title, children, h = '80vh' }) {
+  if (!open) return null;
+  return (
+    <div style={{ position: 'absolute', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.25)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', animation: 'fadeIn .2s ease both', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={onClose}>
+      <div className="glass-panel-strong" onClick={e => e.stopPropagation()} style={{ width: '70%', maxWidth: 520, maxHeight: h, borderRadius: 20, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px 10px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+          <span style={{ fontSize: 14, fontWeight: 700 }}>{title}</span>
+          <button onClick={onClose} className="glass-button" style={{ width: 30, height: 30, borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><X size={15} color="var(--text-secondary)" /></button>
+        </div>
+        <div style={{ flex: 1, overflowY: 'auto', padding: '6px 10px 20px' }}>{children}</div>
+      </div>
+    </div>
+  );
+}
+
+// 独立悬浮小圆按钮（无大框）
+function FloatBtn({ children, onClick, title, style }) {
+  return (
+    <button
+      onClick={onClick}
+      title={title}
+      className="glass-button"
+      style={{
+        width: 34, height: 34, borderRadius: 'import { useState, useRef, useEffect, lazy, Suspense } from 'react';
+import { Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Repeat1, Volume2, Search, Maximize2, User, MoreHorizontal, X } from 'lucide-react';
+import { usePlayerStore } from '../store/usePlayerStore';
+import { useAuthStore } from '../store/useAuthStore';
+import { music } from '../api/music';
+import Visualizer from '../components/Visualizer';
+import FloatingLyrics from '../components/FloatingLyrics';
+
+const Visualizer3D = lazy(() => import('../components/Visualizer3D'));
+
+function fmt(s) { if (!s || isNaN(s)) return '0:00'; const m = Math.floor(s / 60), sec = Math.floor(s % 60); return `${m}:${sec.toString().padStart(2, '0')}`; }
+
+const VIZ_MODES = [{ key: 'ring', label: '环', icon: '◯' }, { key: 'wave', label: '波', icon: '〜' }, { key: '3d', label: '3D', icon: '◆' }];
+const PRESETS = ['#4FC3F7', '#A78BFA', '#FF6B9D', '#4ADE80', '#FB923C', '#C0C0C0'];
+
+function hexToRgb(hex) {
+  const s = hex.replace('#', '');
+  const bigint = parseInt(s.length === 3 ? s.split('').map(c => c + c).join('') : s, 16);
+  return { r: (bigint >> 16) & 255, g: (bigint >> 8) & 255, b: bigint & 255 };
+}
+
+function Row({ track, active, onPlay }) {
+  const c = track.cover || `https://picsum.photos/seed/${track.id}/400/400`;
+  return (
+    <div className={`glass-row ${active ? 'is-active' : ''}`} onClick={() => onPlay(track)}>
+      <div style={{ width: 42, height: 42, borderRadius: 8, overflow: 'hidden', flexShrink: 0, background: active ? '#222' : '#111' }}>
+        <img src={c} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: active ? 'var(--accent-dynamic)' : 'var(--text-primary)' }}>{track.title}</div>
+        <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 1 }}>{track.artist}{track.album ? ` · ${track.album}` : ''}</div>
+      </div>
+      <span style={{ fontSize: 11, color: 'var(--text-muted)', flexShrink: 0 }}>{track.duration ? fmt(track.duration) : ''}</span>
+    </div>
+  );
+}
+
+function Sheet({ open, onClose, title, children, h = '80vh' }) {
+  if (!open) return null;
+  return (
+    <div style={{ position: 'absolute', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.25)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', animation: 'fadeIn .2s ease both', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={onClose}>
+      <div className="glass-panel-strong" onClick={e => e.stopPropagation()} style={{ width: '70%', maxWidth: 520, maxHeight: h, borderRadius: 20, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px 10px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+          <span style={{ fontSize: 14, fontWeight: 700 }}>{title}</span>
+          <button onClick={onClose} className="glass-button" style={{ width: 30, height: 30, borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><X size={15} color="var(--text-secondary)" /></button>
+        </div>
+        <div style={{ flex: 1, overflowY: 'auto', padding: '6px 10px 20px' }}>{children}</div>
+      </div>
+    </div>
+  );
+}
+
+// 独立悬浮小圆按钮（无大框）
+function FloatBtn({ children, onClick, title, style }) {
+  return (
+    <button
+      onClick={onClick}
+      title={title}
+      className="glass-button"
+      style={{
+        width: 34, height: 34, borderRadius: '50%',
+        display: 'flex',import { useState, useRef, useEffect, lazy, Suspense } from 'react';
+import { Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Repeat1, Volume2, Search, Maximize2, User, MoreHorizontal, X } from 'lucide-react';
+import { usePlayerStore } from '../store/usePlayerStore';
+import { useAuthStore } from '../store/useAuthStore';
+import { music } from '../api/music';
+import Visualizer from '../components/Visualizer';
+import FloatingLyrics from '../components/FloatingLyrics';
+
+const Visualizer3D = lazy(() => import('../components/Visualizer3D'));
+
+function fmt(s) { if (!s || isNaN(s)) return '0:00'; const m = Math.floor(s / 60), sec = Math.floor(s % 60); return `${m}:${sec.toString().padStart(2, '0')}`; }
+
+const VIZ_MODES = [{ key: 'ring', label: '环', icon: '◯' }, { key: 'wave', label: '波', icon: '〜' }, { key: '3d', label: '3D', icon: '◆' }];
+const PRESETS = ['#4FC3F7', '#A78BFA', '#FF6B9D', '#4ADE80', '#FB923C', '#C0C0C0'];
+
+function hexToRgb(hex) {
+  const s = hex.replace('#', '');
+  const bigint = parseInt(s.length === 3 ? s.split('').map(c => c + c).join('') : s, 16);
+  return { r: (bigint >> 16) & 255, g: (bigint >> 8) & 255, b: bigint & 255 };
+}
+
+function Row({ track, active, onPlay }) {
+  const c = track.cover || `https://picsum.photos/seed/${track.id}/400/400`;
+  return (
+    <div className={`glass-row ${active ? 'is-active' : ''}`} onClick={() => onPlay(track)}>
+      <div style={{ width: 42, height: 42, borderRadius: 8, overflow: 'hidden', flexShrink: 0, background: active ? '#222' : '#111' }}>
+        <img src={c} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: active ? 'var(--accent-dynamic)' : 'var(--text-primary)' }}>{track.title}</div>
+        <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 1 }}>{track.artist}{track.album ? ` · ${track.album}` : ''}</div>
+      </div>
+      <span style={{ fontSize: 11, color: 'var(--text-muted)', flexShrink: 0 }}>{track.duration ? fmt(track.duration) : ''}</span>
+    </div>
+  );
+}
+
+function Sheet({ open, onClose, title, children, h = '80vh' }) {
+  if (!open) return null;
+  return (
+    <div style={{ position: 'absolute', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.25)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', animation: 'fadeIn .2s ease both', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={onClose}>
+      <div className="glass-panel-strong" onClick={e => e.stopPropagation()} style={{ width: '70%', maxWidth: 520, maxHeight: h, borderRadius: 20, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px 10px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+          <span style={{ fontSize: 14, fontWeight: 700 }}>{title}</span>
+          <button onClick={onClose} className="glass-button" style={{ width: 30, height: 30, borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><X size={15} color="var(--text-secondary)" /></button>
+        </div>
+        <div style={{ flex: 1, overflowY: 'auto', padding: '6px 10px 20px' }}>{children}</div>
+      </div>
+    </div>
+  );
+}
+
+// 独立悬浮小圆按钮（无大框）
+function FloatBtn({ children, onClick, title, style }) {
+  return (
+    <button
+      onClick={onClick}
+      title={title}
+      className="glass-button"
+      style={{
+        width: 34, height: 34, borderRadius: '50%',
+        display: 'flex', alignItems: 'center', justifyContent: 'import { useState, useRef, useEffect, lazy, Suspense } from 'react';
+import { Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Repeat1, Volume2, Search, Maximize2, User, MoreHorizontal, X } from 'lucide-react';
+import { usePlayerStore } from '../store/usePlayerStore';
+import { useAuthStore } from '../store/useAuthStore';
+import { music } from '../api/music';
+import Visualizer from '../components/Visualizer';
+import FloatingLyrics from '../components/FloatingLyrics';
+
+const Visualizer3D = lazy(() => import('../components/Visualizer3D'));
+
+function fmt(s) { if (!s || isNaN(s)) return '0:00'; const m = Math.floor(s / 60), sec = Math.floor(s % 60); return `${m}:${sec.toString().padStart(2, '0')}`; }
+
+const VIZ_MODES = [{ key: 'ring', label: '环', icon: '◯' }, { key: 'wave', label: '波', icon: '〜' }, { key: '3d', label: '3D', icon: '◆' }];
+const PRESETS = ['#4FC3F7', '#A78BFA', '#FF6B9D', '#4ADE80', '#FB923C', '#C0C0C0'];
+
+function hexToRgb(hex) {
+  const s = hex.replace('#', '');
+  const bigint = parseInt(s.length === 3 ? s.split('').map(c => c + c).join('') : s, 16);
+  return { r: (bigint >> 16) & 255, g: (bigint >> 8) & 255, b: bigint & 255 };
+}
+
+function Row({ track, active, onPlay }) {
+  const c = track.cover || `https://picsum.photos/seed/${track.id}/400/400`;
+  return (
+    <div className={`glass-row ${active ? 'is-active' : ''}`} onClick={() => onPlay(track)}>
+      <div style={{ width: 42, height: 42, borderRadius: 8, overflow: 'hidden', flexShrink: 0, background: active ? '#222' : '#111' }}>
+        <img src={c} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: active ? 'var(--accent-dynamic)' : 'var(--text-primary)' }}>{track.title}</div>
+        <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 1 }}>{track.artist}{track.album ? ` · ${track.album}` : ''}</div>
+      </div>
+      <span style={{ fontSize: 11, color: 'var(--text-muted)', flexShrink: 0 }}>{track.duration ? fmt(track.duration) : ''}</span>
+    </div>
+  );
+}
+
+function Sheet({ open, onClose, title, children, h = '80vh' }) {
+  if (!open) return null;
+  return (
+    <div style={{ position: 'absolute', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.25)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', animation: 'fadeIn .2s ease both', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={onClose}>
+      <div className="glass-panel-strong" onClick={e => e.stopPropagation()} style={{ width: '70%', maxWidth: 520, maxHeight: h, borderRadius: 20, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px 10px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+          <span style={{ fontSize: 14, fontWeight: 700 }}>{title}</span>
+          <button onClick={onClose} className="glass-button" style={{ width: 30, height: 30, borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><X size={15} color="var(--text-secondary)" /></button>
+        </div>
+        <div style={{ flex: 1, overflowY: 'auto', padding: '6px 10px 20px' }}>{children}</div>
+      </div>
+    </div>
+  );
+}
+
+// 独立悬浮小圆按钮（无大框）
+function FloatBtn({ children, onClick, title, style }) {
+  return (
+    <button
+      onClick={onClick}
+      title={title}
+      className="glass-button"
+      style={{
+        width: 34, height: 34, borderRadius: '50%',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        flexShrink: 0, transition: 'all .2s ease',
+import { useState, useRef, useEffect, lazy, Suspense } from 'react';
+import { Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Repeat1, Volume2, Search, Maximize2, User, MoreHorizontal, X } from 'lucide-react';
+import { usePlayerStore } from '../store/usePlayerStore';
+import { useAuthStore } from '../store/useAuthStore';
+import { music } from '../api/music';
+import Visualizer from '../components/Visualizer';
+import FloatingLyrics from '../components/FloatingLyrics';
+
+const Visualizer3D = lazy(() => import('../components/Visualizer3D'));
+
+function fmt(s) { if (!s || isNaN(s)) return '0:00'; const m = Math.floor(s / 60), sec = Math.floor(s % 60); return `${m}:${sec.toString().padStart(2, '0')}`; }
+
+const VIZ_MODES = [{ key: 'ring', label: '环', icon: '◯' }, { key: 'wave', label: '波', icon: '〜' }, { key: '3d', label: '3D', icon: '◆' }];
+const PRESETS = ['#4FC3F7', '#A78BFA', '#FF6B9D', '#4ADE80', '#FB923C', '#C0C0C0'];
+
+function hexToRgb(hex) {
+  const s = hex.replace('#', '');
+  const bigint = parseInt(s.length === 3 ? s.split('').map(c => c + c).join('') : s, 16);
+  return { r: (bigint >> 16) & 255, g: (bigint >> 8) & 255, b: bigint & 255 };
+}
+
+function Row({ track, active, onPlay }) {
+  const c = track.cover || `https://picsum.photos/seed/${track.id}/400/400`;
+  return (
+    <div className={`glass-row ${active ? 'is-active' : ''}`} onClick={() => onPlay(track)}>
+      <div style={{ width: 42, height: 42, borderRadius: 8, overflow: 'hidden', flexShrink: 0, background: active ? '#222' : '#111' }}>
+        <img src={c} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: active ? 'var(--accent-dynamic)' : 'var(--text-primary)' }}>{track.title}</div>
+        <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 1 }}>{track.artist}{track.album ? ` · ${track.album}` : ''}</div>
+      </div>
+      <span style={{ fontSize: 11, color: 'var(--text-muted)', flexShrink: 0 }}>{track.duration ? fmt(track.duration) : ''}</span>
+    </div>
+  );
+}
+
+function Sheet({ open, onClose, title, children, h = '80vh' }) {
+  if (!open) return null;
+  return (
+    <div style={{ position: 'absolute', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.25)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', animation: 'fadeIn .2s ease both', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={onClose}>
+      <div className="glass-panel-strong" onClick={e => e.stopPropagation()} style={{ width: '70%', maxWidth: 520, maxHeight: h, borderRadius: 20, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px 10px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+          <span style={{ fontSize: 14, fontWeight: 700 }}>{title}</span>
+          <button onClick={onClose} className="glass-button" style={{ width: 30, height: 30, borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><X size={15} color="var(--text-secondary)" /></button>
+        </div>
+        <div style={{ flex: 1, overflowY: 'auto', padding: '6px 10px 20px' }}>{children}</div>
+      </div>
+    </div>
+  );
+}
+
+// 独立悬浮小圆按钮（无大框）
+function FloatBtn({ children, onClick, title, style }) {
+  return (
+    <button
+      onClick={onClick}
+      title={title}
+      className="glass-button"
+      style={{
+        width: 34, height: 34, borderRadius: '50%',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        flexShrink: 0, transition: 'all .2s ease',
+        color: 'var(--text-primary)',
+        background: 'rgba(255,255import { useState, useRef, useEffect, lazy, Suspense } from 'react';
+import { Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Repeat1, Volume2, Search, Maximize2, User, MoreHorizontal, X } from 'lucide-react';
+import { usePlayerStore } from '../store/usePlayerStore';
+import { useAuthStore } from '../store/useAuthStore';
+import { music } from '../api/music';
+import Visualizer from '../components/Visualizer';
+import FloatingLyrics from '../components/FloatingLyrics';
+
+const Visualizer3D = lazy(() => import('../components/Visualizer3D'));
+
+function fmt(s) { if (!s || isNaN(s)) return '0:00'; const m = Math.floor(s / 60), sec = Math.floor(s % 60); return `${m}:${sec.toString().padStart(2, '0')}`; }
+
+const VIZ_MODES = [{ key: 'ring', label: '环', icon: '◯' }, { key: 'wave', label: '波', icon: '〜' }, { key: '3d', label: '3D', icon: '◆' }];
+const PRESETS = ['#4FC3F7', '#A78BFA', '#FF6B9D', '#4ADE80', '#FB923C', '#C0C0C0'];
+
+function hexToRgb(hex) {
+  const s = hex.replace('#', '');
+  const bigint = parseInt(s.length === 3 ? s.split('').map(c => c + c).join('') : s, 16);
+  return { r: (bigint >> 16) & 255, g: (bigint >> 8) & 255, b: bigint & 255 };
+}
+
+function Row({ track, active, onPlay }) {
+  const c = track.cover || `https://picsum.photos/seed/${track.id}/400/400`;
+  return (
+    <div className={`glass-row ${active ? 'is-active' : ''}`} onClick={() => onPlay(track)}>
+      <div style={{ width: 42, height: 42, borderRadius: 8, overflow: 'hidden', flexShrink: 0, background: active ? '#222' : '#111' }}>
+        <img src={c} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: active ? 'var(--accent-dynamic)' : 'var(--text-primary)' }}>{track.title}</div>
+        <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 1 }}>{track.artist}{track.album ? ` · ${track.album}` : ''}</div>
+      </div>
+      <span style={{ fontSize: 11, color: 'var(--text-muted)', flexShrink: 0 }}>{track.duration ? fmt(track.duration) : ''}</span>
+    </div>
+  );
+}
+
+function Sheet({ open, onClose, title, children, h = '80vh' }) {
+  if (!open) return null;
+  return (
+    <div style={{ position: 'absolute', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.25)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', animation: 'fadeIn .2s ease both', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={onClose}>
+      <div className="glass-panel-strong" onClick={e => e.stopPropagation()} style={{ width: '70%', maxWidth: 520, maxHeight: h, borderRadius: 20, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px 10px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+          <span style={{ fontSize: 14, fontWeight: 700 }}>{title}</span>
+          <button onClick={onClose} className="glass-button" style={{ width: 30, height: 30, borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><X size={15} color="var(--text-secondary)" /></button>
+        </div>
+        <div style={{ flex: 1, overflowY: 'auto', padding: '6px 10px 20px' }}>{children}</div>
+      </div>
+    </div>
+  );
+}
+
+// 独立悬浮小圆按钮（无大框）
+function FloatBtn({ children, onClick, title, style }) {
+  return (
+    <button
+      onClick={onClick}
+      title={title}
+      className="glass-button"
+      style={{
+        width: 34, height: 34, borderRadius: '50%',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        flexShrink: 0, transition: 'all .2s ease',
+        color: 'var(--text-primary)',
+        background: 'rgba(255,255,255,0.06)',
+import { useState, useRef, useEffect, lazy, Suspense } from 'react';
+import { Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Repeat1, Volume2, Search, Maximize2, User, MoreHorizontal, X } from 'lucide-react';
+import { usePlayerStore } from '../store/usePlayerStore';
+import { useAuthStore } from '../store/useAuthStore';
+import { music } from '../api/music';
+import Visualizer from '../components/Visualizer';
+import FloatingLyrics from '../components/FloatingLyrics';
+
+const Visualizer3D = lazy(() => import('../components/Visualizer3D'));
+
+function fmt(s) { if (!s || isNaN(s)) return '0:00'; const m = Math.floor(s / 60), sec = Math.floor(s % 60); return `${m}:${sec.toString().padStart(2, '0')}`; }
+
+const VIZ_MODES = [{ key: 'ring', label: '环', icon: '◯' }, { key: 'wave', label: '波', icon: '〜' }, { key: '3d', label: '3D', icon: '◆' }];
+const PRESETS = ['#4FC3F7', '#A78BFA', '#FF6B9D', '#4ADE80', '#FB923C', '#C0C0C0'];
+
+function hexToRgb(hex) {
+  const s = hex.replace('#', '');
+  const bigint = parseInt(s.length === 3 ? s.split('').map(c => c + c).join('') : s, 16);
+  return { r: (bigint >> 16) & 255, g: (bigint >> 8) & 255, b: bigint & 255 };
+}
+
+function Row({ track, active, onPlay }) {
+  const c = track.cover || `https://picsum.photos/seed/${track.id}/400/400`;
+  return (
+    <div className={`glass-row ${active ? 'is-active' : ''}`} onClick={() => onPlay(track)}>
+      <div style={{ width: 42, height: 42, borderRadius: 8, overflow: 'hidden', flexShrink: 0, background: active ? '#222' : '#111' }}>
+        <img src={c} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: active ? 'var(--accent-dynamic)' : 'var(--text-primary)' }}>{track.title}</div>
+        <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 1 }}>{track.artist}{track.album ? ` · ${track.album}` : ''}</div>
+      </div>
+      <span style={{ fontSize: 11, color: 'var(--text-muted)', flexShrink: 0 }}>{track.duration ? fmt(track.duration) : ''}</span>
+    </div>
+  );
+}
+
+function Sheet({ open, onClose, title, children, h = '80vh' }) {
+  if (!open) return null;
+  return (
+    <div style={{ position: 'absolute', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.25)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', animation: 'fadeIn .2s ease both', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={onClose}>
+      <div className="glass-panel-strong" onClick={e => e.stopPropagation()} style={{ width: '70%', maxWidth: 520, maxHeight: h, borderRadius: 20, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px 10px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+          <span style={{ fontSize: 14, fontWeight: 700 }}>{title}</span>
+          <button onClick={onClose} className="glass-button" style={{ width: 30, height: 30, borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><X size={15} color="var(--text-secondary)" /></button>
+        </div>
+        <div style={{ flex: 1, overflowY: 'auto', padding: '6px 10px 20px' }}>{children}</div>
+      </div>
+    </div>
+  );
+}
+
+// 独立悬浮小圆按钮（无大框）
+function FloatBtn({ children, onClick, title, style }) {
+  return (
+    <button
+      onClick={onClick}
+      title={title}
+      className="glass-button"
+      style={{
+        width: 34, height: 34, borderRadius: '50%',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        flexShrink: 0, transition: 'all .2s ease',
+        color: 'var(--text-primary)',
+        background: 'rgba(255,255,255,0.06)',
+        borderColor: 'rgba(255,255,255,0.08)',
+        ...import { useState, useRef, useEffect, lazy, Suspense } from 'react';
+import { Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Repeat1, Volume2, Search, Maximize2, User, MoreHorizontal, X } from 'lucide-react';
+import { usePlayerStore } from '../store/usePlayerStore';
+import { useAuthStore } from '../store/useAuthStore';
+import { music } from '../api/music';
+import Visualizer from '../components/Visualizer';
+import FloatingLyrics from '../components/FloatingLyrics';
+
+const Visualizer3D = lazy(() => import('../components/Visualizer3D'));
+
+function fmt(s) { if (!s || isNaN(s)) return '0:00'; const m = Math.floor(s / 60), sec = Math.floor(s % 60); return `${m}:${sec.toString().padStart(2, '0')}`; }
+
+const VIZ_MODES = [{ key: 'ring', label: '环', icon: '◯' }, { key: 'wave', label: '波', icon: '〜' }, { key: '3d', label: '3D', icon: '◆' }];
+const PRESETS = ['#4FC3F7', '#A78BFA', '#FF6B9D', '#4ADE80', '#FB923C', '#C0C0C0'];
+
+function hexToRgb(hex) {
+  const s = hex.replace('#', '');
+  const bigint = parseInt(s.length === 3 ? s.split('').map(c => c + c).join('') : s, 16);
+  return { r: (bigint >> 16) & 255, g: (bigint >> 8) & 255, b: bigint & 255 };
+}
+
+function Row({ track, active, onPlay }) {
+  const c = track.cover || `https://picsum.photos/seed/${track.id}/400/400`;
+  return (
+    <div className={`glass-row ${active ? 'is-active' : ''}`} onClick={() => onPlay(track)}>
+      <div style={{ width: 42, height: 42, borderRadius: 8, overflow: 'hidden', flexShrink: 0, background: active ? '#222' : '#111' }}>
+        <img src={c} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: active ? 'var(--accent-dynamic)' : 'var(--text-primary)' }}>{track.title}</div>
+        <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 1 }}>{track.artist}{track.album ? ` · ${track.album}` : ''}</div>
+      </div>
+      <span style={{ fontSize: 11, color: 'var(--text-muted)', flexShrink: 0 }}>{track.duration ? fmt(track.duration) : ''}</span>
+    </div>
+  );
+}
+
+function Sheet({ open, onClose, title, children, h = '80vh' }) {
+  if (!open) return null;
+  return (
+    <div style={{ position: 'absolute', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.25)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', animation: 'fadeIn .2s ease both', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={onClose}>
+      <div className="glass-panel-strong" onClick={e => e.stopPropagation()} style={{ width: '70%', maxWidth: 520, maxHeight: h, borderRadius: 20, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px 10px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+          <span style={{ fontSize: 14, fontWeight: 700 }}>{title}</span>
+          <button onClick={onClose} className="glass-button" style={{ width: 30, height: 30, borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><X size={15} color="var(--text-secondary)" /></button>
+        </div>
+        <div style={{ flex: 1, overflowY: 'auto', padding: '6px 10px 20px' }}>{children}</div>
+      </div>
+    </div>
+  );
+}
+
+// 独立悬浮小圆按钮（无大框）
+function FloatBtn({ children, onClick, title, style }) {
+  return (
+    <button
+      onClick={onClick}
+      title={title}
+      className="glass-button"
+      style={{
+        width: 34, height: 34, borderRadius: '50%',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        flexShrink: 0, transition: 'all .2s ease',
+        color: 'var(--text-primary)',
+        background: 'rgba(255,255,255,0.06)',
+        borderColor: 'rgba(255,255,255,0.08)',
+        ...style,
+      }}
+    >{children}</button>
+  );
+}
+
+export default function Player({ onProfile })import { useState, useRef, useEffect, lazy, Suspense } from 'react';
+import { Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Repeat1, Volume2, Search, Maximize2, User, MoreHorizontal, X } from 'lucide-react';
+import { usePlayerStore } from '../store/usePlayerStore';
+import { useAuthStore } from '../store/useAuthStore';
+import { music } from '../api/music';
+import Visualizer from '../components/Visualizer';
+import FloatingLyrics from '../components/FloatingLyrics';
+
+const Visualizer3D = lazy(() => import('../components/Visualizer3D'));
+
+function fmt(s) { if (!s || isNaN(s)) return '0:00'; const m = Math.floor(s / 60), sec = Math.floor(s % 60); return `${m}:${sec.toString().padStart(2, '0')}`; }
+
+const VIZ_MODES = [{ key: 'ring', label: '环', icon: '◯' }, { key: 'wave', label: '波', icon: '〜' }, { key: '3d', label: '3D', icon: '◆' }];
+const PRESETS = ['#4FC3F7', '#A78BFA', '#FF6B9D', '#4ADE80', '#FB923C', '#C0C0C0'];
+
+function hexToRgb(hex) {
+  const s = hex.replace('#', '');
+  const bigint = parseInt(s.length === 3 ? s.split('').map(c => c + c).join('') : s, 16);
+  return { r: (bigint >> 16) & 255, g: (bigint >> 8) & 255, b: bigint & 255 };
+}
+
+function Row({ track, active, onPlay }) {
+  const c = track.cover || `https://picsum.photos/seed/${track.id}/400/400`;
+  return (
+    <div className={`glass-row ${active ? 'is-active' : ''}`} onClick={() => onPlay(track)}>
+      <div style={{ width: 42, height: 42, borderRadius: 8, overflow: 'hidden', flexShrink: 0, background: active ? '#222' : '#111' }}>
+        <img src={c} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: active ? 'var(--accent-dynamic)' : 'var(--text-primary)' }}>{track.title}</div>
+        <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 1 }}>{track.artist}{track.album ? ` · ${track.album}` : ''}</div>
+      </div>
+      <span style={{ fontSize: 11, color: 'var(--text-muted)', flexShrink: 0 }}>{track.duration ? fmt(track.duration) : ''}</span>
+    </div>
+  );
+}
+
+function Sheet({ open, onClose, title, children, h = '80vh' }) {
+  if (!open) return null;
+  return (
+    <div style={{ position: 'absolute', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.25)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', animation: 'fadeIn .2s ease both', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={onClose}>
+      <div className="glass-panel-strong" onClick={e => e.stopPropagation()} style={{ width: '70%', maxWidth: 520, maxHeight: h, borderRadius: 20, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px 10px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+          <span style={{ fontSize: 14, fontWeight: 700 }}>{title}</span>
+          <button onClick={onClose} className="glass-button" style={{ width: 30, height: 30, borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><X size={15} color="var(--text-secondary)" /></button>
+        </div>
+        <div style={{ flex: 1, overflowY: 'auto', padding: '6px 10px 20px' }}>{children}</div>
+      </div>
+    </div>
+  );
+}
+
+// 独立悬浮小圆按钮（无大框）
+function FloatBtn({ children, onClick, title, style }) {
+  return (
+    <button
+      onClick={onClick}
+      title={title}
+      className="glass-button"
+      style={{
+        width: 34, height: 34, borderRadius: '50%',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        flexShrink: 0, transition: 'all .2s ease',
+        color: 'var(--text-primary)',
+        background: 'rgba(255,255,255,0.06)',
+        borderColor: 'rgba(255,255,255,0.08)',
+        ...style,
+      }}
+    >{children}</button>
+  );
+}
+
+export default function Player({ onProfile }) {
+  const { currentTrack, isPlaying, currentTime, duration, volume, playModeimport { useState, useRef, useEffect, lazy, Suspense } from 'react';
+import { Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Repeat1, Volume2, Search, Maximize2, User, MoreHorizontal, X } from 'lucide-react';
+import { usePlayerStore } from '../store/usePlayerStore';
+import { useAuthStore } from '../store/useAuthStore';
+import { music } from '../api/music';
+import Visualizer from '../components/Visualizer';
+import FloatingLyrics from '../components/FloatingLyrics';
+
+const Visualizer3D = lazy(() => import('../components/Visualizer3D'));
+
+function fmt(s) { if (!s || isNaN(s)) return '0:00'; const m = Math.floor(s / 60), sec = Math.floor(s % 60); return `${m}:${sec.toString().padStart(2, '0')}`; }
+
+const VIZ_MODES = [{ key: 'ring', label: '环', icon: '◯' }, { key: 'wave', label: '波', icon: '〜' }, { key: '3d', label: '3D', icon: '◆' }];
+const PRESETS = ['#4FC3F7', '#A78BFA', '#FF6B9D', '#4ADE80', '#FB923C', '#C0C0C0'];
+
+function hexToRgb(hex) {
+  const s = hex.replace('#', '');
+  const bigint = parseInt(s.length === 3 ? s.split('').map(c => c + c).join('') : s, 16);
+  return { r: (bigint >> 16) & 255, g: (bigint >> 8) & 255, b: bigint & 255 };
+}
+
+function Row({ track, active, onPlay }) {
+  const c = track.cover || `https://picsum.photos/seed/${track.id}/400/400`;
+  return (
+    <div className={`glass-row ${active ? 'is-active' : ''}`} onClick={() => onPlay(track)}>
+      <div style={{ width: 42, height: 42, borderRadius: 8, overflow: 'hidden', flexShrink: 0, background: active ? '#222' : '#111' }}>
+        <img src={c} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: active ? 'var(--accent-dynamic)' : 'var(--text-primary)' }}>{track.title}</div>
+        <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 1 }}>{track.artist}{track.album ? ` · ${track.album}` : ''}</div>
+      </div>
+      <span style={{ fontSize: 11, color: 'var(--text-muted)', flexShrink: 0 }}>{track.duration ? fmt(track.duration) : ''}</span>
+    </div>
+  );
+}
+
+function Sheet({ open, onClose, title, children, h = '80vh' }) {
+  if (!open) return null;
+  return (
+    <div style={{ position: 'absolute', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.25)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', animation: 'fadeIn .2s ease both', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={onClose}>
+      <div className="glass-panel-strong" onClick={e => e.stopPropagation()} style={{ width: '70%', maxWidth: 520, maxHeight: h, borderRadius: 20, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px 10px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+          <span style={{ fontSize: 14, fontWeight: 700 }}>{title}</span>
+          <button onClick={onClose} className="glass-button" style={{ width: 30, height: 30, borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><X size={15} color="var(--text-secondary)" /></button>
+        </div>
+        <div style={{ flex: 1, overflowY: 'auto', padding: '6px 10px 20px' }}>{children}</div>
+      </div>
+    </div>
+  );
+}
+
+// 独立悬浮小圆按钮（无大框）
+function FloatBtn({ children, onClick, title, style }) {
+  return (
+    <button
+      onClick={onClick}
+      title={title}
+      className="glass-button"
+      style={{
+        width: 34, height: 34, borderRadius: '50%',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        flexShrink: 0, transition: 'all .2s ease',
+        color: 'var(--text-primary)',
+        background: 'rgba(255,255,255,0.06)',
+        borderColor: 'rgba(255,255,255,0.08)',
+        ...style,
+      }}
+    >{children}</button>
+  );
+}
+
+export default function Player({ onProfile }) {
+  const { currentTrack, isPlaying, currentTime, duration, volume, playMode, playlist, togglePlay, next, prev, seek, setVolume, toggleMode, playTrackimport { useState, useRef, useEffect, lazy, Suspense } from 'react';
+import { Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Repeat1, Volume2, Search, Maximize2, User, MoreHorizontal, X } from 'lucide-react';
+import { usePlayerStore } from '../store/usePlayerStore';
+import { useAuthStore } from '../store/useAuthStore';
+import { music } from '../api/music';
+import Visualizer from '../components/Visualizer';
+import FloatingLyrics from '../components/FloatingLyrics';
+
+const Visualizer3D = lazy(() => import('../components/Visualizer3D'));
+
+function fmt(s) { if (!s || isNaN(s)) return '0:00'; const m = Math.floor(s / 60), sec = Math.floor(s % 60); return `${m}:${sec.toString().padStart(2, '0')}`; }
+
+const VIZ_MODES = [{ key: 'ring', label: '环', icon: '◯' }, { key: 'wave', label: '波', icon: '〜' }, { key: '3d', label: '3D', icon: '◆' }];
+const PRESETS = ['#4FC3F7', '#A78BFA', '#FF6B9D', '#4ADE80', '#FB923C', '#C0C0C0'];
+
+function hexToRgb(hex) {
+  const s = hex.replace('#', '');
+  const bigint = parseInt(s.length === 3 ? s.split('').map(c => c + c).join('') : s, 16);
+  return { r: (bigint >> 16) & 255, g: (bigint >> 8) & 255, b: bigint & 255 };
+}
+
+function Row({ track, active, onPlay }) {
+  const c = track.cover || `https://picsum.photos/seed/${track.id}/400/400`;
+  return (
+    <div className={`glass-row ${active ? 'is-active' : ''}`} onClick={() => onPlay(track)}>
+      <div style={{ width: 42, height: 42, borderRadius: 8, overflow: 'hidden', flexShrink: 0, background: active ? '#222' : '#111' }}>
+        <img src={c} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: active ? 'var(--accent-dynamic)' : 'var(--text-primary)' }}>{track.title}</div>
+        <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 1 }}>{track.artist}{track.album ? ` · ${track.album}` : ''}</div>
+      </div>
+      <span style={{ fontSize: 11, color: 'var(--text-muted)', flexShrink: 0 }}>{track.duration ? fmt(track.duration) : ''}</span>
+    </div>
+  );
+}
+
+function Sheet({ open, onClose, title, children, h = '80vh' }) {
+  if (!open) return null;
+  return (
+    <div style={{ position: 'absolute', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.25)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', animation: 'fadeIn .2s ease both', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={onClose}>
+      <div className="glass-panel-strong" onClick={e => e.stopPropagation()} style={{ width: '70%', maxWidth: 520, maxHeight: h, borderRadius: 20, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px 10px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+          <span style={{ fontSize: 14, fontWeight: 700 }}>{title}</span>
+          <button onClick={onClose} className="glass-button" style={{ width: 30, height: 30, borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><X size={15} color="var(--text-secondary)" /></button>
+        </div>
+        <div style={{ flex: 1, overflowY: 'auto', padding: '6px 10px 20px' }}>{children}</div>
+      </div>
+    </div>
+  );
+}
+
+// 独立悬浮小圆按钮（无大框）
+function FloatBtn({ children, onClick, title, style }) {
+  return (
+    <button
+      onClick={onClick}
+      title={title}
+      className="glass-button"
+      style={{
+        width: 34, height: 34, borderRadius: '50%',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        flexShrink: 0, transition: 'all .2s ease',
+        color: 'var(--text-primary)',
+        background: 'rgba(255,255,255,0.06)',
+        borderColor: 'rgba(255,255,255,0.08)',
+        ...style,
+      }}
+    >{children}</button>
+  );
+}
+
+export default function Player({ onProfile }) {
+  const { currentTrack, isPlaying, currentTime, duration, volume, playMode, playlist, togglePlay, next, prev, seek, setVolume, toggleMode, playTrack, lyrics, currentLyric, isLoadingUrl, error, clearError, setError } =import { useState, useRef, useEffect, lazy, Suspense } from 'react';
+import { Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Repeat1, Volume2, Search, Maximize2, User, MoreHorizontal, X } from 'lucide-react';
+import { usePlayerStore } from '../store/usePlayerStore';
+import { useAuthStore } from '../store/useAuthStore';
+import { music } from '../api/music';
+import Visualizer from '../components/Visualizer';
+import FloatingLyrics from '../components/FloatingLyrics';
+
+const Visualizer3D = lazy(() => import('../components/Visualizer3D'));
+
+function fmt(s) { if (!s || isNaN(s)) return '0:00'; const m = Math.floor(s / 60), sec = Math.floor(s % 60); return `${m}:${sec.toString().padStart(2, '0')}`; }
+
+const VIZ_MODES = [{ key: 'ring', label: '环', icon: '◯' }, { key: 'wave', label: '波', icon: '〜' }, { key: '3d', label: '3D', icon: '◆' }];
+const PRESETS = ['#4FC3F7', '#A78BFA', '#FF6B9D', '#4ADE80', '#FB923C', '#C0C0C0'];
+
+function hexToRgb(hex) {
+  const s = hex.replace('#', '');
+  const bigint = parseInt(s.length === 3 ? s.split('').map(c => c + c).join('') : s, 16);
+  return { r: (bigint >> 16) & 255, g: (bigint >> 8) & 255, b: bigint & 255 };
+}
+
+function Row({ track, active, onPlay }) {
+  const c = track.cover || `https://picsum.photos/seed/${track.id}/400/400`;
+  return (
+    <div className={`glass-row ${active ? 'is-active' : ''}`} onClick={() => onPlay(track)}>
+      <div style={{ width: 42, height: 42, borderRadius: 8, overflow: 'hidden', flexShrink: 0, background: active ? '#222' : '#111' }}>
+        <img src={c} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: active ? 'var(--accent-dynamic)' : 'var(--text-primary)' }}>{track.title}</div>
+        <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 1 }}>{track.artist}{track.album ? ` · ${track.album}` : ''}</div>
+      </div>
+      <span style={{ fontSize: 11, color: 'var(--text-muted)', flexShrink: 0 }}>{track.duration ? fmt(track.duration) : ''}</span>
+    </div>
+  );
+}
+
+function Sheet({ open, onClose, title, children, h = '80vh' }) {
+  if (!open) return null;
+  return (
+    <div style={{ position: 'absolute', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.25)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', animation: 'fadeIn .2s ease both', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={onClose}>
+      <div className="glass-panel-strong" onClick={e => e.stopPropagation()} style={{ width: '70%', maxWidth: 520, maxHeight: h, borderRadius: 20, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px 10px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+          <span style={{ fontSize: 14, fontWeight: 700 }}>{title}</span>
+          <button onClick={onClose} className="glass-button" style={{ width: 30, height: 30, borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><X size={15} color="var(--text-secondary)" /></button>
+        </div>
+        <div style={{ flex: 1, overflowY: 'auto', padding: '6px 10px 20px' }}>{children}</div>
+      </div>
+    </div>
+  );
+}
+
+// 独立悬浮小圆按钮（无大框）
+function FloatBtn({ children, onClick, title, style }) {
+  return (
+    <button
+      onClick={onClick}
+      title={title}
+      className="glass-button"
+      style={{
+        width: 34, height: 34, borderRadius: '50%',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        flexShrink: 0, transition: 'all .2s ease',
+        color: 'var(--text-primary)',
+        background: 'rgba(255,255,255,0.06)',
+        borderColor: 'rgba(255,255,255,0.08)',
+        ...style,
+      }}
+    >{children}</button>
+  );
+}
+
+export default function Player({ onProfile }) {
+  const { currentTrack, isPlaying, currentTime, duration, volume, playMode, playlist, togglePlay, next, prev, seek, setVolume, toggleMode, playTrack, lyrics, currentLyric, isLoadingUrl, error, clearError, setError } = usePlayerStore();
+  const { userInfo, isLoggedIn } = useAuthStore();
+  const [sq, setSq] =import { useState, useRef, useEffect, lazy, Suspense } from 'react';
+import { Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Repeat1, Volume2, Search, Maximize2, User, MoreHorizontal, X } from 'lucide-react';
+import { usePlayerStore } from '../store/usePlayerStore';
+import { useAuthStore } from '../store/useAuthStore';
+import { music } from '../api/music';
+import Visualizer from '../components/Visualizer';
+import FloatingLyrics from '../components/FloatingLyrics';
+
+const Visualizer3D = lazy(() => import('../components/Visualizer3D'));
+
+function fmt(s) { if (!s || isNaN(s)) return '0:00'; const m = Math.floor(s / 60), sec = Math.floor(s % 60); return `${m}:${sec.toString().padStart(2, '0')}`; }
+
+const VIZ_MODES = [{ key: 'ring', label: '环', icon: '◯' }, { key: 'wave', label: '波', icon: '〜' }, { key: '3d', label: '3D', icon: '◆' }];
+const PRESETS = ['#4FC3F7', '#A78BFA', '#FF6B9D', '#4ADE80', '#FB923C', '#C0C0C0'];
+
+function hexToRgb(hex) {
+  const s = hex.replace('#', '');
+  const bigint = parseInt(s.length === 3 ? s.split('').map(c => c + c).join('') : s, 16);
+  return { r: (bigint >> 16) & 255, g: (bigint >> 8) & 255, b: bigint & 255 };
+}
+
+function Row({ track, active, onPlay }) {
+  const c = track.cover || `https://picsum.photos/seed/${track.id}/400/400`;
+  return (
+    <div className={`glass-row ${active ? 'is-active' : ''}`} onClick={() => onPlay(track)}>
+      <div style={{ width: 42, height: 42, borderRadius: 8, overflow: 'hidden', flexShrink: 0, background: active ? '#222' : '#111' }}>
+        <img src={c} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: active ? 'var(--accent-dynamic)' : 'var(--text-primary)' }}>{track.title}</div>
+        <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 1 }}>{track.artist}{track.album ? ` · ${track.album}` : ''}</div>
+      </div>
+      <span style={{ fontSize: 11, color: 'var(--text-muted)', flexShrink: 0 }}>{track.duration ? fmt(track.duration) : ''}</span>
+    </div>
+  );
+}
+
+function Sheet({ open, onClose, title, children, h = '80vh' }) {
+  if (!open) return null;
+  return (
+    <div style={{ position: 'absolute', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.25)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', animation: 'fadeIn .2s ease both', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={onClose}>
+      <div className="glass-panel-strong" onClick={e => e.stopPropagation()} style={{ width: '70%', maxWidth: 520, maxHeight: h, borderRadius: 20, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px 10px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+          <span style={{ fontSize: 14, fontWeight: 700 }}>{title}</span>
+          <button onClick={onClose} className="glass-button" style={{ width: 30, height: 30, borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><X size={15} color="var(--text-secondary)" /></button>
+        </div>
+        <div style={{ flex: 1, overflowY: 'auto', padding: '6px 10px 20px' }}>{children}</div>
+      </div>
+    </div>
+  );
+}
+
+// 独立悬浮小圆按钮（无大框）
+function FloatBtn({ children, onClick, title, style }) {
+  return (
+    <button
+      onClick={onClick}
+      title={title}
+      className="glass-button"
+      style={{
+        width: 34, height: 34, borderRadius: '50%',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        flexShrink: 0, transition: 'all .2s ease',
+        color: 'var(--text-primary)',
+        background: 'rgba(255,255,255,0.06)',
+        borderColor: 'rgba(255,255,255,0.08)',
+        ...style,
+      }}
+    >{children}</button>
+  );
+}
+
+export default function Player({ onProfile }) {
+  const { currentTrack, isPlaying, currentTime, duration, volume, playMode, playlist, togglePlay, next, prev, seek, setVolume, toggleMode, playTrack, lyrics, currentLyric, isLoadingUrl, error, clearError, setError } = usePlayerStore();
+  const { userInfo, isLoggedIn } = useAuthStore();
+  const [sq, setSq] = useState(false); const [viz, setViz] = useState(false);
+  constimport { useState, useRef, useEffect, lazy, Suspense } from 'react';
+import { Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Repeat1, Volume2, Search, Maximize2, User, MoreHorizontal, X } from 'lucide-react';
+import { usePlayerStore } from '../store/usePlayerStore';
+import { useAuthStore } from '../store/useAuthStore';
+import { music } from '../api/music';
+import Visualizer from '../components/Visualizer';
+import FloatingLyrics from '../components/FloatingLyrics';
+
+const Visualizer3D = lazy(() => import('../components/Visualizer3D'));
+
+function fmt(s) { if (!s || isNaN(s)) return '0:00'; const m = Math.floor(s / 60), sec = Math.floor(s % 60); return `${m}:${sec.toString().padStart(2, '0')}`; }
+
+const VIZ_MODES = [{ key: 'ring', label: '环', icon: '◯' }, { key: 'wave', label: '波', icon: '〜' }, { key: '3d', label: '3D', icon: '◆' }];
+const PRESETS = ['#4FC3F7', '#A78BFA', '#FF6B9D', '#4ADE80', '#FB923C', '#C0C0C0'];
+
+function hexToRgb(hex) {
+  const s = hex.replace('#', '');
+  const bigint = parseInt(s.length === 3 ? s.split('').map(c => c + c).join('') : s, 16);
+  return { r: (bigint >> 16) & 255, g: (bigint >> 8) & 255, b: bigint & 255 };
+}
+
+function Row({ track, active, onPlay }) {
+  const c = track.cover || `https://picsum.photos/seed/${track.id}/400/400`;
+  return (
+    <div className={`glass-row ${active ? 'is-active' : ''}`} onClick={() => onPlay(track)}>
+      <div style={{ width: 42, height: 42, borderRadius: 8, overflow: 'hidden', flexShrink: 0, background: active ? '#222' : '#111' }}>
+        <img src={c} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: active ? 'var(--accent-dynamic)' : 'var(--text-primary)' }}>{track.title}</div>
+        <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 1 }}>{track.artist}{track.album ? ` · ${track.album}` : ''}</div>
+      </div>
+      <span style={{ fontSize: 11, color: 'var(--text-muted)', flexShrink: 0 }}>{track.duration ? fmt(track.duration) : ''}</span>
+    </div>
+  );
+}
+
+function Sheet({ open, onClose, title, children, h = '80vh' }) {
+  if (!open) return null;
+  return (
+    <div style={{ position: 'absolute', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.25)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', animation: 'fadeIn .2s ease both', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={onClose}>
+      <div className="glass-panel-strong" onClick={e => e.stopPropagation()} style={{ width: '70%', maxWidth: 520, maxHeight: h, borderRadius: 20, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px 10px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+          <span style={{ fontSize: 14, fontWeight: 700 }}>{title}</span>
+          <button onClick={onClose} className="glass-button" style={{ width: 30, height: 30, borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><X size={15} color="var(--text-secondary)" /></button>
+        </div>
+        <div style={{ flex: 1, overflowY: 'auto', padding: '6px 10px 20px' }}>{children}</div>
+      </div>
+    </div>
+  );
+}
+
+// 独立悬浮小圆按钮（无大框）
+function FloatBtn({ children, onClick, title, style }) {
+  return (
+    <button
+      onClick={onClick}
+      title={title}
+      className="glass-button"
+      style={{
+        width: 34, height: 34, borderRadius: '50%',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        flexShrink: 0, transition: 'all .2s ease',
+        color: 'var(--text-primary)',
+        background: 'rgba(255,255,255,0.06)',
+        borderColor: 'rgba(255,255,255,0.08)',
+        ...style,
+      }}
+    >{children}</button>
+  );
+}
+
+export default function Player({ onProfile }) {
+  const { currentTrack, isPlaying, currentTime, duration, volume, playMode, playlist, togglePlay, next, prev, seek, setVolume, toggleMode, playTrack, lyrics, currentLyric, isLoadingUrl, error, clearError, setError } = usePlayerStore();
+  const { userInfo, isLoggedIn } = useAuthStore();
+  const [sq, setSq] = useState(false); const [viz, setViz] = useState(false);
+  const [query, setQuery] = useState(''); const [results, setResults] = useimport { useState, useRef, useEffect, lazy, Suspense } from 'react';
+import { Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Repeat1, Volume2, Search, Maximize2, User, MoreHorizontal, X } from 'lucide-react';
+import { usePlayerStore } from '../store/usePlayerStore';
+import { useAuthStore } from '../store/useAuthStore';
+import { music } from '../api/music';
+import Visualizer from '../components/Visualizer';
+import FloatingLyrics from '../components/FloatingLyrics';
+
+const Visualizer3D = lazy(() => import('../components/Visualizer3D'));
+
+function fmt(s) { if (!s || isNaN(s)) return '0:00'; const m = Math.floor(s / 60), sec = Math.floor(s % 60); return `${m}:${sec.toString().padStart(2, '0')}`; }
+
+const VIZ_MODES = [{ key: 'ring', label: '环', icon: '◯' }, { key: 'wave', label: '波', icon: '〜' }, { key: '3d', label: '3D', icon: '◆' }];
+const PRESETS = ['#4FC3F7', '#A78BFA', '#FF6B9D', '#4ADE80', '#FB923C', '#C0C0C0'];
+
+function hexToRgb(hex) {
+  const s = hex.replace('#', '');
+  const bigint = parseInt(s.length === 3 ? s.split('').map(c => c + c).join('') : s, 16);
+  return { r: (bigint >> 16) & 255, g: (bigint >> 8) & 255, b: bigint & 255 };
+}
+
+function Row({ track, active, onPlay }) {
+  const c = track.cover || `https://picsum.photos/seed/${track.id}/400/400`;
+  return (
+    <div className={`glass-row ${active ? 'is-active' : ''}`} onClick={() => onPlay(track)}>
+      <div style={{ width: 42, height: 42, borderRadius: 8, overflow: 'hidden', flexShrink: 0, background: active ? '#222' : '#111' }}>
+        <img src={c} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: active ? 'var(--accent-dynamic)' : 'var(--text-primary)' }}>{track.title}</div>
+        <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 1 }}>{track.artist}{track.album ? ` · ${track.album}` : ''}</div>
+      </div>
+      <span style={{ fontSize: 11, color: 'var(--text-muted)', flexShrink: 0 }}>{track.duration ? fmt(track.duration) : ''}</span>
+    </div>
+  );
+}
+
+function Sheet({ open, onClose, title, children, h = '80vh' }) {
+  if (!open) return null;
+  return (
+    <div style={{ position: 'absolute', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.25)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', animation: 'fadeIn .2s ease both', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={onClose}>
+      <div className="glass-panel-strong" onClick={e => e.stopPropagation()} style={{ width: '70%', maxWidth: 520, maxHeight: h, borderRadius: 20, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px 10px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+          <span style={{ fontSize: 14, fontWeight: 700 }}>{title}</span>
+          <button onClick={onClose} className="glass-button" style={{ width: 30, height: 30, borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><X size={15} color="var(--text-secondary)" /></button>
+        </div>
+        <div style={{ flex: 1, overflowY: 'auto', padding: '6px 10px 20px' }}>{children}</div>
+      </div>
+    </div>
+  );
+}
+
+// 独立悬浮小圆按钮（无大框）
+function FloatBtn({ children, onClick, title, style }) {
+  return (
+    <button
+      onClick={onClick}
+      title={title}
+      className="glass-button"
+      style={{
+        width: 34, height: 34, borderRadius: '50%',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        flexShrink: 0, transition: 'all .2s ease',
+        color: 'var(--text-primary)',
+        background: 'rgba(255,255,255,0.06)',
+        borderColor: 'rgba(255,255,255,0.08)',
+        ...style,
+      }}
+    >{children}</button>
+  );
+}
+
+export default function Player({ onProfile }) {
+  const { currentTrack, isPlaying, currentTime, duration, volume, playMode, playlist, togglePlay, next, prev, seek, setVolume, toggleMode, playTrack, lyrics, currentLyric, isLoadingUrl, error, clearError, setError } = usePlayerStore();
+  const { userInfo, isLoggedIn } = useAuthStore();
+  const [sq, setSq] = useState(false); const [viz, setViz] = useState(false);
+  const [query, setQuery] = useState(''); const [results, setResults] = useState([]); const [searching, setSearchingimport { useState, useRef, useEffect, lazy, Suspense } from 'react';
+import { Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Repeat1, Volume2, Search, Maximize2, User, MoreHorizontal, X } from 'lucide-react';
+import { usePlayerStore } from '../store/usePlayerStore';
+import { useAuthStore } from '../store/useAuthStore';
+import { music } from '../api/music';
+import Visualizer from '../components/Visualizer';
+import FloatingLyrics from '../components/FloatingLyrics';
+
+const Visualizer3D = lazy(() => import('../components/Visualizer3D'));
+
+function fmt(s) { if (!s || isNaN(s)) return '0:00'; const m = Math.floor(s / 60), sec = Math.floor(s % 60); return `${m}:${sec.toString().padStart(2, '0')}`; }
+
+const VIZ_MODES = [{ key: 'ring', label: '环', icon: '◯' }, { key: 'wave', label: '波', icon: '〜' }, { key: '3d', label: '3D', icon: '◆' }];
+const PRESETS = ['#4FC3F7', '#A78BFA', '#FF6B9D', '#4ADE80', '#FB923C', '#C0C0C0'];
+
+function hexToRgb(hex) {
+  const s = hex.replace('#', '');
+  const bigint = parseInt(s.length === 3 ? s.split('').map(c => c + c).join('') : s, 16);
+  return { r: (bigint >> 16) & 255, g: (bigint >> 8) & 255, b: bigint & 255 };
+}
+
+function Row({ track, active, onPlay }) {
+  const c = track.cover || `https://picsum.photos/seed/${track.id}/400/400`;
+  return (
+    <div className={`glass-row ${active ? 'is-active' : ''}`} onClick={() => onPlay(track)}>
+      <div style={{ width: 42, height: 42, borderRadius: 8, overflow: 'hidden', flexShrink: 0, background: active ? '#222' : '#111' }}>
+        <img src={c} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: active ? 'var(--accent-dynamic)' : 'var(--text-primary)' }}>{track.title}</div>
+        <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 1 }}>{track.artist}{track.album ? ` · ${track.album}` : ''}</div>
+      </div>
+      <span style={{ fontSize: 11, color: 'var(--text-muted)', flexShrink: 0 }}>{track.duration ? fmt(track.duration) : ''}</span>
+    </div>
+  );
+}
+
+function Sheet({ open, onClose, title, children, h = '80vh' }) {
+  if (!open) return null;
+  return (
+    <div style={{ position: 'absolute', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.25)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', animation: 'fadeIn .2s ease both', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={onClose}>
+      <div className="glass-panel-strong" onClick={e => e.stopPropagation()} style={{ width: '70%', maxWidth: 520, maxHeight: h, borderRadius: 20, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px 10px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+          <span style={{ fontSize: 14, fontWeight: 700 }}>{title}</span>
+          <button onClick={onClose} className="glass-button" style={{ width: 30, height: 30, borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><X size={15} color="var(--text-secondary)" /></button>
+        </div>
+        <div style={{ flex: 1, overflowY: 'auto', padding: '6px 10px 20px' }}>{children}</div>
+      </div>
+    </div>
+  );
+}
+
+// 独立悬浮小圆按钮（无大框）
+function FloatBtn({ children, onClick, title, style }) {
+  return (
+    <button
+      onClick={onClick}
+      title={title}
+      className="glass-button"
+      style={{
+        width: 34, height: 34, borderRadius: '50%',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        flexShrink: 0, transition: 'all .2s ease',
+        color: 'var(--text-primary)',
+        background: 'rgba(255,255,255,0.06)',
+        borderColor: 'rgba(255,255,255,0.08)',
+        ...style,
+      }}
+    >{children}</button>
+  );
+}
+
+export default function Player({ onProfile }) {
+  const { currentTrack, isPlaying, currentTime, duration, volume, playMode, playlist, togglePlay, next, prev, seek, setVolume, toggleMode, playTrack, lyrics, currentLyric, isLoadingUrl, error, clearError, setError } = usePlayerStore();
+  const { userInfo, isLoggedIn } = useAuthStore();
+  const [sq, setSq] = useState(false); const [viz, setViz] = useState(false);
+  const [query, setQuery] = useState(''); const [results, setResults] = useState([]); const [searching, setSearching] = useState(false); const st = useimport { useState, useRef, useEffect, lazy, Suspense } from 'react';
+import { Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Repeat1, Volume2, Search, Maximize2, User, MoreHorizontal, X } from 'lucide-react';
+import { usePlayerStore } from '../store/usePlayerStore';
+import { useAuthStore } from '../store/useAuthStore';
+import { music } from '../api/music';
+import Visualizer from '../components/Visualizer';
+import FloatingLyrics from '../components/FloatingLyrics';
+
+const Visualizer3D = lazy(() => import('../components/Visualizer3D'));
+
+function fmt(s) { if (!s || isNaN(s)) return '0:00'; const m = Math.floor(s / 60), sec = Math.floor(s % 60); return `${m}:${sec.toString().padStart(2, '0')}`; }
+
+const VIZ_MODES = [{ key: 'ring', label: '环', icon: '◯' }, { key: 'wave', label: '波', icon: '〜' }, { key: '3d', label: '3D', icon: '◆' }];
+const PRESETS = ['#4FC3F7', '#A78BFA', '#FF6B9D', '#4ADE80', '#FB923C', '#C0C0C0'];
+
+function hexToRgb(hex) {
+  const s = hex.replace('#', '');
+  const bigint = parseInt(s.length === 3 ? s.split('').map(c => c + c).join('') : s, 16);
+  return { r: (bigint >> 16) & 255, g: (bigint >> 8) & 255, b: bigint & 255 };
+}
+
+function Row({ track, active, onPlay }) {
+  const c = track.cover || `https://picsum.photos/seed/${track.id}/400/400`;
+  return (
+    <div className={`glass-row ${active ? 'is-active' : ''}`} onClick={() => onPlay(track)}>
+      <div style={{ width: 42, height: 42, borderRadius: 8, overflow: 'hidden', flexShrink: 0, background: active ? '#222' : '#111' }}>
+        <img src={c} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: active ? 'var(--accent-dynamic)' : 'var(--text-primary)' }}>{track.title}</div>
+        <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 1 }}>{track.artist}{track.album ? ` · ${track.album}` : ''}</div>
+      </div>
+      <span style={{ fontSize: 11, color: 'var(--text-muted)', flexShrink: 0 }}>{track.duration ? fmt(track.duration) : ''}</span>
+    </div>
+  );
+}
+
+function Sheet({ open, onClose, title, children, h = '80vh' }) {
+  if (!open) return null;
+  return (
+    <div style={{ position: 'absolute', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.25)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', animation: 'fadeIn .2s ease both', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={onClose}>
+      <div className="glass-panel-strong" onClick={e => e.stopPropagation()} style={{ width: '70%', maxWidth: 520, maxHeight: h, borderRadius: 20, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px 10px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+          <span style={{ fontSize: 14, fontWeight: 700 }}>{title}</span>
+          <button onClick={onClose} className="glass-button" style={{ width: 30, height: 30, borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><X size={15} color="var(--text-secondary)" /></button>
+        </div>
+        <div style={{ flex: 1, overflowY: 'auto', padding: '6px 10px 20px' }}>{children}</div>
+      </div>
+    </div>
+  );
+}
+
+// 独立悬浮小圆按钮（无大框）
+function FloatBtn({ children, onClick, title, style }) {
+  return (
+    <button
+      onClick={onClick}
+      title={title}
+      className="glass-button"
+      style={{
+        width: 34, height: 34, borderRadius: '50%',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        flexShrink: 0, transition: 'all .2s ease',
+        color: 'var(--text-primary)',
+        background: 'rgba(255,255,255,0.06)',
+        borderColor: 'rgba(255,255,255,0.08)',
+        ...style,
+      }}
+    >{children}</button>
+  );
+}
+
+export default function Player({ onProfile }) {
+  const { currentTrack, isPlaying, currentTime, duration, volume, playMode, playlist, togglePlay, next, prev, seek, setVolume, toggleMode, playTrack, lyrics, currentLyric, isLoadingUrl, error, clearError, setError } = usePlayerStore();
+  const { userInfo, isLoggedIn } = useAuthStore();
+  const [sq, setSq] = useState(false); const [viz, setViz] = useState(false);
+  const [query, setQuery] = useState(''); const [results, setResults] = useState([]); const [searching, setSearching] = useState(false); const st = useRef(null);
+  const [vm, setVm] = useState(() => { try {import { useState, useRef, useEffect, lazy, Suspense } from 'react';
+import { Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Repeat1, Volume2, Search, Maximize2, User, MoreHorizontal, X } from 'lucide-react';
+import { usePlayerStore } from '../store/usePlayerStore';
+import { useAuthStore } from '../store/useAuthStore';
+import { music } from '../api/music';
+import Visualizer from '../components/Visualizer';
+import FloatingLyrics from '../components/FloatingLyrics';
+
+const Visualizer3D = lazy(() => import('../components/Visualizer3D'));
+
+function fmt(s) { if (!s || isNaN(s)) return '0:00'; const m = Math.floor(s / 60), sec = Math.floor(s % 60); return `${m}:${sec.toString().padStart(2, '0')}`; }
+
+const VIZ_MODES = [{ key: 'ring', label: '环', icon: '◯' }, { key: 'wave', label: '波', icon: '〜' }, { key: '3d', label: '3D', icon: '◆' }];
+const PRESETS = ['#4FC3F7', '#A78BFA', '#FF6B9D', '#4ADE80', '#FB923C', '#C0C0C0'];
+
+function hexToRgb(hex) {
+  const s = hex.replace('#', '');
+  const bigint = parseInt(s.length === 3 ? s.split('').map(c => c + c).join('') : s, 16);
+  return { r: (bigint >> 16) & 255, g: (bigint >> 8) & 255, b: bigint & 255 };
+}
+
+function Row({ track, active, onPlay }) {
+  const c = track.cover || `https://picsum.photos/seed/${track.id}/400/400`;
+  return (
+    <div className={`glass-row ${active ? 'is-active' : ''}`} onClick={() => onPlay(track)}>
+      <div style={{ width: 42, height: 42, borderRadius: 8, overflow: 'hidden', flexShrink: 0, background: active ? '#222' : '#111' }}>
+        <img src={c} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: active ? 'var(--accent-dynamic)' : 'var(--text-primary)' }}>{track.title}</div>
+        <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 1 }}>{track.artist}{track.album ? ` · ${track.album}` : ''}</div>
+      </div>
+      <span style={{ fontSize: 11, color: 'var(--text-muted)', flexShrink: 0 }}>{track.duration ? fmt(track.duration) : ''}</span>
+    </div>
+  );
+}
+
+function Sheet({ open, onClose, title, children, h = '80vh' }) {
+  if (!open) return null;
+  return (
+    <div style={{ position: 'absolute', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.25)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', animation: 'fadeIn .2s ease both', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={onClose}>
+      <div className="glass-panel-strong" onClick={e => e.stopPropagation()} style={{ width: '70%', maxWidth: 520, maxHeight: h, borderRadius: 20, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px 10px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+          <span style={{ fontSize: 14, fontWeight: 700 }}>{title}</span>
+          <button onClick={onClose} className="glass-button" style={{ width: 30, height: 30, borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><X size={15} color="var(--text-secondary)" /></button>
+        </div>
+        <div style={{ flex: 1, overflowY: 'auto', padding: '6px 10px 20px' }}>{children}</div>
+      </div>
+    </div>
+  );
+}
+
+// 独立悬浮小圆按钮（无大框）
+function FloatBtn({ children, onClick, title, style }) {
+  return (
+    <button
+      onClick={onClick}
+      title={title}
+      className="glass-button"
+      style={{
+        width: 34, height: 34, borderRadius: '50%',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        flexShrink: 0, transition: 'all .2s ease',
+        color: 'var(--text-primary)',
+        background: 'rgba(255,255,255,0.06)',
+        borderColor: 'rgba(255,255,255,0.08)',
+        ...style,
+      }}
+    >{children}</button>
+  );
+}
+
+export default function Player({ onProfile }) {
+  const { currentTrack, isPlaying, currentTime, duration, volume, playMode, playlist, togglePlay, next, prev, seek, setVolume, toggleMode, playTrack, lyrics, currentLyric, isLoadingUrl, error, clearError, setError } = usePlayerStore();
+  const { userInfo, isLoggedIn } = useAuthStore();
+  const [sq, setSq] = useState(false); const [viz, setViz] = useState(false);
+  const [query, setQuery] = useState(''); const [results, setResults] = useState([]); const [searching, setSearching] = useState(false); const st = useRef(null);
+  const [vm, setVm] = useState(() => { try { return localStorage.getItem('sonus_viz_mode') || 'ring' } catch { returnimport { useState, useRef, useEffect, lazy, Suspense } from 'react';
+import { Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Repeat1, Volume2, Search, Maximize2, User, MoreHorizontal, X } from 'lucide-react';
+import { usePlayerStore } from '../store/usePlayerStore';
+import { useAuthStore } from '../store/useAuthStore';
+import { music } from '../api/music';
+import Visualizer from '../components/Visualizer';
+import FloatingLyrics from '../components/FloatingLyrics';
+
+const Visualizer3D = lazy(() => import('../components/Visualizer3D'));
+
+function fmt(s) { if (!s || isNaN(s)) return '0:00'; const m = Math.floor(s / 60), sec = Math.floor(s % 60); return `${m}:${sec.toString().padStart(2, '0')}`; }
+
+const VIZ_MODES = [{ key: 'ring', label: '环', icon: '◯' }, { key: 'wave', label: '波', icon: '〜' }, { key: '3d', label: '3D', icon: '◆' }];
+const PRESETS = ['#4FC3F7', '#A78BFA', '#FF6B9D', '#4ADE80', '#FB923C', '#C0C0C0'];
+
+function hexToRgb(hex) {
+  const s = hex.replace('#', '');
+  const bigint = parseInt(s.length === 3 ? s.split('').map(c => c + c).join('') : s, 16);
+  return { r: (bigint >> 16) & 255, g: (bigint >> 8) & 255, b: bigint & 255 };
+}
+
+function Row({ track, active, onPlay }) {
+  const c = track.cover || `https://picsum.photos/seed/${track.id}/400/400`;
+  return (
+    <div className={`glass-row ${active ? 'is-active' : ''}`} onClick={() => onPlay(track)}>
+      <div style={{ width: 42, height: 42, borderRadius: 8, overflow: 'hidden', flexShrink: 0, background: active ? '#222' : '#111' }}>
+        <img src={c} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: active ? 'var(--accent-dynamic)' : 'var(--text-primary)' }}>{track.title}</div>
+        <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 1 }}>{track.artist}{track.album ? ` · ${track.album}` : ''}</div>
+      </div>
+      <span style={{ fontSize: 11, color: 'var(--text-muted)', flexShrink: 0 }}>{track.duration ? fmt(track.duration) : ''}</span>
+    </div>
+  );
+}
+
+function Sheet({ open, onClose, title, children, h = '80vh' }) {
+  if (!open) return null;
+  return (
+    <div style={{ position: 'absolute', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.25)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', animation: 'fadeIn .2s ease both', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={onClose}>
+      <div className="glass-panel-strong" onClick={e => e.stopPropagation()} style={{ width: '70%', maxWidth: 520, maxHeight: h, borderRadius: 20, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px 10px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+          <span style={{ fontSize: 14, fontWeight: 700 }}>{title}</span>
+          <button onClick={onClose} className="glass-button" style={{ width: 30, height: 30, borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><X size={15} color="var(--text-secondary)" /></button>
+        </div>
+        <div style={{ flex: 1, overflowY: 'auto', padding: '6px 10px 20px' }}>{children}</div>
+      </div>
+    </div>
+  );
+}
+
+// 独立悬浮小圆按钮（无大框）
+function FloatBtn({ children, onClick, title, style }) {
+  return (
+    <button
+      onClick={onClick}
+      title={title}
+      className="glass-button"
+      style={{
+        width: 34, height: 34, borderRadius: '50%',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        flexShrink: 0, transition: 'all .2s ease',
+        color: 'var(--text-primary)',
+        background: 'rgba(255,255,255,0.06)',
+        borderColor: 'rgba(255,255,255,0.08)',
+        ...style,
+      }}
+    >{children}</button>
+  );
+}
+
+export default function Player({ onProfile }) {
+  const { currentTrack, isPlaying, currentTime, duration, volume, playMode, playlist, togglePlay, next, prev, seek, setVolume, toggleMode, playTrack, lyrics, currentLyric, isLoadingUrl, error, clearError, setError } = usePlayerStore();
+  const { userInfo, isLoggedIn } = useAuthStore();
+  const [sq, setSq] = useState(false); const [viz, setViz] = useState(false);
+  const [query, setQuery] = useState(''); const [results, setResults] = useState([]); const [searching, setSearching] = useState(false); const st = useRef(null);
+  const [vm, setVm] = useState(() => { try { return localStorage.getItem('sonus_viz_mode') || 'ring' } catch { return 'ring' } });
+  const [ac, setAc] = useState(() =>import { useState, useRef, useEffect, lazy, Suspense } from 'react';
+import { Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Repeat1, Volume2, Search, Maximize2, User, MoreHorizontal, X } from 'lucide-react';
+import { usePlayerStore } from '../store/usePlayerStore';
+import { useAuthStore } from '../store/useAuthStore';
+import { music } from '../api/music';
+import Visualizer from '../components/Visualizer';
+import FloatingLyrics from '../components/FloatingLyrics';
+
+const Visualizer3D = lazy(() => import('../components/Visualizer3D'));
+
+function fmt(s) { if (!s || isNaN(s)) return '0:00'; const m = Math.floor(s / 60), sec = Math.floor(s % 60); return `${m}:${sec.toString().padStart(2, '0')}`; }
+
+const VIZ_MODES = [{ key: 'ring', label: '环', icon: '◯' }, { key: 'wave', label: '波', icon: '〜' }, { key: '3d', label: '3D', icon: '◆' }];
+const PRESETS = ['#4FC3F7', '#A78BFA', '#FF6B9D', '#4ADE80', '#FB923C', '#C0C0C0'];
+
+function hexToRgb(hex) {
+  const s = hex.replace('#', '');
+  const bigint = parseInt(s.length === 3 ? s.split('').map(c => c + c).join('') : s, 16);
+  return { r: (bigint >> 16) & 255, g: (bigint >> 8) & 255, b: bigint & 255 };
+}
+
+function Row({ track, active, onPlay }) {
+  const c = track.cover || `https://picsum.photos/seed/${track.id}/400/400`;
+  return (
+    <div className={`glass-row ${active ? 'is-active' : ''}`} onClick={() => onPlay(track)}>
+      <div style={{ width: 42, height: 42, borderRadius: 8, overflow: 'hidden', flexShrink: 0, background: active ? '#222' : '#111' }}>
+        <img src={c} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: active ? 'var(--accent-dynamic)' : 'var(--text-primary)' }}>{track.title}</div>
+        <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 1 }}>{track.artist}{track.album ? ` · ${track.album}` : ''}</div>
+      </div>
+      <span style={{ fontSize: 11, color: 'var(--text-muted)', flexShrink: 0 }}>{track.duration ? fmt(track.duration) : ''}</span>
+    </div>
+  );
+}
+
+function Sheet({ open, onClose, title, children, h = '80vh' }) {
+  if (!open) return null;
+  return (
+    <div style={{ position: 'absolute', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.25)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', animation: 'fadeIn .2s ease both', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={onClose}>
+      <div className="glass-panel-strong" onClick={e => e.stopPropagation()} style={{ width: '70%', maxWidth: 520, maxHeight: h, borderRadius: 20, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px 10px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+          <span style={{ fontSize: 14, fontWeight: 700 }}>{title}</span>
+          <button onClick={onClose} className="glass-button" style={{ width: 30, height: 30, borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><X size={15} color="var(--text-secondary)" /></button>
+        </div>
+        <div style={{ flex: 1, overflowY: 'auto', padding: '6px 10px 20px' }}>{children}</div>
+      </div>
+    </div>
+  );
+}
+
+// 独立悬浮小圆按钮（无大框）
+function FloatBtn({ children, onClick, title, style }) {
+  return (
+    <button
+      onClick={onClick}
+      title={title}
+      className="glass-button"
+      style={{
+        width: 34, height: 34, borderRadius: '50%',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        flexShrink: 0, transition: 'all .2s ease',
+        color: 'var(--text-primary)',
+        background: 'rgba(255,255,255,0.06)',
+        borderColor: 'rgba(255,255,255,0.08)',
+        ...style,
+      }}
+    >{children}</button>
+  );
+}
+
+export default function Player({ onProfile }) {
+  const { currentTrack, isPlaying, currentTime, duration, volume, playMode, playlist, togglePlay, next, prev, seek, setVolume, toggleMode, playTrack, lyrics, currentLyric, isLoadingUrl, error, clearError, setError } = usePlayerStore();
+  const { userInfo, isLoggedIn } = useAuthStore();
+  const [sq, setSq] = useState(false); const [viz, setViz] = useState(false);
+  const [query, setQuery] = useState(''); const [results, setResults] = useState([]); const [searching, setSearching] = useState(false); const st = useRef(null);
+  const [vm, setVm] = useState(() => { try { return localStorage.getItem('sonus_viz_mode') || 'ring' } catch { return 'ring' } });
+  const [ac, setAc] = useState(() => { try { return localStorage.getItem('sonimport { useState, useRef, useEffect, lazy, Suspense } from 'react';
+import { Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Repeat1, Volume2, Search, Maximize2, User, MoreHorizontal, X } from 'lucide-react';
+import { usePlayerStore } from '../store/usePlayerStore';
+import { useAuthStore } from '../store/useAuthStore';
+import { music } from '../api/music';
+import Visualizer from '../components/Visualizer';
+import FloatingLyrics from '../components/FloatingLyrics';
+
+const Visualizer3D = lazy(() => import('../components/Visualizer3D'));
+
+function fmt(s) { if (!s || isNaN(s)) return '0:00'; const m = Math.floor(s / 60), sec = Math.floor(s % 60); return `${m}:${sec.toString().padStart(2, '0')}`; }
+
+const VIZ_MODES = [{ key: 'ring', label: '环', icon: '◯' }, { key: 'wave', label: '波', icon: '〜' }, { key: '3d', label: '3D', icon: '◆' }];
+const PRESETS = ['#4FC3F7', '#A78BFA', '#FF6B9D', '#4ADE80', '#FB923C', '#C0C0C0'];
+
+function hexToRgb(hex) {
+  const s = hex.replace('#', '');
+  const bigint = parseInt(s.length === 3 ? s.split('').map(c => c + c).join('') : s, 16);
+  return { r: (bigint >> 16) & 255, g: (bigint >> 8) & 255, b: bigint & 255 };
+}
+
+function Row({ track, active, onPlay }) {
+  const c = track.cover || `https://picsum.photos/seed/${track.id}/400/400`;
+  return (
+    <div className={`glass-row ${active ? 'is-active' : ''}`} onClick={() => onPlay(track)}>
+      <div style={{ width: 42, height: 42, borderRadius: 8, overflow: 'hidden', flexShrink: 0, background: active ? '#222' : '#111' }}>
+        <img src={c} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: active ? 'var(--accent-dynamic)' : 'var(--text-primary)' }}>{track.title}</div>
+        <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 1 }}>{track.artist}{track.album ? ` · ${track.album}` : ''}</div>
+      </div>
+      <span style={{ fontSize: 11, color: 'var(--text-muted)', flexShrink: 0 }}>{track.duration ? fmt(track.duration) : ''}</span>
+    </div>
+  );
+}
+
+function Sheet({ open, onClose, title, children, h = '80vh' }) {
+  if (!open) return null;
+  return (
+    <div style={{ position: 'absolute', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.25)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', animation: 'fadeIn .2s ease both', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={onClose}>
+      <div className="glass-panel-strong" onClick={e => e.stopPropagation()} style={{ width: '70%', maxWidth: 520, maxHeight: h, borderRadius: 20, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px 10px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+          <span style={{ fontSize: 14, fontWeight: 700 }}>{title}</span>
+          <button onClick={onClose} className="glass-button" style={{ width: 30, height: 30, borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><X size={15} color="var(--text-secondary)" /></button>
+        </div>
+        <div style={{ flex: 1, overflowY: 'auto', padding: '6px 10px 20px' }}>{children}</div>
+      </div>
+    </div>
+  );
+}
+
+// 独立悬浮小圆按钮（无大框）
+function FloatBtn({ children, onClick, title, style }) {
+  return (
+    <button
+      onClick={onClick}
+      title={title}
+      className="glass-button"
+      style={{
+        width: 34, height: 34, borderRadius: '50%',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        flexShrink: 0, transition: 'all .2s ease',
+        color: 'var(--text-primary)',
+        background: 'rgba(255,255,255,0.06)',
+        borderColor: 'rgba(255,255,255,0.08)',
+        ...style,
+      }}
+    >{children}</button>
+  );
+}
+
+export default function Player({ onProfile }) {
+  const { currentTrack, isPlaying, currentTime, duration, volume, playMode, playlist, togglePlay, next, prev, seek, setVolume, toggleMode, playTrack, lyrics, currentLyric, isLoadingUrl, error, clearError, setError } = usePlayerStore();
+  const { userInfo, isLoggedIn } = useAuthStore();
+  const [sq, setSq] = useState(false); const [viz, setViz] = useState(false);
+  const [query, setQuery] = useState(''); const [results, setResults] = useState([]); const [searching, setSearching] = useState(false); const st = useRef(null);
+  const [vm, setVm] = useState(() => { try { return localStorage.getItem('sonus_viz_mode') || 'ring' } catch { return 'ring' } });
+  const [ac, setAc] = useState(() => { try { return localStorage.getItem('sonus_accent') || '#4FC3F7' } catch { return '#4FC3F7' } });
+  const [import { useState, useRef, useEffect, lazy, Suspense } from 'react';
+import { Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Repeat1, Volume2, Search, Maximize2, User, MoreHorizontal, X } from 'lucide-react';
+import { usePlayerStore } from '../store/usePlayerStore';
+import { useAuthStore } from '../store/useAuthStore';
+import { music } from '../api/music';
+import Visualizer from '../components/Visualizer';
+import FloatingLyrics from '../components/FloatingLyrics';
+
+const Visualizer3D = lazy(() => import('../components/Visualizer3D'));
+
+function fmt(s) { if (!s || isNaN(s)) return '0:00'; const m = Math.floor(s / 60), sec = Math.floor(s % 60); return `${m}:${sec.toString().padStart(2, '0')}`; }
+
+const VIZ_MODES = [{ key: 'ring', label: '环', icon: '◯' }, { key: 'wave', label: '波', icon: '〜' }, { key: '3d', label: '3D', icon: '◆' }];
+const PRESETS = ['#4FC3F7', '#A78BFA', '#FF6B9D', '#4ADE80', '#FB923C', '#C0C0C0'];
+
+function hexToRgb(hex) {
+  const s = hex.replace('#', '');
+  const bigint = parseInt(s.length === 3 ? s.split('').map(c => c + c).join('') : s, 16);
+  return { r: (bigint >> 16) & 255, g: (bigint >> 8) & 255, b: bigint & 255 };
+}
+
+function Row({ track, active, onPlay }) {
+  const c = track.cover || `https://picsum.photos/seed/${track.id}/400/400`;
+  return (
+    <div className={`glass-row ${active ? 'is-active' : ''}`} onClick={() => onPlay(track)}>
+      <div style={{ width: 42, height: 42, borderRadius: 8, overflow: 'hidden', flexShrink: 0, background: active ? '#222' : '#111' }}>
+        <img src={c} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: active ? 'var(--accent-dynamic)' : 'var(--text-primary)' }}>{track.title}</div>
+        <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 1 }}>{track.artist}{track.album ? ` · ${track.album}` : ''}</div>
+      </div>
+      <span style={{ fontSize: 11, color: 'var(--text-muted)', flexShrink: 0 }}>{track.duration ? fmt(track.duration) : ''}</span>
+    </div>
+  );
+}
+
+function Sheet({ open, onClose, title, children, h = '80vh' }) {
+  if (!open) return null;
+  return (
+    <div style={{ position: 'absolute', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.25)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', animation: 'fadeIn .2s ease both', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={onClose}>
+      <div className="glass-panel-strong" onClick={e => e.stopPropagation()} style={{ width: '70%', maxWidth: 520, maxHeight: h, borderRadius: 20, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px 10px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+          <span style={{ fontSize: 14, fontWeight: 700 }}>{title}</span>
+          <button onClick={onClose} className="glass-button" style={{ width: 30, height: 30, borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><X size={15} color="var(--text-secondary)" /></button>
+        </div>
+        <div style={{ flex: 1, overflowY: 'auto', padding: '6px 10px 20px' }}>{children}</div>
+      </div>
+    </div>
+  );
+}
+
+// 独立悬浮小圆按钮（无大框）
+function FloatBtn({ children, onClick, title, style }) {
+  return (
+    <button
+      onClick={onClick}
+      title={title}
+      className="glass-button"
+      style={{
+        width: 34, height: 34, borderRadius: '50%',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        flexShrink: 0, transition: 'all .2s ease',
+        color: 'var(--text-primary)',
+        background: 'rgba(255,255,255,0.06)',
+        borderColor: 'rgba(255,255,255,0.08)',
+        ...style,
+      }}
+    >{children}</button>
+  );
+}
+
+export default function Player({ onProfile }) {
+  const { currentTrack, isPlaying, currentTime, duration, volume, playMode, playlist, togglePlay, next, prev, seek, setVolume, toggleMode, playTrack, lyrics, currentLyric, isLoadingUrl, error, clearError, setError } = usePlayerStore();
+  const { userInfo, isLoggedIn } = useAuthStore();
+  const [sq, setSq] = useState(false); const [viz, setViz] = useState(false);
+  const [query, setQuery] = useState(''); const [results, setResults] = useState([]); const [searching, setSearching] = useState(false); const st = useRef(null);
+  const [vm, setVm] = useState(() => { try { return localStorage.getItem('sonus_viz_mode') || 'ring' } catch { return 'ring' } });
+  const [ac, setAc] = useState(() => { try { return localStorage.getItem('sonus_accent') || '#4FC3F7' } catch { return '#4FC3F7' } });
+  const [expanded, setExpanded] = useState(false);
+  const pr = useRef(null); constimport { useState, useRef, useEffect, lazy, Suspense } from 'react';
+import { Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Repeat1, Volume2, Search, Maximize2, User, MoreHorizontal, X } from 'lucide-react';
+import { usePlayerStore } from '../store/usePlayerStore';
+import { useAuthStore } from '../store/useAuthStore';
+import { music } from '../api/music';
+import Visualizer from '../components/Visualizer';
+import FloatingLyrics from '../components/FloatingLyrics';
+
+const Visualizer3D = lazy(() => import('../components/Visualizer3D'));
+
+function fmt(s) { if (!s || isNaN(s)) return '0:00'; const m = Math.floor(s / 60), sec = Math.floor(s % 60); return `${m}:${sec.toString().padStart(2, '0')}`; }
+
+const VIZ_MODES = [{ key: 'ring', label: '环', icon: '◯' }, { key: 'wave', label: '波', icon: '〜' }, { key: '3d', label: '3D', icon: '◆' }];
+const PRESETS = ['#4FC3F7', '#A78BFA', '#FF6B9D', '#4ADE80', '#FB923C', '#C0C0C0'];
+
+function hexToRgb(hex) {
+  const s = hex.replace('#', '');
+  const bigint = parseInt(s.length === 3 ? s.split('').map(c => c + c).join('') : s, 16);
+  return { r: (bigint >> 16) & 255, g: (bigint >> 8) & 255, b: bigint & 255 };
+}
+
+function Row({ track, active, onPlay }) {
+  const c = track.cover || `https://picsum.photos/seed/${track.id}/400/400`;
+  return (
+    <div className={`glass-row ${active ? 'is-active' : ''}`} onClick={() => onPlay(track)}>
+      <div style={{ width: 42, height: 42, borderRadius: 8, overflow: 'hidden', flexShrink: 0, background: active ? '#222' : '#111' }}>
+        <img src={c} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: active ? 'var(--accent-dynamic)' : 'var(--text-primary)' }}>{track.title}</div>
+        <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 1 }}>{track.artist}{track.album ? ` · ${track.album}` : ''}</div>
+      </div>
+      <span style={{ fontSize: 11, color: 'var(--text-muted)', flexShrink: 0 }}>{track.duration ? fmt(track.duration) : ''}</span>
+    </div>
+  );
+}
+
+function Sheet({ open, onClose, title, children, h = '80vh' }) {
+  if (!open) return null;
+  return (
+    <div style={{ position: 'absolute', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.25)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', animation: 'fadeIn .2s ease both', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={onClose}>
+      <div className="glass-panel-strong" onClick={e => e.stopPropagation()} style={{ width: '70%', maxWidth: 520, maxHeight: h, borderRadius: 20, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px 10px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+          <span style={{ fontSize: 14, fontWeight: 700 }}>{title}</span>
+          <button onClick={onClose} className="glass-button" style={{ width: 30, height: 30, borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><X size={15} color="var(--text-secondary)" /></button>
+        </div>
+        <div style={{ flex: 1, overflowY: 'auto', padding: '6px 10px 20px' }}>{children}</div>
+      </div>
+    </div>
+  );
+}
+
+// 独立悬浮小圆按钮（无大框）
+function FloatBtn({ children, onClick, title, style }) {
+  return (
+    <button
+      onClick={onClick}
+      title={title}
+      className="glass-button"
+      style={{
+        width: 34, height: 34, borderRadius: '50%',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        flexShrink: 0, transition: 'all .2s ease',
+        color: 'var(--text-primary)',
+        background: 'rgba(255,255,255,0.06)',
+        borderColor: 'rgba(255,255,255,0.08)',
+        ...style,
+      }}
+    >{children}</button>
+  );
+}
+
+export default function Player({ onProfile }) {
+  const { currentTrack, isPlaying, currentTime, duration, volume, playMode, playlist, togglePlay, next, prev, seek, setVolume, toggleMode, playTrack, lyrics, currentLyric, isLoadingUrl, error, clearError, setError } = usePlayerStore();
+  const { userInfo, isLoggedIn } = useAuthStore();
+  const [sq, setSq] = useState(false); const [viz, setViz] = useState(false);
+  const [query, setQuery] = useState(''); const [results, setResults] = useState([]); const [searching, setSearching] = useState(false); const st = useRef(null);
+  const [vm, setVm] = useState(() => { try { return localStorage.getItem('sonus_viz_mode') || 'ring' } catch { return 'ring' } });
+  const [ac, setAc] = useState(() => { try { return localStorage.getItem('sonus_accent') || '#4FC3F7' } catch { return '#4FC3F7' } });
+  const [expanded, setExpanded] = useState(false);
+  const pr = useRef(null); const [sk, setSk] = useState(false);
+
+  const pct = duration ? (import { useState, useRef, useEffect, lazy, Suspense } from 'react';
+import { Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Repeat1, Volume2, Search, Maximize2, User, MoreHorizontal, X } from 'lucide-react';
+import { usePlayerStore } from '../store/usePlayerStore';
+import { useAuthStore } from '../store/useAuthStore';
+import { music } from '../api/music';
+import Visualizer from '../components/Visualizer';
+import FloatingLyrics from '../components/FloatingLyrics';
+
+const Visualizer3D = lazy(() => import('../components/Visualizer3D'));
+
+function fmt(s) { if (!s || isNaN(s)) return '0:00'; const m = Math.floor(s / 60), sec = Math.floor(s % 60); return `${m}:${sec.toString().padStart(2, '0')}`; }
+
+const VIZ_MODES = [{ key: 'ring', label: '环', icon: '◯' }, { key: 'wave', label: '波', icon: '〜' }, { key: '3d', label: '3D', icon: '◆' }];
+const PRESETS = ['#4FC3F7', '#A78BFA', '#FF6B9D', '#4ADE80', '#FB923C', '#C0C0C0'];
+
+function hexToRgb(hex) {
+  const s = hex.replace('#', '');
+  const bigint = parseInt(s.length === 3 ? s.split('').map(c => c + c).join('') : s, 16);
+  return { r: (bigint >> 16) & 255, g: (bigint >> 8) & 255, b: bigint & 255 };
+}
+
+function Row({ track, active, onPlay }) {
+  const c = track.cover || `https://picsum.photos/seed/${track.id}/400/400`;
+  return (
+    <div className={`glass-row ${active ? 'is-active' : ''}`} onClick={() => onPlay(track)}>
+      <div style={{ width: 42, height: 42, borderRadius: 8, overflow: 'hidden', flexShrink: 0, background: active ? '#222' : '#111' }}>
+        <img src={c} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: active ? 'var(--accent-dynamic)' : 'var(--text-primary)' }}>{track.title}</div>
+        <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 1 }}>{track.artist}{track.album ? ` · ${track.album}` : ''}</div>
+      </div>
+      <span style={{ fontSize: 11, color: 'var(--text-muted)', flexShrink: 0 }}>{track.duration ? fmt(track.duration) : ''}</span>
+    </div>
+  );
+}
+
+function Sheet({ open, onClose, title, children, h = '80vh' }) {
+  if (!open) return null;
+  return (
+    <div style={{ position: 'absolute', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.25)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', animation: 'fadeIn .2s ease both', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={onClose}>
+      <div className="glass-panel-strong" onClick={e => e.stopPropagation()} style={{ width: '70%', maxWidth: 520, maxHeight: h, borderRadius: 20, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px 10px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+          <span style={{ fontSize: 14, fontWeight: 700 }}>{title}</span>
+          <button onClick={onClose} className="glass-button" style={{ width: 30, height: 30, borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><X size={15} color="var(--text-secondary)" /></button>
+        </div>
+        <div style={{ flex: 1, overflowY: 'auto', padding: '6px 10px 20px' }}>{children}</div>
+      </div>
+    </div>
+  );
+}
+
+// 独立悬浮小圆按钮（无大框）
+function FloatBtn({ children, onClick, title, style }) {
+  return (
+    <button
+      onClick={onClick}
+      title={title}
+      className="glass-button"
+      style={{
+        width: 34, height: 34, borderRadius: '50%',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        flexShrink: 0, transition: 'all .2s ease',
+        color: 'var(--text-primary)',
+        background: 'rgba(255,255,255,0.06)',
+        borderColor: 'rgba(255,255,255,0.08)',
+        ...style,
+      }}
+    >{children}</button>
+  );
+}
+
+export default function Player({ onProfile }) {
+  const { currentTrack, isPlaying, currentTime, duration, volume, playMode, playlist, togglePlay, next, prev, seek, setVolume, toggleMode, playTrack, lyrics, currentLyric, isLoadingUrl, error, clearError, setError } = usePlayerStore();
+  const { userInfo, isLoggedIn } = useAuthStore();
+  const [sq, setSq] = useState(false); const [viz, setViz] = useState(false);
+  const [query, setQuery] = useState(''); const [results, setResults] = useState([]); const [searching, setSearching] = useState(false); const st = useRef(null);
+  const [vm, setVm] = useState(() => { try { return localStorage.getItem('sonus_viz_mode') || 'ring' } catch { return 'ring' } });
+  const [ac, setAc] = useState(() => { try { return localStorage.getItem('sonus_accent') || '#4FC3F7' } catch { return '#4FC3F7' } });
+  const [expanded, setExpanded] = useState(false);
+  const pr = useRef(null); const [sk, setSk] = useState(false);
+
+  const pct = duration ? (currentTime / duration) * 100 : 0;
+  const mi = playMode ===import { useState, useRef, useEffect, lazy, Suspense } from 'react';
+import { Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Repeat1, Volume2, Search, Maximize2, User, MoreHorizontal, X } from 'lucide-react';
+import { usePlayerStore } from '../store/usePlayerStore';
+import { useAuthStore } from '../store/useAuthStore';
+import { music } from '../api/music';
+import Visualizer from '../components/Visualizer';
+import FloatingLyrics from '../components/FloatingLyrics';
+
+const Visualizer3D = lazy(() => import('../components/Visualizer3D'));
+
+function fmt(s) { if (!s || isNaN(s)) return '0:00'; const m = Math.floor(s / 60), sec = Math.floor(s % 60); return `${m}:${sec.toString().padStart(2, '0')}`; }
+
+const VIZ_MODES = [{ key: 'ring', label: '环', icon: '◯' }, { key: 'wave', label: '波', icon: '〜' }, { key: '3d', label: '3D', icon: '◆' }];
+const PRESETS = ['#4FC3F7', '#A78BFA', '#FF6B9D', '#4ADE80', '#FB923C', '#C0C0C0'];
+
+function hexToRgb(hex) {
+  const s = hex.replace('#', '');
+  const bigint = parseInt(s.length === 3 ? s.split('').map(c => c + c).join('') : s, 16);
+  return { r: (bigint >> 16) & 255, g: (bigint >> 8) & 255, b: bigint & 255 };
+}
+
+function Row({ track, active, onPlay }) {
+  const c = track.cover || `https://picsum.photos/seed/${track.id}/400/400`;
+  return (
+    <div className={`glass-row ${active ? 'is-active' : ''}`} onClick={() => onPlay(track)}>
+      <div style={{ width: 42, height: 42, borderRadius: 8, overflow: 'hidden', flexShrink: 0, background: active ? '#222' : '#111' }}>
+        <img src={c} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: active ? 'var(--accent-dynamic)' : 'var(--text-primary)' }}>{track.title}</div>
+        <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 1 }}>{track.artist}{track.album ? ` · ${track.album}` : ''}</div>
+      </div>
+      <span style={{ fontSize: 11, color: 'var(--text-muted)', flexShrink: 0 }}>{track.duration ? fmt(track.duration) : ''}</span>
+    </div>
+  );
+}
+
+function Sheet({ open, onClose, title, children, h = '80vh' }) {
+  if (!open) return null;
+  return (
+    <div style={{ position: 'absolute', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.25)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', animation: 'fadeIn .2s ease both', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={onClose}>
+      <div className="glass-panel-strong" onClick={e => e.stopPropagation()} style={{ width: '70%', maxWidth: 520, maxHeight: h, borderRadius: 20, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px 10px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+          <span style={{ fontSize: 14, fontWeight: 700 }}>{title}</span>
+          <button onClick={onClose} className="glass-button" style={{ width: 30, height: 30, borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><X size={15} color="var(--text-secondary)" /></button>
+        </div>
+        <div style={{ flex: 1, overflowY: 'auto', padding: '6px 10px 20px' }}>{children}</div>
+      </div>
+    </div>
+  );
+}
+
+// 独立悬浮小圆按钮（无大框）
+function FloatBtn({ children, onClick, title, style }) {
+  return (
+    <button
+      onClick={onClick}
+      title={title}
+      className="glass-button"
+      style={{
+        width: 34, height: 34, borderRadius: '50%',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        flexShrink: 0, transition: 'all .2s ease',
+        color: 'var(--text-primary)',
+        background: 'rgba(255,255,255,0.06)',
+        borderColor: 'rgba(255,255,255,0.08)',
+        ...style,
+      }}
+    >{children}</button>
+  );
+}
+
+export default function Player({ onProfile }) {
+  const { currentTrack, isPlaying, currentTime, duration, volume, playMode, playlist, togglePlay, next, prev, seek, setVolume, toggleMode, playTrack, lyrics, currentLyric, isLoadingUrl, error, clearError, setError } = usePlayerStore();
+  const { userInfo, isLoggedIn } = useAuthStore();
+  const [sq, setSq] = useState(false); const [viz, setViz] = useState(false);
+  const [query, setQuery] = useState(''); const [results, setResults] = useState([]); const [searching, setSearching] = useState(false); const st = useRef(null);
+  const [vm, setVm] = useState(() => { try { return localStorage.getItem('sonus_viz_mode') || 'ring' } catch { return 'ring' } });
+  const [ac, setAc] = useState(() => { try { return localStorage.getItem('sonus_accent') || '#4FC3F7' } catch { return '#4FC3F7' } });
+  const [expanded, setExpanded] = useState(false);
+  const pr = useRef(null); const [sk, setSk] = useState(false);
+
+  const pct = duration ? (currentTime / duration) * 100 : 0;
+  const mi = playMode === 'single' ? <Repeat1 size={13} /> : playMode === 'random' ? <Shuffle size={13} /> : <Repeat size={13} />;
+  const mcimport { useState, useRef, useEffect, lazy, Suspense } from 'react';
+import { Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Repeat1, Volume2, Search, Maximize2, User, MoreHorizontal, X } from 'lucide-react';
+import { usePlayerStore } from '../store/usePlayerStore';
+import { useAuthStore } from '../store/useAuthStore';
+import { music } from '../api/music';
+import Visualizer from '../components/Visualizer';
+import FloatingLyrics from '../components/FloatingLyrics';
+
+const Visualizer3D = lazy(() => import('../components/Visualizer3D'));
+
+function fmt(s) { if (!s || isNaN(s)) return '0:00'; const m = Math.floor(s / 60), sec = Math.floor(s % 60); return `${m}:${sec.toString().padStart(2, '0')}`; }
+
+const VIZ_MODES = [{ key: 'ring', label: '环', icon: '◯' }, { key: 'wave', label: '波', icon: '〜' }, { key: '3d', label: '3D', icon: '◆' }];
+const PRESETS = ['#4FC3F7', '#A78BFA', '#FF6B9D', '#4ADE80', '#FB923C', '#C0C0C0'];
+
+function hexToRgb(hex) {
+  const s = hex.replace('#', '');
+  const bigint = parseInt(s.length === 3 ? s.split('').map(c => c + c).join('') : s, 16);
+  return { r: (bigint >> 16) & 255, g: (bigint >> 8) & 255, b: bigint & 255 };
+}
+
+function Row({ track, active, onPlay }) {
+  const c = track.cover || `https://picsum.photos/seed/${track.id}/400/400`;
+  return (
+    <div className={`glass-row ${active ? 'is-active' : ''}`} onClick={() => onPlay(track)}>
+      <div style={{ width: 42, height: 42, borderRadius: 8, overflow: 'hidden', flexShrink: 0, background: active ? '#222' : '#111' }}>
+        <img src={c} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: active ? 'var(--accent-dynamic)' : 'var(--text-primary)' }}>{track.title}</div>
+        <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 1 }}>{track.artist}{track.album ? ` · ${track.album}` : ''}</div>
+      </div>
+      <span style={{ fontSize: 11, color: 'var(--text-muted)', flexShrink: 0 }}>{track.duration ? fmt(track.duration) : ''}</span>
+    </div>
+  );
+}
+
+function Sheet({ open, onClose, title, children, h = '80vh' }) {
+  if (!open) return null;
+  return (
+    <div style={{ position: 'absolute', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.25)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', animation: 'fadeIn .2s ease both', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={onClose}>
+      <div className="glass-panel-strong" onClick={e => e.stopPropagation()} style={{ width: '70%', maxWidth: 520, maxHeight: h, borderRadius: 20, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px 10px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+          <span style={{ fontSize: 14, fontWeight: 700 }}>{title}</span>
+          <button onClick={onClose} className="glass-button" style={{ width: 30, height: 30, borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><X size={15} color="var(--text-secondary)" /></button>
+        </div>
+        <div style={{ flex: 1, overflowY: 'auto', padding: '6px 10px 20px' }}>{children}</div>
+      </div>
+    </div>
+  );
+}
+
+// 独立悬浮小圆按钮（无大框）
+function FloatBtn({ children, onClick, title, style }) {
+  return (
+    <button
+      onClick={onClick}
+      title={title}
+      className="glass-button"
+      style={{
+        width: 34, height: 34, borderRadius: '50%',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        flexShrink: 0, transition: 'all .2s ease',
+        color: 'var(--text-primary)',
+        background: 'rgba(255,255,255,0.06)',
+        borderColor: 'rgba(255,255,255,0.08)',
+        ...style,
+      }}
+    >{children}</button>
+  );
+}
+
+export default function Player({ onProfile }) {
+  const { currentTrack, isPlaying, currentTime, duration, volume, playMode, playlist, togglePlay, next, prev, seek, setVolume, toggleMode, playTrack, lyrics, currentLyric, isLoadingUrl, error, clearError, setError } = usePlayerStore();
+  const { userInfo, isLoggedIn } = useAuthStore();
+  const [sq, setSq] = useState(false); const [viz, setViz] = useState(false);
+  const [query, setQuery] = useState(''); const [results, setResults] = useState([]); const [searching, setSearching] = useState(false); const st = useRef(null);
+  const [vm, setVm] = useState(() => { try { return localStorage.getItem('sonus_viz_mode') || 'ring' } catch { return 'ring' } });
+  const [ac, setAc] = useState(() => { try { return localStorage.getItem('sonus_accent') || '#4FC3F7' } catch { return '#4FC3F7' } });
+  const [expanded, setExpanded] = useState(false);
+  const pr = useRef(null); const [sk, setSk] = useState(false);
+
+  const pct = duration ? (currentTime / duration) * 100 : 0;
+  const mi = playMode === 'single' ? <Repeat1 size={13} /> : playMode === 'random' ? <Shuffle size={13} /> : <Repeat size={13} />;
+  const mc = playMode === 'list' ? 'var(--text-secondary)' : 'var(--accent-dynamic)';
+  const av = userInfo?.import { useState, useRef, useEffect, lazy, Suspense } from 'react';
+import { Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Repeat1, Volume2, Search, Maximize2, User, MoreHorizontal, X } from 'lucide-react';
+import { usePlayerStore } from '../store/usePlayerStore';
+import { useAuthStore } from '../store/useAuthStore';
+import { music } from '../api/music';
+import Visualizer from '../components/Visualizer';
+import FloatingLyrics from '../components/FloatingLyrics';
+
+const Visualizer3D = lazy(() => import('../components/Visualizer3D'));
+
+function fmt(s) { if (!s || isNaN(s)) return '0:00'; const m = Math.floor(s / 60), sec = Math.floor(s % 60); return `${m}:${sec.toString().padStart(2, '0')}`; }
+
+const VIZ_MODES = [{ key: 'ring', label: '环', icon: '◯' }, { key: 'wave', label: '波', icon: '〜' }, { key: '3d', label: '3D', icon: '◆' }];
+const PRESETS = ['#4FC3F7', '#A78BFA', '#FF6B9D', '#4ADE80', '#FB923C', '#C0C0C0'];
+
+function hexToRgb(hex) {
+  const s = hex.replace('#', '');
+  const bigint = parseInt(s.length === 3 ? s.split('').map(c => c + c).join('') : s, 16);
+  return { r: (bigint >> 16) & 255, g: (bigint >> 8) & 255, b: bigint & 255 };
+}
+
+function Row({ track, active, onPlay }) {
+  const c = track.cover || `https://picsum.photos/seed/${track.id}/400/400`;
+  return (
+    <div className={`glass-row ${active ? 'is-active' : ''}`} onClick={() => onPlay(track)}>
+      <div style={{ width: 42, height: 42, borderRadius: 8, overflow: 'hidden', flexShrink: 0, background: active ? '#222' : '#111' }}>
+        <img src={c} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: active ? 'var(--accent-dynamic)' : 'var(--text-primary)' }}>{track.title}</div>
+        <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 1 }}>{track.artist}{track.album ? ` · ${track.album}` : ''}</div>
+      </div>
+      <span style={{ fontSize: 11, color: 'var(--text-muted)', flexShrink: 0 }}>{track.duration ? fmt(track.duration) : ''}</span>
+    </div>
+  );
+}
+
+function Sheet({ open, onClose, title, children, h = '80vh' }) {
+  if (!open) return null;
+  return (
+    <div style={{ position: 'absolute', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.25)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', animation: 'fadeIn .2s ease both', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={onClose}>
+      <div className="glass-panel-strong" onClick={e => e.stopPropagation()} style={{ width: '70%', maxWidth: 520, maxHeight: h, borderRadius: 20, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px 10px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+          <span style={{ fontSize: 14, fontWeight: 700 }}>{title}</span>
+          <button onClick={onClose} className="glass-button" style={{ width: 30, height: 30, borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><X size={15} color="var(--text-secondary)" /></button>
+        </div>
+        <div style={{ flex: 1, overflowY: 'auto', padding: '6px 10px 20px' }}>{children}</div>
+      </div>
+    </div>
+  );
+}
+
+// 独立悬浮小圆按钮（无大框）
+function FloatBtn({ children, onClick, title, style }) {
+  return (
+    <button
+      onClick={onClick}
+      title={title}
+      className="glass-button"
+      style={{
+        width: 34, height: 34, borderRadius: '50%',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        flexShrink: 0, transition: 'all .2s ease',
+        color: 'var(--text-primary)',
+        background: 'rgba(255,255,255,0.06)',
+        borderColor: 'rgba(255,255,255,0.08)',
+        ...style,
+      }}
+    >{children}</button>
+  );
+}
+
+export default function Player({ onProfile }) {
+  const { currentTrack, isPlaying, currentTime, duration, volume, playMode, playlist, togglePlay, next, prev, seek, setVolume, toggleMode, playTrack, lyrics, currentLyric, isLoadingUrl, error, clearError, setError } = usePlayerStore();
+  const { userInfo, isLoggedIn } = useAuthStore();
+  const [sq, setSq] = useState(false); const [viz, setViz] = useState(false);
+  const [query, setQuery] = useState(''); const [results, setResults] = useState([]); const [searching, setSearching] = useState(false); const st = useRef(null);
+  const [vm, setVm] = useState(() => { try { return localStorage.getItem('sonus_viz_mode') || 'ring' } catch { return 'ring' } });
+  const [ac, setAc] = useState(() => { try { return localStorage.getItem('sonus_accent') || '#4FC3F7' } catch { return '#4FC3F7' } });
+  const [expanded, setExpanded] = useState(false);
+  const pr = useRef(null); const [sk, setSk] = useState(false);
+
+  const pct = duration ? (currentTime / duration) * 100 : 0;
+  const mi = playMode === 'single' ? <Repeat1 size={13} /> : playMode === 'random' ? <Shuffle size={13} /> : <Repeat size={13} />;
+  const mc = playMode === 'list' ? 'var(--text-secondary)' : 'var(--accent-dynamic)';
+  const av = userInfo?.avatar;
+  const accentRgb = hexToimport { useState, useRef, useEffect, lazy, Suspense } from 'react';
+import { Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Repeat1, Volume2, Search, Maximize2, User, MoreHorizontal, X } from 'lucide-react';
+import { usePlayerStore } from '../store/usePlayerStore';
+import { useAuthStore } from '../store/useAuthStore';
+import { music } from '../api/music';
+import Visualizer from '../components/Visualizer';
+import FloatingLyrics from '../components/FloatingLyrics';
+
+const Visualizer3D = lazy(() => import('../components/Visualizer3D'));
+
+function fmt(s) { if (!s || isNaN(s)) return '0:00'; const m = Math.floor(s / 60), sec = Math.floor(s % 60); return `${m}:${sec.toString().padStart(2, '0')}`; }
+
+const VIZ_MODES = [{ key: 'ring', label: '环', icon: '◯' }, { key: 'wave', label: '波', icon: '〜' }, { key: '3d', label: '3D', icon: '◆' }];
+const PRESETS = ['#4FC3F7', '#A78BFA', '#FF6B9D', '#4ADE80', '#FB923C', '#C0C0C0'];
+
+function hexToRgb(hex) {
+  const s = hex.replace('#', '');
+  const bigint = parseInt(s.length === 3 ? s.split('').map(c => c + c).join('') : s, 16);
+  return { r: (bigint >> 16) & 255, g: (bigint >> 8) & 255, b: bigint & 255 };
+}
+
+function Row({ track, active, onPlay }) {
+  const c = track.cover || `https://picsum.photos/seed/${track.id}/400/400`;
+  return (
+    <div className={`glass-row ${active ? 'is-active' : ''}`} onClick={() => onPlay(track)}>
+      <div style={{ width: 42, height: 42, borderRadius: 8, overflow: 'hidden', flexShrink: 0, background: active ? '#222' : '#111' }}>
+        <img src={c} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: active ? 'var(--accent-dynamic)' : 'var(--text-primary)' }}>{track.title}</div>
+        <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 1 }}>{track.artist}{track.album ? ` · ${track.album}` : ''}</div>
+      </div>
+      <span style={{ fontSize: 11, color: 'var(--text-muted)', flexShrink: 0 }}>{track.duration ? fmt(track.duration) : ''}</span>
+    </div>
+  );
+}
+
+function Sheet({ open, onClose, title, children, h = '80vh' }) {
+  if (!open) return null;
+  return (
+    <div style={{ position: 'absolute', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.25)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', animation: 'fadeIn .2s ease both', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={onClose}>
+      <div className="glass-panel-strong" onClick={e => e.stopPropagation()} style={{ width: '70%', maxWidth: 520, maxHeight: h, borderRadius: 20, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px 10px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+          <span style={{ fontSize: 14, fontWeight: 700 }}>{title}</span>
+          <button onClick={onClose} className="glass-button" style={{ width: 30, height: 30, borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><X size={15} color="var(--text-secondary)" /></button>
+        </div>
+        <div style={{ flex: 1, overflowY: 'auto', padding: '6px 10px 20px' }}>{children}</div>
+      </div>
+    </div>
+  );
+}
+
+// 独立悬浮小圆按钮（无大框）
+function FloatBtn({ children, onClick, title, style }) {
+  return (
+    <button
+      onClick={onClick}
+      title={title}
+      className="glass-button"
+      style={{
+        width: 34, height: 34, borderRadius: '50%',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        flexShrink: 0, transition: 'all .2s ease',
+        color: 'var(--text-primary)',
+        background: 'rgba(255,255,255,0.06)',
+        borderColor: 'rgba(255,255,255,0.08)',
+        ...style,
+      }}
+    >{children}</button>
+  );
+}
+
+export default function Player({ onProfile }) {
+  const { currentTrack, isPlaying, currentTime, duration, volume, playMode, playlist, togglePlay, next, prev, seek, setVolume, toggleMode, playTrack, lyrics, currentLyric, isLoadingUrl, error, clearError, setError } = usePlayerStore();
+  const { userInfo, isLoggedIn } = useAuthStore();
+  const [sq, setSq] = useState(false); const [viz, setViz] = useState(false);
+  const [query, setQuery] = useState(''); const [results, setResults] = useState([]); const [searching, setSearching] = useState(false); const st = useRef(null);
+  const [vm, setVm] = useState(() => { try { return localStorage.getItem('sonus_viz_mode') || 'ring' } catch { return 'ring' } });
+  const [ac, setAc] = useState(() => { try { return localStorage.getItem('sonus_accent') || '#4FC3F7' } catch { return '#4FC3F7' } });
+  const [expanded, setExpanded] = useState(false);
+  const pr = useRef(null); const [sk, setSk] = useState(false);
+
+  const pct = duration ? (currentTime / duration) * 100 : 0;
+  const mi = playMode === 'single' ? <Repeat1 size={13} /> : playMode === 'random' ? <Shuffle size={13} /> : <Repeat size={13} />;
+  const mc = playMode === 'list' ? 'var(--text-secondary)' : 'var(--accent-dynamic)';
+  const av = userInfo?.avatar;
+  const accentRgb = hexToRgb(ac);
+
+  useEffect(() => { document.documentElement.style.setProperty('--accent-dynamicimport { useState, useRef, useEffect, lazy, Suspense } from 'react';
+import { Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Repeat1, Volume2, Search, Maximize2, User, MoreHorizontal, X } from 'lucide-react';
+import { usePlayerStore } from '../store/usePlayerStore';
+import { useAuthStore } from '../store/useAuthStore';
+import { music } from '../api/music';
+import Visualizer from '../components/Visualizer';
+import FloatingLyrics from '../components/FloatingLyrics';
+
+const Visualizer3D = lazy(() => import('../components/Visualizer3D'));
+
+function fmt(s) { if (!s || isNaN(s)) return '0:00'; const m = Math.floor(s / 60), sec = Math.floor(s % 60); return `${m}:${sec.toString().padStart(2, '0')}`; }
+
+const VIZ_MODES = [{ key: 'ring', label: '环', icon: '◯' }, { key: 'wave', label: '波', icon: '〜' }, { key: '3d', label: '3D', icon: '◆' }];
+const PRESETS = ['#4FC3F7', '#A78BFA', '#FF6B9D', '#4ADE80', '#FB923C', '#C0C0C0'];
+
+function hexToRgb(hex) {
+  const s = hex.replace('#', '');
+  const bigint = parseInt(s.length === 3 ? s.split('').map(c => c + c).join('') : s, 16);
+  return { r: (bigint >> 16) & 255, g: (bigint >> 8) & 255, b: bigint & 255 };
+}
+
+function Row({ track, active, onPlay }) {
+  const c = track.cover || `https://picsum.photos/seed/${track.id}/400/400`;
+  return (
+    <div className={`glass-row ${active ? 'is-active' : ''}`} onClick={() => onPlay(track)}>
+      <div style={{ width: 42, height: 42, borderRadius: 8, overflow: 'hidden', flexShrink: 0, background: active ? '#222' : '#111' }}>
+        <img src={c} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: active ? 'var(--accent-dynamic)' : 'var(--text-primary)' }}>{track.title}</div>
+        <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 1 }}>{track.artist}{track.album ? ` · ${track.album}` : ''}</div>
+      </div>
+      <span style={{ fontSize: 11, color: 'var(--text-muted)', flexShrink: 0 }}>{track.duration ? fmt(track.duration) : ''}</span>
+    </div>
+  );
+}
+
+function Sheet({ open, onClose, title, children, h = '80vh' }) {
+  if (!open) return null;
+  return (
+    <div style={{ position: 'absolute', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.25)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', animation: 'fadeIn .2s ease both', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={onClose}>
+      <div className="glass-panel-strong" onClick={e => e.stopPropagation()} style={{ width: '70%', maxWidth: 520, maxHeight: h, borderRadius: 20, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px 10px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+          <span style={{ fontSize: 14, fontWeight: 700 }}>{title}</span>
+          <button onClick={onClose} className="glass-button" style={{ width: 30, height: 30, borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><X size={15} color="var(--text-secondary)" /></button>
+        </div>
+        <div style={{ flex: 1, overflowY: 'auto', padding: '6px 10px 20px' }}>{children}</div>
+      </div>
+    </div>
+  );
+}
+
+// 独立悬浮小圆按钮（无大框）
+function FloatBtn({ children, onClick, title, style }) {
+  return (
+    <button
+      onClick={onClick}
+      title={title}
+      className="glass-button"
+      style={{
+        width: 34, height: 34, borderRadius: '50%',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        flexShrink: 0, transition: 'all .2s ease',
+        color: 'var(--text-primary)',
+        background: 'rgba(255,255,255,0.06)',
+        borderColor: 'rgba(255,255,255,0.08)',
+        ...style,
+      }}
+    >{children}</button>
+  );
+}
+
+export default function Player({ onProfile }) {
+  const { currentTrack, isPlaying, currentTime, duration, volume, playMode, playlist, togglePlay, next, prev, seek, setVolume, toggleMode, playTrack, lyrics, currentLyric, isLoadingUrl, error, clearError, setError } = usePlayerStore();
+  const { userInfo, isLoggedIn } = useAuthStore();
+  const [sq, setSq] = useState(false); const [viz, setViz] = useState(false);
+  const [query, setQuery] = useState(''); const [results, setResults] = useState([]); const [searching, setSearching] = useState(false); const st = useRef(null);
+  const [vm, setVm] = useState(() => { try { return localStorage.getItem('sonus_viz_mode') || 'ring' } catch { return 'ring' } });
+  const [ac, setAc] = useState(() => { try { return localStorage.getItem('sonus_accent') || '#4FC3F7' } catch { return '#4FC3F7' } });
+  const [expanded, setExpanded] = useState(false);
+  const pr = useRef(null); const [sk, setSk] = useState(false);
+
+  const pct = duration ? (currentTime / duration) * 100 : 0;
+  const mi = playMode === 'single' ? <Repeat1 size={13} /> : playMode === 'random' ? <Shuffle size={13} /> : <Repeat size={13} />;
+  const mc = playMode === 'list' ? 'var(--text-secondary)' : 'var(--accent-dynamic)';
+  const av = userInfo?.avatar;
+  const accentRgb = hexToRgb(ac);
+
+  useEffect(() => { document.documentElement.style.setProperty('--accent-dynamic', ac); }, [ac]);
+  useEffect(() => { if (error) {import { useState, useRef, useEffect, lazy, Suspense } from 'react';
+import { Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Repeat1, Volume2, Search, Maximize2, User, MoreHorizontal, X } from 'lucide-react';
+import { usePlayerStore } from '../store/usePlayerStore';
+import { useAuthStore } from '../store/useAuthStore';
+import { music } from '../api/music';
+import Visualizer from '../components/Visualizer';
+import FloatingLyrics from '../components/FloatingLyrics';
+
+const Visualizer3D = lazy(() => import('../components/Visualizer3D'));
+
+function fmt(s) { if (!s || isNaN(s)) return '0:00'; const m = Math.floor(s / 60), sec = Math.floor(s % 60); return `${m}:${sec.toString().padStart(2, '0')}`; }
+
+const VIZ_MODES = [{ key: 'ring', label: '环', icon: '◯' }, { key: 'wave', label: '波', icon: '〜' }, { key: '3d', label: '3D', icon: '◆' }];
+const PRESETS = ['#4FC3F7', '#A78BFA', '#FF6B9D', '#4ADE80', '#FB923C', '#C0C0C0'];
+
+function hexToRgb(hex) {
+  const s = hex.replace('#', '');
+  const bigint = parseInt(s.length === 3 ? s.split('').map(c => c + c).join('') : s, 16);
+  return { r: (bigint >> 16) & 255, g: (bigint >> 8) & 255, b: bigint & 255 };
+}
+
+function Row({ track, active, onPlay }) {
+  const c = track.cover || `https://picsum.photos/seed/${track.id}/400/400`;
+  return (
+    <div className={`glass-row ${active ? 'is-active' : ''}`} onClick={() => onPlay(track)}>
+      <div style={{ width: 42, height: 42, borderRadius: 8, overflow: 'hidden', flexShrink: 0, background: active ? '#222' : '#111' }}>
+        <img src={c} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: active ? 'var(--accent-dynamic)' : 'var(--text-primary)' }}>{track.title}</div>
+        <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 1 }}>{track.artist}{track.album ? ` · ${track.album}` : ''}</div>
+      </div>
+      <span style={{ fontSize: 11, color: 'var(--text-muted)', flexShrink: 0 }}>{track.duration ? fmt(track.duration) : ''}</span>
+    </div>
+  );
+}
+
+function Sheet({ open, onClose, title, children, h = '80vh' }) {
+  if (!open) return null;
+  return (
+    <div style={{ position: 'absolute', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.25)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', animation: 'fadeIn .2s ease both', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={onClose}>
+      <div className="glass-panel-strong" onClick={e => e.stopPropagation()} style={{ width: '70%', maxWidth: 520, maxHeight: h, borderRadius: 20, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px 10px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+          <span style={{ fontSize: 14, fontWeight: 700 }}>{title}</span>
+          <button onClick={onClose} className="glass-button" style={{ width: 30, height: 30, borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><X size={15} color="var(--text-secondary)" /></button>
+        </div>
+        <div style={{ flex: 1, overflowY: 'auto', padding: '6px 10px 20px' }}>{children}</div>
+      </div>
+    </div>
+  );
+}
+
+// 独立悬浮小圆按钮（无大框）
+function FloatBtn({ children, onClick, title, style }) {
+  return (
+    <button
+      onClick={onClick}
+      title={title}
+      className="glass-button"
+      style={{
+        width: 34, height: 34, borderRadius: '50%',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        flexShrink: 0, transition: 'all .2s ease',
+        color: 'var(--text-primary)',
+        background: 'rgba(255,255,255,0.06)',
+        borderColor: 'rgba(255,255,255,0.08)',
+        ...style,
+      }}
+    >{children}</button>
+  );
+}
+
+export default function Player({ onProfile }) {
+  const { currentTrack, isPlaying, currentTime, duration, volume, playMode, playlist, togglePlay, next, prev, seek, setVolume, toggleMode, playTrack, lyrics, currentLyric, isLoadingUrl, error, clearError, setError } = usePlayerStore();
+  const { userInfo, isLoggedIn } = useAuthStore();
+  const [sq, setSq] = useState(false); const [viz, setViz] = useState(false);
+  const [query, setQuery] = useState(''); const [results, setResults] = useState([]); const [searching, setSearching] = useState(false); const st = useRef(null);
+  const [vm, setVm] = useState(() => { try { return localStorage.getItem('sonus_viz_mode') || 'ring' } catch { return 'ring' } });
+  const [ac, setAc] = useState(() => { try { return localStorage.getItem('sonus_accent') || '#4FC3F7' } catch { return '#4FC3F7' } });
+  const [expanded, setExpanded] = useState(false);
+  const pr = useRef(null); const [sk, setSk] = useState(false);
+
+  const pct = duration ? (currentTime / duration) * 100 : 0;
+  const mi = playMode === 'single' ? <Repeat1 size={13} /> : playMode === 'random' ? <Shuffle size={13} /> : <Repeat size={13} />;
+  const mc = playMode === 'list' ? 'var(--text-secondary)' : 'var(--accent-dynamic)';
+  const av = userInfo?.avatar;
+  const accentRgb = hexToRgb(ac);
+
+  useEffect(() => { document.documentElement.style.setProperty('--accent-dynamic', ac); }, [ac]);
+  useEffect(() => { if (error) { const t = setTimeout(clearError, 5000); return () => clearTimeout(t); } }, [error, clearError]);
+import { useState, useRef, useEffect, lazy, Suspense } from 'react';
+import { Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Repeat1, Volume2, Search, Maximize2, User, MoreHorizontal, X } from 'lucide-react';
+import { usePlayerStore } from '../store/usePlayerStore';
+import { useAuthStore } from '../store/useAuthStore';
+import { music } from '../api/music';
+import Visualizer from '../components/Visualizer';
+import FloatingLyrics from '../components/FloatingLyrics';
+
+const Visualizer3D = lazy(() => import('../components/Visualizer3D'));
+
+function fmt(s) { if (!s || isNaN(s)) return '0:00'; const m = Math.floor(s / 60), sec = Math.floor(s % 60); return `${m}:${sec.toString().padStart(2, '0')}`; }
+
+const VIZ_MODES = [{ key: 'ring', label: '环', icon: '◯' }, { key: 'wave', label: '波', icon: '〜' }, { key: '3d', label: '3D', icon: '◆' }];
+const PRESETS = ['#4FC3F7', '#A78BFA', '#FF6B9D', '#4ADE80', '#FB923C', '#C0C0C0'];
+
+function hexToRgb(hex) {
+  const s = hex.replace('#', '');
+  const bigint = parseInt(s.length === 3 ? s.split('').map(c => c + c).join('') : s, 16);
+  return { r: (bigint >> 16) & 255, g: (bigint >> 8) & 255, b: bigint & 255 };
+}
+
+function Row({ track, active, onPlay }) {
+  const c = track.cover || `https://picsum.photos/seed/${track.id}/400/400`;
+  return (
+    <div className={`glass-row ${active ? 'is-active' : ''}`} onClick={() => onPlay(track)}>
+      <div style={{ width: 42, height: 42, borderRadius: 8, overflow: 'hidden', flexShrink: 0, background: active ? '#222' : '#111' }}>
+        <img src={c} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: active ? 'var(--accent-dynamic)' : 'var(--text-primary)' }}>{track.title}</div>
+        <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 1 }}>{track.artist}{track.album ? ` · ${track.album}` : ''}</div>
+      </div>
+      <span style={{ fontSize: 11, color: 'var(--text-muted)', flexShrink: 0 }}>{track.duration ? fmt(track.duration) : ''}</span>
+    </div>
+  );
+}
+
+function Sheet({ open, onClose, title, children, h = '80vh' }) {
+  if (!open) return null;
+  return (
+    <div style={{ position: 'absolute', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.25)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', animation: 'fadeIn .2s ease both', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={onClose}>
+      <div className="glass-panel-strong" onClick={e => e.stopPropagation()} style={{ width: '70%', maxWidth: 520, maxHeight: h, borderRadius: 20, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px 10px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+          <span style={{ fontSize: 14, fontWeight: 700 }}>{title}</span>
+          <button onClick={onClose} className="glass-button" style={{ width: 30, height: 30, borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><X size={15} color="var(--text-secondary)" /></button>
+        </div>
+        <div style={{ flex: 1, overflowY: 'auto', padding: '6px 10px 20px' }}>{children}</div>
+      </div>
+    </div>
+  );
+}
+
+// 独立悬浮小圆按钮（无大框）
+function FloatBtn({ children, onClick, title, style }) {
+  return (
+    <button
+      onClick={onClick}
+      title={title}
+      className="glass-button"
+      style={{
+        width: 34, height: 34, borderRadius: '50%',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        flexShrink: 0, transition: 'all .2s ease',
+        color: 'var(--text-primary)',
+        background: 'rgba(255,255,255,0.06)',
+        borderColor: 'rgba(255,255,255,0.08)',
+        ...style,
+      }}
+    >{children}</button>
+  );
+}
+
+export default function Player({ onProfile }) {
+  const { currentTrack, isPlaying, currentTime, duration, volume, playMode, playlist, togglePlay, next, prev, seek, setVolume, toggleMode, playTrack, lyrics, currentLyric, isLoadingUrl, error, clearError, setError } = usePlayerStore();
+  const { userInfo, isLoggedIn } = useAuthStore();
+  const [sq, setSq] = useState(false); const [viz, setViz] = useState(false);
+  const [query, setQuery] = useState(''); const [results, setResults] = useState([]); const [searching, setSearching] = useState(false); const st = useRef(null);
+  const [vm, setVm] = useState(() => { try { return localStorage.getItem('sonus_viz_mode') || 'ring' } catch { return 'ring' } });
+  const [ac, setAc] = useState(() => { try { return localStorage.getItem('sonus_accent') || '#4FC3F7' } catch { return '#4FC3F7' } });
+  const [expanded, setExpanded] = useState(false);
+  const pr = useRef(null); const [sk, setSk] = useState(false);
+
+  const pct = duration ? (currentTime / duration) * 100 : 0;
+  const mi = playMode === 'single' ? <Repeat1 size={13} /> : playMode === 'random' ? <Shuffle size={13} /> : <Repeat size={13} />;
+  const mc = playMode === 'list' ? 'var(--text-secondary)' : 'var(--accent-dynamic)';
+  const av = userInfo?.avatar;
+  const accentRgb = hexToRgb(ac);
+
+  useEffect(() => { document.documentElement.style.setProperty('--accent-dynamic', ac); }, [ac]);
+  useEffect(() => { if (error) { const t = setTimeout(clearError, 5000); return () => clearTimeout(t); } }, [error, clearError]);
+
+  const doSearch = async kw => {
