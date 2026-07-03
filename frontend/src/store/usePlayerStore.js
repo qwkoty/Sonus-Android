@@ -137,7 +137,7 @@ export const usePlayerStore = create((set, get) => {
       let url = track.url || '';
       if (!url && track.rawId) {
         try {
-          url = await music.stream(track.rawId, cookie, uin, key);
+          url = await music.stream(track.rawId, cookie, uin, key, track.mediaMid || '');
         } catch (e) {
           console.error('获取播放链接失败', e);
         }

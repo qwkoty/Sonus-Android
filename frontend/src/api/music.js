@@ -1,5 +1,6 @@
 // music.js — Sonus 原生 APK 模式专用 API 层
 // 直接请求 QQ 音乐官方接口，通过 CookieReader 自动注入 Cookie，无 CORS 限制
+// 参照 Mineradio 项目的 QQ 音乐接口实现
 
 import { CookieReader } from '../plugins/CookieReader';
 
@@ -27,6 +28,18 @@ function decodeB64Utf8(b64) {
   }
 }
 
+// 从 Cookie 字符串中提取播放授权票据（qm_keyst 优先）
+function extractMusicKey(cookie) {
+  if (!cookie) return '';
+  // 按优先级匹配：qm_keyst > qqmusic_key > music_key > wxskey > p_skey > skey
+  const keys = ['qm_keyst', 'qqmusic_key', 'music_key', 'wxskey', 'p_skey', 'skey'];
+  for (const k of keys) {
+    const m = cookie.match(new RegExp(`(?:^|;\\s*)${k}=([^;]+)`));
+    if (m) return m[1];
+  }
+  return '';
+}
+
 // ==================== 搜索 ====================
 async function searchAPK(keyword, limit = 30) {
   const d = await nativeGet(qqUrl({
@@ -40,6 +53,7 @@ async function searchAPK(keyword, limit = 30) {
   return (d?.req_0?.data?.body?.song?.list || []).map((s) => ({
     id: `qq_${s.mid}`,
     rawId: s.mid,
+    mediaMid: s.file?.media_mid || '',
     platform: 'qq',
     title: s.name || '',
     artist: (s.singer || []).map((a) => a.name).join(' / '),
@@ -50,84 +64,95 @@ async function searchAPK(keyword, limit = 30) {
 }
 
 // ==================== 播放链接 ====================
-// 多策略 fallback：先试 m4a 标准音质，空了试 mp3，再试 songtype=1（VIP）
-// cookie 字符串优先注入请求头，保证登录态有效
-async function urlAPK(id, cookie = '', uin = '0', key = '') {
-  const rawId = String(id).replace(/^qq_/, '');
+// 参照 Mineradio 实现：
+// - filename = prefix + mediaId + ext（mediaId 优先用 mediaMid，其次 songmid）
+// - 一次性发送所有音质候选，取第一个有 purl 的
+// - musicKey 从 cookie 中提取 qm_keyst，作为 comm.authst
+// - 有 musicKey 时 ct=19，无时 ct=24
+async function urlAPK(id, cookie = '', uin = '0', _key = '', mediaMid = '') {
+  const songmid = String(id).replace(/^qq_/, '');
   const uinStr = String(uin || '0');
-  const loginflag = cookie ? 1 : 0;
   const cookieStr = cookie || '';
+
+  // 从 cookie 中提取播放授权票据
+  const musicKey = extractMusicKey(cookieStr);
+  const loginflag = musicKey ? 1 : 0;
 
   // 把登录 Cookie 同步到音频流域名，让 WebView Audio 播放时带登录态
   if (cookieStr) {
     try { await CookieReader.syncStreamCookies('https://y.qq.com'); } catch {}
   }
 
-  // 策略列表：音质前缀/后缀 + songtype 组合
-  const strategies = [
-    { prefix: 'C400', ext: '.m4a', songtype: 0 },
-    { prefix: 'M500', ext: '.mp3', songtype: 0 },
-    { prefix: 'M800', ext: '.mp3', songtype: 0 },
-    { prefix: 'C400', ext: '.m4a', songtype: 1 },
-    { prefix: 'M500', ext: '.mp3', songtype: 1 },
+  // 随机 guid
+  const guid = String(10000000 + Math.floor(Math.random() * 90000000));
+
+  // mediaId 候选：优先 mediaMid，其次 songmid
+  const mediaIds = [];
+  if (mediaMid) mediaIds.push(mediaMid);
+  if (songmid && !mediaIds.includes(songmid)) mediaIds.push(songmid);
+
+  // 音质候选（从高到低）
+  const qualityCandidates = [
+    { prefix: 'F000', ext: '.flac' },
+    { prefix: 'M800', ext: '.mp3' },
+    { prefix: 'C400', ext: '.m4a' },
+    { prefix: 'M500', ext: '.mp3' },
   ];
 
-  for (const s of strategies) {
-    try {
-      // 标准 filename 格式：前缀 + songmid + mediaId(默认=songmid) + 后缀
-      const file = `${s.prefix}${rawId}${rawId}${s.ext}`;
-      const guid = '10000';
-      const payload = {
-        req_0: {
-          module: 'vkey.GetVkeyServer',
-          method: 'CgiGetVkey',
-          param: {
-            filename: [file],
-            guid,
-            songmid: [rawId],
-            songtype: [s.songtype],
-            uin: uinStr,
-            loginflag,
-            platform: '20',
-          },
-        },
-        comm: {
-          uin: uinStr,
-          format: 'json',
-          ct: 19,
-          cv: 0,
-          authst: key || '',
-        },
-      };
-      const url = `https://u.y.qq.com/cgi-bin/musicu.fcg?-=getplaysongvkey&g_tk=5381&loginUin=${uinStr}&hostUin=0&format=json&inCharset=utf8&outCharset=utf-8&notice=0&platform=yqq.json&needNewCode=0&data=${encodeURIComponent(JSON.stringify(payload))}`;
-      const d = await nativeGet(url, cookieStr);
-      console.log('[vkey]', file, s.songtype, JSON.stringify(d?.req_0?.data?.midurlinfo?.[0]));
-      const item = d?.req_0?.data?.midurlinfo?.[0];
-      let domain = d?.req_0?.data?.sip?.find(i => !i.startsWith('http://ws'));
-      if (!domain) domain = d?.req_0?.data?.sip?.[0];
-      if (item?.purl && domain) {
-        const url = domain + item.purl;
-        console.log('[stream url]', url);
-        return url;
-      }
-    } catch (e) {
-      console.warn('[vkey failed]', s.songtype, e.message);
+  // 生成所有 filename 候选
+  const fileCandidates = mediaIds.flatMap(mediaId =>
+    qualityCandidates.map(item => ({ ...item, mediaId, filename: item.prefix + mediaId + item.ext }))
+  );
+  const filenames = fileCandidates.map(item => item.filename);
+
+  const param = {
+    guid,
+    songmid: filenames.map(() => songmid),
+    songtype: filenames.map(() => 0),
+    uin: uinStr,
+    loginflag,
+    platform: '20',
+    filename: filenames,
+  };
+
+  const comm = { uin: uinStr, format: 'json', ct: musicKey ? 19 : 24, cv: 0 };
+  if (musicKey) comm.authst = musicKey;
+
+  const payload = {
+    comm,
+    req_0: {
+      module: 'vkey.GetVkeyServer',
+      method: 'CgiGetVkey',
+      param,
+    },
+  };
+
+  try {
+    const url = qqUrl(payload);
+    const d = await nativeGet(url, cookieStr);
+    const data = d?.req_0?.data;
+    const infos = Array.isArray(data?.midurlinfo) ? data.midurlinfo : [];
+    const info = infos.find(item => item && item.purl) || infos[0];
+    const purl = info?.purl;
+
+    if (purl) {
+      const sip = (data?.sip?.[0]) || 'https://ws.stream.qqmusic.qq.com/';
+      const streamUrl = sip + purl;
+      console.log('[stream url]', streamUrl);
+      return streamUrl;
     }
+
+    const qqCode = info?.result || info?.code || info?.errtype;
+    console.warn('[vkey] no purl, qqCode:', qqCode, 'playbackKey:', !!musicKey, 'tried:', filenames.slice(0, 3));
+
+    // 104003 = 缺少播放授权，提示重新登录
+    if (qqCode === 104003 && !musicKey) {
+      console.error('[vkey] 104003: 缺少 qm_keyst 播放授权，请重新登录 QQ 音乐');
+    }
+  } catch (e) {
+    console.warn('[vkey failed]', e.message);
   }
 
-  // 最后 fallback：旧版 mobile express 接口
-  try {
-    const fb = await nativeGet(
-      `https://c.y.qq.com/base/fcgi-bin/fcg_music_express_mobile3.fcg?format=json205361747&songmid=${rawId}&filename=C400${rawId}.m4a&guid=10000&uin=${uinStr}&platform=yqq&cid=205361747`,
-      cookieStr
-    );
-    console.log('[express fallback]', JSON.stringify(fb));
-    const fi = fb?.data?.items?.[0];
-    if (fi?.url) return fi.url;
-    if (fi?.filename) return `https://dl.stream.qqmusic.qq.com/${fi.filename}`;
-  } catch (e) {
-    console.warn('[express fallback failed]', e.message);
-  }
   return '';
 }
 

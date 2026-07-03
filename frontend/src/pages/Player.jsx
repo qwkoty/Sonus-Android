@@ -10,6 +10,38 @@ const Visualizer3D = lazy(() => import('../components/Visualizer3D'));
 
 function fmt(s) { if (!s || isNaN(s)) return '0:00'; const m = Math.floor(s / 60), sec = Math.floor(s % 60); return `${m}:${sec.toString().padStart(2, '0')}`; }
 
+// HEX 转 HSL 色相
+function hexToHue(hex) {
+  const c = hex.replace('#', '');
+  const r = parseInt(c.substring(0, 2), 16) / 255;
+  const g = parseInt(c.substring(2, 4), 16) / 255;
+  const b = parseInt(c.substring(4, 6), 16) / 255;
+  const max = Math.max(r, g, b), min = Math.min(r, g, b);
+  if (max === min) return 0;
+  const d = max - min;
+  let h;
+  if (max === r) h = ((g - b) / d + (g < b ? 6 : 0)) / 6;
+  else if (max === g) h = ((b - r) / d + 2) / 6;
+  else h = ((r - g) / d + 4) / 6;
+  return Math.round(h * 360);
+}
+// HSL 转 HEX
+function hslToHex(h, s, l) {
+  s /= 100; l /= 100;
+  const c = (1 - Math.abs(2 * l - 1)) * s;
+  const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
+  const m = l - c / 2;
+  let r, g, b;
+  if (h < 60) [r, g, b] = [c, x, 0];
+  else if (h < 120) [r, g, b] = [x, c, 0];
+  else if (h < 180) [r, g, b] = [0, c, x];
+  else if (h < 240) [r, g, b] = [0, x, c];
+  else if (h < 300) [r, g, b] = [x, 0, c];
+  else [r, g, b] = [c, 0, x];
+  const toHex = v => Math.round((v + m) * 255).toString(16).padStart(2, '0');
+  return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+}
+
 const VIZ_MODES = [{ key: 'ring', label: '环', icon: '◯' }, { key: 'wave', label: '波', icon: '〜' }, { key: '3d', label: '3D', icon: '◆' }];
 const PRESETS = ['#4FC3F7', '#A78BFA', '#FF6B9D', '#4ADE80', '#FB923C', '#C0C0C0'];
 
@@ -214,10 +246,22 @@ export default function Player({ onProfile }) {
             <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginBottom: 8 }}>主题色</div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
               {PRESETS.map(c => <button key={c} onClick={() => { setAc(c); try { localStorage.setItem('sonus_accent', c) } catch { } }} style={{ width: 26, height: 26, borderRadius: '50%', background: c, border: ac === c ? '2px solid #fff' : '2px solid rgba(255,255,255,0.15)', cursor: 'pointer', boxShadow: ac === c ? `0 0 8px ${c}` : 'none', transition: '.2s' }} />)}
-              <label style={{ width: 26, height: 26, borderRadius: '50%', cursor: 'pointer', background: 'conic-gradient(red,orange,yellow,green,cyan,blue,purple,red)', border: '2px solid rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', overflow: 'hidden' }}>
-                <input type="color" value={ac} onChange={e => { setAc(e.target.value); try { localStorage.setItem('sonus_accent', e.target.value) } catch { } }} style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer' }} />
-                <span style={{ fontSize: 8, color: '#fff', pointerEvents: 'none', textShadow: '0 0 2px #000' }}>+</span>
-              </label>
+            </div>
+            {/* 自定义调色盘 */}
+            <div style={{ marginTop: 12, padding: 12, borderRadius: 14, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+                <div style={{ width: 36, height: 36, borderRadius: 10, background: ac, boxShadow: `0 0 12px ${ac}66`, flexShrink: 0, border: '1px solid rgba(255,255,255,0.15)' }} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 10, color: 'var(--text-secondary)', marginBottom: 2 }}>自定义颜色</div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: '#fff', fontFamily: 'monospace', textTransform: 'uppercase' }}>{ac}</div>
+                </div>
+                <label style={{ cursor: 'pointer', padding: '6px 12px', borderRadius: 8, background: 'rgba(255,255,255,0.1)', fontSize: 11, color: '#fff', flexShrink: 0 }}>
+                  选取
+                  <input type="color" value={ac} onChange={e => { setAc(e.target.value); try { localStorage.setItem('sonus_accent', e.target.value) } catch { } }} style={{ position: 'absolute', opacity: 0, width: 0, height: 0, pointerEvents: 'none' }} />
+                </label>
+              </div>
+              {/* 色相滑块 */}
+              <input type="range" min="0" max="360" step="1" value={hexToHue(ac)} onChange={e => { const h = parseInt(e.target.value); const c = hslToHex(h, 70, 60); setAc(c); try { localStorage.setItem('sonus_accent', c) } catch { } }} style={{ width: '100%', height: 8, borderRadius: 4, appearance: 'none', WebkitAppearance: 'none', background: 'linear-gradient(to right, hsl(0,70%,60%), hsl(60,70%,60%), hsl(120,70%,60%), hsl(180,70%,60%), hsl(240,70%,60%), hsl(300,70%,60%), hsl(360,70%,60%))', outline: 'none', cursor: 'pointer' }} />
             </div>
           </div>
         </div>
