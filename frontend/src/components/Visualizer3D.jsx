@@ -6,7 +6,7 @@ const GRID = 142;             // 142x142 = 20164 ≈ 2 万粒子
 const FOV = 55;
 
 // 3D 封面粒子画：2 万粒子在 X-Y 平面排满封面图像（每粒子颜色 = 封面对应像素）
-// 电影镜头：相机缓慢推拉 + 轨道旋转 + 微俯仰，营造电影感
+// 电影镜头：用户双指捏合缩放 + 双指划拉旋转（手势驱动）
 // 呼吸动画：整体 scale 随时间正弦呼吸
 // 待机动画：无音频时粒子做径向涟漪 + 波浪起伏
 // 音频响应：中心 = 低频（bass），向外依次 mid / treble，频率随距中心距离递增
@@ -20,6 +20,19 @@ export default function Visualizer3D({ accent = '#4FC3F7', cover = '', onReady }
   useEffect(() => { onReadyRef.current = onReady; }, [onReady]);
   useEffect(() => { accentRef.current = accent; }, [accent]);
   useEffect(() => { coverRef.current = cover; }, [cover]);
+
+  // 手势状态（双指缩放 + 旋转）
+  const gestureRef = useRef({
+    zoom: 1.0,           // 当前缩放倍率
+    rotation: 0,         // 当前旋转角度（弧度）
+    targetZoom: 1.0,     // 目标缩放（平滑过渡）
+    targetRotation: 0,   // 目标旋转
+    pinching: false,
+    startDist: 0,
+    startAngle: 0,
+    startZoom: 1.0,
+    startRot: 0,
+  });
 
   // 加载封面并采样为 ImageData
   useEffect(() => {
@@ -251,22 +264,23 @@ export default function Visualizer3D({ accent = '#4FC3F7', cover = '', onReady }
       posAttr.needsUpdate = true;
       if (needColorUpdate) colorAttr.needsUpdate = true;
 
-      // ===== 电影镜头：缓慢推拉 + 轨道旋转 + 微俯仰 =====
-      // 推拉：相机沿 Z 轴在 cameraZ * 0.85 ~ cameraZ * 1.15 之间缓慢移动
-      const zoomPhase = Math.sin(time * 0.18) * 0.5 + 0.5;   // 0..1
-      const zoom = cameraZ * (0.88 + zoomPhase * 0.20);
-      // 轨道旋转：相机绕 Y 轴缓慢公转（幅度小，避免边缘溢出）
-      const orbitAngle = time * 0.12;
-      const orbitR = planeSize * 0.18;
-      camera.position.x = Math.sin(orbitAngle) * orbitR;
-      camera.position.y = Math.sin(time * 0.22) * planeSize * 0.10;
-      camera.position.z = zoom;
-      // 微俯仰
+      // ===== 电影镜头：手势驱动（双指缩放 + 旋转）=====
+      const g = gestureRef.current;
+      // 平滑过渡到目标值（弹性手感）
+      g.zoom += (g.targetZoom - g.zoom) * 0.18;
+      g.rotation += (g.targetRotation - g.rotation) * 0.18;
+      // 缩放限制 0.4 ~ 3.0
+      const clampedZoom = Math.max(0.4, Math.min(3.0, g.zoom));
+      camera.position.z = cameraZ / clampedZoom;
+      // 用户旋转直接应用到粒子整体
+      points.rotation.y = g.rotation;
+      // 微俯仰保持 3D 感
+      points.rotation.x = -0.18;
+      camera.position.x = 0;
+      camera.position.y = 0;
       camera.lookAt(0, 0, 0);
 
-      // 粒子整体缓慢摇摆增强 3D 感
-      points.rotation.y = Math.sin(time * 0.25) * 0.28;
-      points.rotation.x = -0.30 + Math.sin(time * 0.35) * 0.07;
+      // 整体呼吸缩放（基础呼吸 + bass 增强）
       const sc = breath;
       points.scale.set(sc, sc, 1);
 
@@ -279,6 +293,46 @@ export default function Visualizer3D({ accent = '#4FC3F7', cover = '', onReady }
       raf = requestAnimationFrame(animate);
     };
     animate();
+
+    // ===== 手势控制：双指缩放 + 旋转 =====
+    const dom = renderer.domElement;
+    const dist = (t1, t2) => Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
+    const angle = (t1, t2) => Math.atan2(t2.clientY - t1.clientY, t2.clientX - t1.clientX);
+    const onTouchStart = (e) => {
+      if (e.touches.length === 2) {
+        const g = gestureRef.current;
+        g.pinching = true;
+        g.startDist = dist(e.touches[0], e.touches[1]);
+        g.startAngle = angle(e.touches[0], e.touches[1]);
+        g.startZoom = g.targetZoom;
+        g.startRot = g.targetRotation;
+      }
+    };
+    const onTouchMove = (e) => {
+      const g = gestureRef.current;
+      if (!g.pinching || e.touches.length !== 2) return;
+      e.preventDefault();
+      const d = dist(e.touches[0], e.touches[1]);
+      const a = angle(e.touches[0], e.touches[1]);
+      // 缩放 = 当前距离 / 起始距离
+      const scale = d / Math.max(1, g.startDist);
+      g.targetZoom = Math.max(0.4, Math.min(3.0, g.startZoom * scale));
+      // 旋转 = 当前角度 - 起始角度
+      g.targetRotation = g.startRot + (a - g.startAngle);
+    };
+    const onTouchEnd = (e) => {
+      if (e.touches.length < 2) gestureRef.current.pinching = false;
+    };
+    // 鼠标滚轮缩放（桌面端调试用）
+    const onWheel = (e) => {
+      const g = gestureRef.current;
+      g.targetZoom = Math.max(0.4, Math.min(3.0, g.targetZoom * (e.deltaY > 0 ? 0.92 : 1.08)));
+    };
+    dom.style.touchAction = 'none';
+    dom.addEventListener('touchstart', onTouchStart, { passive: false });
+    dom.addEventListener('touchmove', onTouchMove, { passive: false });
+    dom.addEventListener('touchend', onTouchEnd);
+    dom.addEventListener('wheel', onWheel, { passive: true });
 
     const handleResize = () => {
       computeLayout();
@@ -293,6 +347,10 @@ export default function Visualizer3D({ accent = '#4FC3F7', cover = '', onReady }
     return () => {
       cancelAnimationFrame(raf);
       window.removeEventListener('resize', handleResize);
+      dom.removeEventListener('touchstart', onTouchStart);
+      dom.removeEventListener('touchmove', onTouchMove);
+      dom.removeEventListener('touchend', onTouchEnd);
+      dom.removeEventListener('wheel', onWheel);
       renderer.dispose();
       geometry.dispose();
       material.dispose();

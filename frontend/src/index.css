@@ -17,20 +17,20 @@
   --radius-lg: 18px;
   --radius-xl: 24px;
 
-  /* 玻璃 — 暗黑半透明 */
-  --glass-bg: rgba(255, 255, 255, 0.04);
-  --glass-bg-hover: rgba(255, 255, 255, 0.07);
-  --glass-bg-active: rgba(255, 255, 255, 0.1);
-  --glass-bg-strong: rgba(255, 255, 255, 0.06);
-  --glass-border: rgba(255, 255, 255, 0.1);
-  --glass-border-strong: rgba(255, 255, 255, 0.14);
-  --glass-blur: 16px;
-  --glass-blur-heavy: 32px;
-  --glass-saturate: 120%;
+  /* 玻璃 — 暗黑半透明（更通透更明显） */
+  --glass-bg: rgba(255, 255, 255, 0.06);
+  --glass-bg-hover: rgba(255, 255, 255, 0.10);
+  --glass-bg-active: rgba(255, 255, 255, 0.13);
+  --glass-bg-strong: rgba(255, 255, 255, 0.10);
+  --glass-border: rgba(255, 255, 255, 0.14);
+  --glass-border-strong: rgba(255, 255, 255, 0.18);
+  --glass-blur: 20px;
+  --glass-blur-heavy: 40px;
+  --glass-saturate: 140%;
   --glass-shadow: 0 4px 16px rgba(0,0,0,0.5);
   --glass-shadow-lg: 0 8px 32px rgba(0,0,0,0.6);
-  --glass-highlight: inset 0 1px 0 rgba(255,255,255,0.06);
-  --glass-highlight-strong: inset 0 1px 0 rgba(255,255,255,0.1);
+  --glass-highlight: inset 0 1px 0 rgba(255,255,255,0.10);
+  --glass-highlight-strong: inset 0 1px 0 rgba(255,255,255,0.14);
 
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
