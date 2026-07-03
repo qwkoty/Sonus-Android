@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
-  ArrowLeft, ChevronRight, Loader2, Music2, Crown, Users,
+  ArrowLeft, ChevronRight, Loader2, Music2,
   LogOut, Play, User as UserIcon, RefreshCw,
 } from 'lucide-react';
 import { useAuthStore } from '../store/useAuthStore';
@@ -212,32 +212,13 @@ export default function Profile({ onBack }) {
                 }
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                  <span style={{
-                    fontSize: 18, fontWeight: 700,
-                    whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-                  }}>
-                    {loadingInfo && !nickname ? '加载中…' : nickname}
-                  </span>
-                  {userInfo?.vipLevel > 0 && (
-                    <span style={{
-                      display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 10,
-                      padding: '2px 7px', borderRadius: 6,
-                      background: 'linear-gradient(135deg, #FFD700, #FFA500)', color: '#3a2200',
-                      fontWeight: 700,
-                    }}>
-                      <Crown size={11} /> VIP {userInfo.vipLevel}
-                    </span>
-                  )}
-                </div>
-                <div style={{ display: 'flex', gap: 16, marginTop: 8, fontSize: 12, color: 'var(--text-secondary)' }}>
-                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                    <Users size={12} /> 关注 {userInfo?.follow ?? 0}
-                  </span>
-                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                    <Users size={12} /> 粉丝 {userInfo?.fans ?? 0}
-                  </span>
-                </div>
+                <span style={{
+                  fontSize: 18, fontWeight: 700,
+                  whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                  display: 'block',
+                }}>
+                  {loadingInfo && !nickname ? '加载中…' : nickname}
+                </span>
               </div>
             </div>
 
