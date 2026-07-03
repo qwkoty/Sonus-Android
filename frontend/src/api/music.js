@@ -1,164 +1,89 @@
-// music.js — APK 模式直连 QQ 音乐 API / 浏览器走后端代理
-import { CapacitorHttp } from '@capacitor/core';
+// music.js — APK 用原生 httpGet（自动带 Cookie），浏览器走后端代理
 import { isAndroid } from '../utils/platform';
+import { CookieReader } from '../plugins/CookieReader';
 
 const BASE = import.meta.env.VITE_API_BASE || '';
+const DIR = isAndroid();
 
-const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
-const HEADERS = { 'User-Agent': UA, Referer: 'https://y.qq.com/' };
-
-// ===== 后端代理请求（浏览器模式） =====
-async function proxyGet(path, timeout = 30000) {
-  const ctrl = new AbortController();
-  const t = setTimeout(() => ctrl.abort(), timeout);
-  try {
-    const r = await fetch(`${BASE}${path}`, { signal: ctrl.signal });
-    if (!r.ok) throw new Error(`HTTP ${r.status}`);
-    const j = await r.json();
-    if (j && 'data' in j) return j.data;
-    if (j && j.error) throw new Error(j.error);
-    return j;
-  } finally { clearTimeout(t); }
+// ===== 后端代理（浏览器） =====
+async function pget(path, to = 30000) {
+  const c = new AbortController(); const t = setTimeout(() => c.abort(), to);
+  try { const r = await fetch(`${BASE}${path}`, { signal: c.signal }); if (!r.ok) throw new Error(`HTTP ${r.status}`); const j = await r.json(); return j?.data || j; } finally { clearTimeout(t); }
 }
-async function proxyPost(path, body, timeout = 30000) {
-  const ctrl = new AbortController();
-  const t = setTimeout(() => ctrl.abort(), timeout);
-  try {
-    const r = await fetch(`${BASE}${path}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal: ctrl.signal });
-    if (!r.ok) throw new Error(`HTTP ${r.status}`);
-    const j = await r.json();
-    if (j && 'data' in j) return j.data;
-    if (j && j.error) throw new Error(j.error);
-    return j;
-  } finally { clearTimeout(t); }
+async function ppost(path, b, to = 30000) {
+  const c = new AbortController(); const t = setTimeout(() => c.abort(), to);
+  try { const r = await fetch(`${BASE}${path}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(b), signal: c.signal }); if (!r.ok) throw new Error(`HTTP ${r.status}`); const j = await r.json(); return j?.data || j; } finally { clearTimeout(t); }
 }
 
-// ===== CapacitorHttp 直连 QQ 音乐（APK 模式） =====
-async function qqApi(payload) {
-  const r = await CapacitorHttp.request({
-    method: 'GET',
-    url: 'https://u.y.qq.com/cgi-bin/musicu.fcg',
-    headers: HEADERS,
-    params: { data: JSON.stringify(payload) },
-    responseType: 'json',
-    connectTimeout: 12000,
-    readTimeout: 12000,
-  });
-  return r.data;
+// ===== APK 原生请求：CookieReader.httpGet 自动从 CookieManager 带 Cookie =====
+async function nativeGet(url) {
+  const r = await CookieReader.httpGet(url);
+  if (!r.ok || !r.body) throw new Error(`HTTP ${r.status}`);
+  return JSON.parse(r.body);
 }
 
-async function qqApiWithCookie(payload, cookie) {
-  const hdr = { ...HEADERS };
-  if (cookie) hdr['Cookie'] = cookie;
-  const r = await CapacitorHttp.request({
-    method: 'GET',
-    url: 'https://u.y.qq.com/cgi-bin/musicu.fcg',
-    headers: hdr,
-    params: { data: JSON.stringify(payload) },
-    responseType: 'json',
-    connectTimeout: 12000,
-    readTimeout: 12000,
-  });
-  return r.data;
+// 拼装 musicu.fcg 请求
+function qqUrl(payload) {
+  return `https://u.y.qq.com/cgi-bin/musicu.fcg?data=${encodeURIComponent(JSON.stringify(payload))}`;
 }
 
-// ===== 搜索（APK 直连） =====
-async function searchDirect(keyword, limit = 30) {
-  const data = await qqApi({
-    req_0: { module: 'music.search.SearchCgiService', method: 'DoSearchForQQMusicDesktop', param: { num_per_page: limit, page_num: 1, query: keyword, search_type: 0 } },
-    comm: { g_tk: 5381, uin: '0', format: 'json', ct: 24, cv: 0, platform: 'h5' },
-  });
-  return (data?.req_0?.data?.body?.song?.list || []).map(s => ({
-    id: `qq_${s.mid}`, rawId: s.mid, platform: 'qq',
-    title: s.name || s.title || '',
-    artist: (s.singer || []).map(a => a.name).join(' / '),
-    album: s.album?.name || '',
-    cover: s.album?.mid ? `https://y.gtimg.cn/music/photo_new/T002R300x300M000${s.album.mid}.jpg` : '',
-    duration: s.interval || 0,
-  }));
+// ===== 搜索 =====
+async function searchAPK(keyword, limit = 30) {
+  const d = await nativeGet(qqUrl({ req_0: { module: 'music.search.SearchCgiService', method: 'DoSearchForQQMusicDesktop', param: { num_per_page: limit, page_num: 1, query: keyword, search_type: 0 } }, comm: { g_tk: 5381, uin: '0', format: 'json', ct: 24, cv: 0, platform: 'h5' } }));
+  return (d?.req_0?.data?.body?.song?.list || []).map(s => ({ id: `qq_${s.mid}`, rawId: s.mid, platform: 'qq', title: s.name || '', artist: (s.singer || []).map(a => a.name).join(' / '), album: s.album?.name || '', cover: s.album?.mid ? `https://y.gtimg.cn/music/photo_new/T002R300x300M000${s.album.mid}.jpg` : '', duration: s.interval || 0 }));
 }
+async function searchWeb(k, l) { return pget(`/api/music/search?keyword=${encodeURIComponent(k)}&limit=${l}`); }
 
-// ===== 搜索（浏览器代理） =====
-async function searchProxy(keyword, limit = 30) {
-  return proxyGet(`/api/music/search?keyword=${encodeURIComponent(keyword)}&limit=${limit}`);
-}
-
-// ===== 播放链接（APK 直连） =====
-async function urlDirect(id, cookie = '', uin = '0') {
+// ===== 播放链接 =====
+async function urlAPK(id, cookie = '', uin = '0') {
   const rawId = String(id).replace(/^qq_/, '');
-  const loginflag = cookie ? 1 : 0;
-  const data = await qqApiWithCookie({
-    req_0: { module: 'music.vkey.GetVkeyServer', method: 'CgiGetVkey', param: { guid: '10000', songmid: rawId, songtype: 0, uin: String(uin), loginflag, platform: '23', h5to: 'speed' } },
-    comm: { uin: String(uin), format: 'json', ct: 24, cv: 0 },
-  }, cookie);
-  const item = data?.req_0?.data?.midurlinfo?.[0];
-  const sip = data?.req_0?.data?.sip?.[0];
+  const d = await nativeGet(qqUrl({ req_0: { module: 'music.vkey.GetVkeyServer', method: 'CgiGetVkey', param: { guid: '10000', songmid: rawId, songtype: 0, uin: String(uin), loginflag: cookie ? 1 : 0, platform: '23', h5to: 'speed' } }, comm: { uin: String(uin), format: 'json', ct: 24, cv: 0 } }));
+  const item = d?.req_0?.data?.midurlinfo?.[0], sip = d?.req_0?.data?.sip?.[0];
   return (item?.purl && sip) ? sip + item.purl : '';
 }
+async function urlWeb(id, c = '', u = '0') { return pget(`/api/music/url?id=${encodeURIComponent(id)}&cookie=${encodeURIComponent(c)}&uin=${encodeURIComponent(u)}`); }
 
-// ===== 播放链接（浏览器代理） =====
-async function urlProxy(id, cookie = '', uin = '0') {
-  return proxyGet(`/api/music/url?id=${encodeURIComponent(id)}&cookie=${encodeURIComponent(cookie)}&uin=${encodeURIComponent(uin)}`);
-}
-
-// ===== 歌词（APK 直连） =====
-async function lyricDirect(id) {
+// ===== 歌词 =====
+async function lyricAPK(id) {
   const rawId = String(id).replace(/^qq_/, '');
-  const data = await qqApi({ req_0: { module: 'music.musichallSong.PlayLyricInfo', method: 'GetPlayLyricInfo', param: { songMID: rawId } }, comm: { uin: '0', format: 'json', ct: 24, cv: 0 } });
-  const b64 = data?.req_0?.data?.lyric;
-  if (!b64) return '';
-  try { return Buffer.from(b64, 'base64').toString('utf-8'); } catch { const s = atob(b64); const ua = new Uint8Array(s.length); for (let i=0;i<s.length;i++) ua[i]=s.charCodeAt(i); return new TextDecoder().decode(ua); }
+  const d = await nativeGet(qqUrl({ req_0: { module: 'music.musichallSong.PlayLyricInfo', method: 'GetPlayLyricInfo', param: { songMID: rawId } }, comm: { uin: '0', format: 'json', ct: 24, cv: 0 } }));
+  const b64 = d?.req_0?.data?.lyric; if (!b64) return '';
+  try { return Buffer.from(b64, 'base64').toString('utf-8'); } catch { const s = atob(b64); const ua = new Uint8Array(s.length); for (let i = 0; i < s.length; i++) ua[i] = s.charCodeAt(i); return new TextDecoder().decode(ua); }
 }
-
-// ===== 歌词（浏览器代理） =====
-async function lyricProxy(id) {
-  const r = await proxyGet(`/api/music/lyric?id=${encodeURIComponent(id)}`);
-  return r?.lyric || '';
-}
+async function lyricWeb(id) { const r = await pget(`/api/music/lyric?id=${encodeURIComponent(id)}`); return r?.lyric || ''; }
 
 // ===== 用户信息 =====
-async function userInfoDirect(cookie, uin) {
-  const data = await qqApiWithCookie({ comm: { uin: String(uin), format: 'json', ct: 24, cv: 0 }, req_0: { module: 'music.UserInfo.userInfoServer', method: 'GetLoginUserInfo', param: {} } }, cookie);
-  const info = data?.req_0?.data;
-  return { nickname: info?.nick || 'QQ音乐用户', avatar: info?.headpic || '', uin: String(uin), vipLevel: info?.vipLevel || 0, follow: info?.follow || 0, fans: info?.fans || 0 };
+async function userInfoAPK(uin) {
+  const d = await nativeGet(qqUrl({ comm: { uin: String(uin), format: 'json', ct: 24, cv: 0 }, req_0: { module: 'music.UserInfo.userInfoServer', method: 'GetLoginUserInfo', param: {} } }));
+  const i = d?.req_0?.data;
+  return { nickname: i?.nick || 'QQ音乐用户', avatar: i?.headpic || '', uin: String(uin), vipLevel: i?.vipLevel || 0, follow: i?.follow || 0, fans: i?.fans || 0 };
 }
 
-// ===== 用户歌单 =====
-async function userPlaylistsDirect(cookie, uin) {
-  const data = await qqApiWithCookie({ comm: { uin: String(uin), format: 'json', ct: 24, cv: 0 }, req_0: { module: 'music.musicasset.PlaylistBaseRead', method: 'GetPlaylistByUin', param: { uin: String(uin), num: 100, order: 0 } } }, cookie);
-  return (data?.req_0?.data?.v_playlist || []).map(p => ({ id: p.tid || p.dirId || '', name: p.diss_name || p.dirName || '歌单', cover: p.diss_cover || p.picurl || '', songCount: p.song_nums || p.songNum || 0 }));
+// ===== 歌单 =====
+async function playlistsAPK(uin) {
+  const d = await nativeGet(qqUrl({ comm: { uin: String(uin), format: 'json', ct: 24, cv: 0 }, req_0: { module: 'music.musicasset.PlaylistBaseRead', method: 'GetPlaylistByUin', param: { uin: String(uin), num: 100, order: 0 } } }));
+  return (d?.req_0?.data?.v_playlist || []).map(p => ({ id: p.tid || p.dirId || '', name: p.diss_name || p.dirName || '歌单', cover: p.diss_cover || p.picurl || '', songCount: p.song_nums || p.songNum || 0 }));
 }
 
-// ===== 歌单详情 =====
-async function playlistDirect(id, cookie = '') {
-  const data = await qqApiWithCookie({ comm: { uin: '0', format: 'json', ct: 24, cv: 0 }, req_0: { module: 'music.srfDissInfo.aiDissInfo', method: 'uniform_get_Dissinfo', param: { disstid: Number(id), song_num: 1000, song_begin: 0, info: 1 } } }, cookie);
-  const dirinfo = data?.req_0?.data?.dirinfo, songlist = data?.req_0?.data?.songlist || [];
-  return { name: dirinfo?.title || '歌单', cover: dirinfo?.picurl || '', tracks: songlist.map(s => ({ id: `qq_${s.mid}`, rawId: s.mid, platform: 'qq', title: s.name || '', artist: (s.singer || []).map(a => a.name).join(' / '), album: s.album?.name || '', cover: s.album?.mid ? `https://y.gtimg.cn/music/photo_new/T002R300x300M000${s.album.mid}.jpg` : '', duration: s.interval || 0 })) };
-}
-
-// ===== Cookie 登录 =====
-async function loginByCookieDirect(cookie) {
+// ===== Cookie 登录验证 =====
+async function loginByCookieAPK(cookie) {
   const m = cookie.match(/(?:^|;\s*)(?:uin|wxuin)=o?(\d+)/);
   if (!m) return { code: 800, msg: '未找到 uin' };
   const uin = m[1], key = (cookie.match(/(?:^|;\s*)(qqmusic_key|qm_keyst|p_skey|skey)=([^;]+)/) || [])[2] || '';
-  try { const info = await userInfoDirect(cookie, uin); return { code: 0, msg: 'ok', cookie, uin, key, nickname: info.nickname || 'QQ音乐用户' }; }
+  try { const i = await userInfoAPK(uin); return { code: 0, msg: 'ok', cookie, uin, key, nickname: i.nickname }; }
   catch { return { code: 800, msg: 'cookie 验证失败' }; }
 }
 
-// ===== 统一导出 =====
-const DIR = isAndroid();
-
 export const music = {
-  search: DIR ? searchDirect : searchProxy,
-  url: DIR ? urlDirect : urlProxy,
-  // stream 返回直链 URL 字符串（用于 audio.src）
-  stream: (id, cookie = '', uin = '0') => DIR ? urlDirect(id, cookie, uin) : `${BASE}/api/music/stream?id=${encodeURIComponent(id)}&cookie=${encodeURIComponent(cookie)}&uin=${encodeURIComponent(uin)}`,
-  cover: (url) => url,
-  lyric: DIR ? lyricDirect : lyricProxy,
-  loginQrCode: () => proxyGet('/api/music/login/qq/qrcode'),
-  loginByRedirect: (u, q) => proxyPost('/api/music/login/qq/redirect', { redirectUrl: u, qrsig: q }),
-  loginByCookie: DIR ? loginByCookieDirect : (c) => proxyPost('/api/music/login/qq/cookie', { cookie: c }),
-  userInfo: DIR ? userInfoDirect : (c, u) => proxyGet(`/api/music/user/qq/info?cookie=${encodeURIComponent(c)}&uin=${encodeURIComponent(u)}`),
-  userPlaylists: DIR ? userPlaylistsDirect : (c, u) => proxyGet(`/api/music/user/qq/playlists?cookie=${encodeURIComponent(c)}&uin=${encodeURIComponent(u)}`),
-  playlist: DIR ? playlistDirect : (id, c = '') => proxyGet(`/api/music/playlist?id=${encodeURIComponent(id)}&cookie=${encodeURIComponent(c)}`),
+  search: DIR ? searchAPK : searchWeb,
+  url: DIR ? urlAPK : urlWeb,
+  stream: (id, c = '', u = '0') => DIR ? urlAPK(id, c, u) : `${BASE}/api/music/stream?id=${encodeURIComponent(id)}&cookie=${encodeURIComponent(c)}&uin=${encodeURIComponent(u)}`,
+  cover: url => url,
+  lyric: DIR ? lyricAPK : lyricWeb,
+  loginQrCode: () => pget('/api/music/login/qq/qrcode'),
+  loginByRedirect: (u, q) => ppost('/api/music/login/qq/redirect', { redirectUrl: u, qrsig: q }),
+  loginByCookie: DIR ? loginByCookieAPK : c => ppost('/api/music/login/qq/cookie', { cookie: c }),
+  userInfo: (c, u) => DIR ? userInfoAPK(u) : pget(`/api/music/user/qq/info?cookie=${encodeURIComponent(c)}&uin=${encodeURIComponent(u)}`),
+  userPlaylists: (c, u) => DIR ? playlistsAPK(u) : pget(`/api/music/user/qq/playlists?cookie=${encodeURIComponent(c)}&uin=${encodeURIComponent(u)}`),
+  playlist: (id, c = '') => DIR ? pget(`/api/music/playlist?id=${encodeURIComponent(id)}&cookie=${encodeURIComponent(c)}`) : pget(`/api/music/playlist?id=${encodeURIComponent(id)}&cookie=${encodeURIComponent(c)}`),
 };

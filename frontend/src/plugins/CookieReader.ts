@@ -1,53 +1,37 @@
 // CookieReader — Capacitor 原生插件桥接
-// 在 Android 上读取 WebView CookieManager 的 Cookie（不受 document.cookie 跨域限制）
-// 在浏览器环境中降级为空实现
-
 import { registerPlugin } from '@capacitor/core';
 
 export interface CookieReaderResult {
-  cookie: string;
-  uin: string;
-  qqmusic_key: string;
-  login_type: string;
-  loggedIn: boolean;
+  cookie: string; uin: string; qqmusic_key: string; login_type: string; loggedIn: boolean;
 }
-
-export interface OpenLoginResult {
-  loggedIn: boolean;
+export interface HttpGetResult {
+  status: number; body: string; ok: boolean;
 }
-
 export interface CookieReaderPlugin {
   getCookiesForUrl(options: { url: string }): Promise<CookieReaderResult>;
   clearCookiesForUrl(options: { url: string }): Promise<void>;
-  openLoginWebView(): Promise<OpenLoginResult>;
+  httpGet(options: { url: string; cookieDomain?: string }): Promise<HttpGetResult>;
+  openLoginWebView(): Promise<{ loggedIn: boolean }>;
 }
 
-const CookieReaderNative = registerPlugin<CookieReaderPlugin>('CookieReader');
+const Native = registerPlugin<CookieReaderPlugin>('CookieReader');
+const IS_CAP = () => typeof window !== 'undefined' && window.Capacitor?.isNativePlatform?.();
 
 export const CookieReader = {
-  isAvailable: () => {
-    return typeof window !== 'undefined' && window.Capacitor?.isNativePlatform?.();
-  },
-
+  isAvailable: IS_CAP,
   getCookiesForUrl: async (url: string): Promise<CookieReaderResult> => {
-    if (!CookieReader.isAvailable()) {
-      return { cookie: '', uin: '', qqmusic_key: '', login_type: '', loggedIn: false };
-    }
-    return await CookieReaderNative.getCookiesForUrl({ url });
+    if (!IS_CAP()) return { cookie: '', uin: '', qqmusic_key: '', login_type: '', loggedIn: false };
+    return Native.getCookiesForUrl({ url });
   },
-
-  clearCookiesForUrl: async (url: string): Promise<void> => {
-    if (!CookieReader.isAvailable()) return;
-    return await CookieReaderNative.clearCookiesForUrl({ url });
+  clearCookiesForUrl: async (url: string) => { if (IS_CAP()) return Native.clearCookiesForUrl({ url }); },
+  // 原生 HTTP GET：自动注入 CookieManager 里对应域的 Cookie，零 CORS 限制
+  httpGet: async (url: string, cookieDomain = 'https://y.qq.com'): Promise<HttpGetResult> => {
+    if (!IS_CAP()) throw new Error('Not in Capacitor');
+    return Native.httpGet({ url, cookieDomain });
   },
-
-  // 通过 Capacitor 插件打开 QQ 音乐登录 WebView，Promise 在用户登录完成后 resolve
-  openLoginWebView: async (): Promise<OpenLoginResult> => {
-    if (!CookieReader.isAvailable()) {
-      throw new Error('CookieReader not available (browser environment)');
-    }
-    return await CookieReaderNative.openLoginWebView();
+  openLoginWebView: async () => {
+    if (!IS_CAP()) throw new Error('Not in Capacitor');
+    return Native.openLoginWebView();
   },
 };
-
 export default CookieReader;
