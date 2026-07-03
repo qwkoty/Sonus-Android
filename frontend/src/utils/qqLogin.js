@@ -61,11 +61,12 @@ export function qqQrCheckJsonp(qrsig) {
 
     const script = document.createElement('script');
     script.src = `https://ssl.ptlogin2.qq.com/ptqrlogin?${params}`;
-    script.onerror = () => finish({ code: -1, msg: '网络错误，可能是浏览器拦截了 ptlogin2 域名' });
+    // 触发场景：QQ 网关普遍 403（不是 CORS，不是浏览器拦截）
+    script.onerror = () => finish({ code: -1, msg: '扫码状态检测失败（QQ 接口暂不可用）' });
     document.head.appendChild(script);
 
-    // 15s 超时（原 10s 偶尔在弱网下不够）
-    const timer = setTimeout(() => finish({ code: -1, msg: '请求超时' }), 15000);
+    // 15s 超时
+    const timer = setTimeout(() => finish({ code: -1, msg: '扫码状态检测超时' }), 15000);
   });
 }
 
@@ -126,11 +127,13 @@ export function qqQrPoll(qrsig, callbacks) {
       default:
         // -1 或未知
         errorStreak++;
-        if (errorStreak >= 3) {
-          onError && onError(res.msg || '网络异常，已停止轮询');
+        // 风控场景下一直会 403，不要快速停止——给用户扫码留时间
+        // 改为只要 phase 还停留足够时间就继续重试
+        if (errorStreak >= 6) {
+          onError && onError(res.msg || '扫码状态检测持续失败，请用 Cookie 模式登录');
           return;
         }
-        onError && onError(res.msg || '网络异常，重试中…');
+        onError && onError(res.msg || '扫码状态检测重试中…');
         break;
     }
 
