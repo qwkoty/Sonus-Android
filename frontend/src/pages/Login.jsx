@@ -1,36 +1,35 @@
 import { useState, useRef, useEffect } from 'react';
-import { RefreshCw, Loader2, Music, ArrowLeft, Cookie, ChevronDown, ChevronUp } from 'lucide-react';
+import { RefreshCw, Loader2, Music, ArrowLeft, User, ListMusic, LogOut, CheckCircle2, AlertCircle } from 'lucide-react';
 import { music } from '../api/music';
 import { useAuthStore } from '../store/useAuthStore';
-import { qqQrPoll } from '../utils/qqLogin';
+import { qqQrCheckJsonp } from '../utils/qqLogin';
 
-// 登录流程：
-// 主模式：自动轮询扫码登录（前端 JSONP 请求 ptqrlogin，绕过服务器 IP 风控）
-//   - 注：若 QQ 网关普遍返回 403（不响应 JSONP），轮询会一直超时；
-//     此时用户切换到"Cookie 导入"模式即可
-// 兜底模式：从浏览器复制 QQ 音乐已登录的 Cookie 粘贴登录
+// 登录流程（手动确认模式）：
+// 1. 进入页面 → 请求二维码（含 login_sig）
+// 2. 用户用手机扫码并在 QQ 中点"确认登录"
+// 3. 用户点"我已扫码登录"按钮 → 前端 JSONP 检查 ptqrlogin 状态
+// 4. 检查成功（code=0）→ 后端跟随 redirectUrl 收集 cookie → setAuth → 切到账号页
+// 5. 账号页显示头像/昵称/VIP，下方"查看我的歌单"按钮按需加载
 export default function Login({ onBack }) {
-  const setAuth = useAuthStore((s) => s.setAuth);
+  const { setAuth, isLoggedIn, userInfo, cookie, uin, nickname, logout, fetchUserInfo } = useAuthStore();
 
-  const [mode, setMode] = useState('qr'); // 'qr' | 'cookie'
+  // view: 'qr' | 'account'  — 已登录显示账号页，否则显示扫码页
+  const [view, setView] = useState(isLoggedIn ? 'account' : 'qr');
 
   // QR 模式状态
   const [qrcode, setQrcode] = useState('');
-  // phase: loading | waiting | scanned | logging | expired | error
+  // phase: loading | waiting | checking | error
   const [phase, setPhase] = useState('loading');
   const [tip, setTip] = useState('正在加载二维码…');
   const [errorMsg, setErrorMsg] = useState('');
   const qrsigRef = useRef('');
-  const loginSigRef = useRef(''); // 关键：xlogin 返回的 login_sig，ptqrlogin 必须带
-  const stopPollRef = useRef(null);
+  const loginSigRef = useRef('');
 
-  // Cookie 模式状态
-  const [cookieInput, setCookieInput] = useState('');
-  const [cookieLogging, setCookieLogging] = useState(false);
-  const [cookieError, setCookieError] = useState('');
+  // 歌单状态
+  const [playlists, setPlaylists] = useState(null); // null=未请求, []=空, [...]=有数据
+  const [loadingPlaylists, setLoadingPlaylists] = useState(false);
 
   const fetchQr = async () => {
-    if (stopPollRef.current) { stopPollRef.current(); stopPollRef.current = null; }
     setPhase('loading');
     setTip('正在加载二维码…');
     setErrorMsg('');
@@ -42,8 +41,7 @@ export default function Login({ onBack }) {
       loginSigRef.current = data.login_sig || '';
       setQrcode(data.qrcode);
       setPhase('waiting');
-      setTip('请使用 QQ 扫描二维码');
-      startPoll(data.qrsig);
+      setTip('请用 QQ 扫描二维码，并在手机上确认登录');
     } catch (e) {
       setErrorMsg(e.message || '获取二维码失败');
       setPhase('error');
@@ -51,110 +49,101 @@ export default function Login({ onBack }) {
     }
   };
 
-  const startPoll = (qrsig) => {
-    if (stopPollRef.current) { stopPollRef.current(); stopPollRef.current = null; }
-    stopPollRef.current = qqQrPoll(qrsig, loginSigRef.current, {
-      onWaiting: () => {
-        if (phase !== 'logging') {
-          setPhase('waiting');
-          setTip('请使用 QQ 扫描二维码');
-        }
-      },
-      onScanned: () => {
-        setPhase('scanned');
-        setTip('已扫码，请在手机上确认登录');
-        setErrorMsg('');
-      },
-      onSuccess: async (redirectUrl, nickname) => {
-        setPhase('logging');
-        setTip('正在登录…');
-        setErrorMsg('');
-        try {
-          const loginRes = await music.loginByRedirect(redirectUrl, qrsigRef.current);
-          if (Number(loginRes?.code) === 0 && loginRes?.cookie && loginRes?.uin) {
-            setAuth({
-              cookie: loginRes.cookie,
-              uin: loginRes.uin,
-              key: loginRes.key,
-              nickname: nickname || loginRes.nickname || 'QQ音乐用户',
-            });
-            return;
+  // 用户点击"我已扫码登录"按钮 → 一次性 JSONP 检查
+  const handleConfirmLogin = async () => {
+    if (!qrsigRef.current) {
+      setErrorMsg('请先等待二维码加载');
+      return;
+    }
+    setPhase('checking');
+    setTip('正在检查登录状态…');
+    setErrorMsg('');
+
+    const res = await qqQrCheckJsonp(qrsigRef.current, loginSigRef.current);
+
+    switch (res.code) {
+      case 0:
+        // 登录成功，后端收集 cookie
+        if (res.redirectUrl) {
+          setTip('登录成功，正在获取账号信息…');
+          try {
+            const loginRes = await music.loginByRedirect(res.redirectUrl, qrsigRef.current);
+            if (Number(loginRes?.code) === 0 && loginRes?.cookie && loginRes?.uin) {
+              setAuth({
+                cookie: loginRes.cookie,
+                uin: loginRes.uin,
+                key: loginRes.key,
+                nickname: res.nickname || loginRes.nickname || 'QQ音乐用户',
+              });
+              setView('account');
+              return;
+            }
+            setErrorMsg(loginRes?.msg || '登录信息收集失败，请重试');
+            setPhase('error');
+            setTip('登录失败');
+          } catch (e) {
+            setErrorMsg('登录失败：' + (e.message || ''));
+            setPhase('error');
+            setTip('登录失败');
           }
-          setErrorMsg(loginRes?.msg || '登录信息收集失败，请刷新重试');
-          setPhase('error');
-          setTip('登录失败');
-        } catch (e) {
-          setErrorMsg('登录失败：' + (e.message || ''));
+        } else {
+          setErrorMsg('登录信息异常，请刷新重试');
           setPhase('error');
           setTip('登录失败');
         }
-      },
-      onExpired: () => {
-        setPhase('expired');
-        setTip('二维码已过期');
+        break;
+      case 66:
+        setErrorMsg('还没有扫码，请先用 QQ 扫描二维码');
+        setPhase('waiting');
+        setTip('请用 QQ 扫描二维码');
+        break;
+      case 67:
+        setErrorMsg('已扫码，请在手机 QQ 上点击"确认登录"后再点此按钮');
+        setPhase('waiting');
+        setTip('请在手机上确认登录');
+        break;
+      case 65:
         setErrorMsg('二维码已过期，请刷新');
-      },
-      onError: (msg) => {
-        // 不阻塞用户：JSONP 在某些网络环境会被风控，不显示错误，只引导
-        // 用户用 Cookie 模式登录
-        if (msg && !errorMsg) {
-          setErrorMsg(msg);
-        }
-      },
-    });
+        setPhase('error');
+        setTip('二维码已过期');
+        break;
+      default:
+        setErrorMsg(res.msg || '检查失败，请确认已扫码并确认登录后再试');
+        setPhase('waiting');
+        setTip('请确认手机上已点击"确认登录"');
+        break;
+    }
+  };
+
+  // 加载歌单
+  const handleLoadPlaylists = async () => {
+    if (playlists) return;
+    setLoadingPlaylists(true);
+    try {
+      const list = await music.userPlaylists(cookie, uin);
+      setPlaylists(list || []);
+    } catch (e) {
+      setPlaylists([]);
+    } finally {
+      setLoadingPlaylists(false);
+    }
+  };
+
+  const handleLogout = () => {
+    logout();
+    setView('qr');
+    setPlaylists(null);
+    setTimeout(fetchQr, 100);
   };
 
   useEffect(() => {
-    if (mode === 'qr') {
+    if (view === 'qr' && !qrcode) {
       fetchQr();
-    } else {
-      if (stopPollRef.current) { stopPollRef.current(); stopPollRef.current = null; }
     }
-    return () => {
-      if (stopPollRef.current) stopPollRef.current();
-    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mode]);
+  }, [view]);
 
-  const handleCookieLogin = async () => {
-    if (!cookieInput.trim()) {
-      setCookieError('请粘贴 Cookie');
-      return;
-    }
-    setCookieLogging(true);
-    setCookieError('');
-    try {
-      // 直接用 cookie 调用户信息接口验证
-      const m = cookieInput.match(/(?:^|;\s*)(?:uin|wxuin)=o?(\d+)/);
-      if (!m) {
-        setCookieError('Cookie 中未找到 uin，请确认是已登录 y.qq.com 的 Cookie');
-        setCookieLogging(false);
-        return;
-      }
-      const uin = m[1];
-      const info = await music.userInfo(cookieInput, uin);
-      if (!info || !info.uin) {
-        setCookieError('Cookie 无效或已过期');
-        setCookieLogging(false);
-        return;
-      }
-      // 提取关键 cookie 值
-      const key = (cookieInput.match(/(?:^|;\s*)(qqmusic_key|p_skey|skey)=([^;]+)/) || [])[2] || '';
-      setAuth({
-        cookie: cookieInput,
-        uin: String(uin),
-        key,
-        nickname: info.nickname || 'QQ音乐用户',
-      });
-      // setAuth 触发 fetchUserInfo + App 自动切到播放器
-    } catch (e) {
-      setCookieError('Cookie 登录失败：' + (e.message || ''));
-    } finally {
-      setCookieLogging(false);
-    }
-  };
-
-  const isBusy = phase === 'loading' || phase === 'logging';
+  const isBusy = phase === 'loading' || phase === 'checking';
 
   return (
     <div style={{
@@ -202,8 +191,137 @@ export default function Login({ onBack }) {
         </span>
       </div>
 
-      {/* 主内容卡片 */}
-      {mode === 'qr' ? (
+      {view === 'account' ? (
+        /* ===== 账号页面 ===== */
+        <div className="glass-panel-strong" style={{
+          position: 'relative', zIndex: 1,
+          padding: 24, borderRadius: 24, width: '100%', maxWidth: 400,
+          display: 'flex', flexDirection: 'column', alignItems: 'center',
+        }}>
+          {/* 头像 */}
+          <div style={{
+            width: 80, height: 80, borderRadius: '50%',
+            background: 'rgba(255,255,255,0.1)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            overflow: 'hidden', marginBottom: 14,
+            border: '2px solid var(--glass-border)',
+            boxShadow: '0 4px 20px rgba(0,0,0,0.3)',
+          }}>
+            {userInfo?.avatar ? (
+              <img src={userInfo.avatar} alt="头像" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            ) : (
+              <User size={36} color="var(--text-secondary)" />
+            )}
+          </div>
+
+          {/* 昵称 */}
+          <div style={{
+            fontSize: 20, fontWeight: 700, color: 'var(--text-primary)',
+            marginBottom: 6, display: 'flex', alignItems: 'center', gap: 8,
+          }}>
+            {nickname}
+            {userInfo?.vipLevel > 0 && (
+              <span style={{
+                fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 6,
+                background: 'linear-gradient(135deg, #FFD700, #FFA500)',
+                color: '#1a1a2e',
+              }}>
+                VIP{userInfo.vipLevel}
+              </span>
+            )}
+          </div>
+
+          {/* UIN */}
+          <div style={{
+            fontSize: 12, color: 'var(--text-muted)', marginBottom: 20,
+          }}>
+            QQ: {uin}
+          </div>
+
+          {/* 歌单按钮 */}
+          <button
+            onClick={handleLoadPlaylists}
+            disabled={loadingPlaylists}
+            className="glass-button-accent"
+            style={{
+              width: '100%', padding: '12px 16px', borderRadius: 12,
+              fontSize: 14, fontWeight: 700, color: '#0A0A0A',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+              opacity: loadingPlaylists ? 0.6 : 1,
+            }}
+          >
+            {loadingPlaylists ? (
+              <><Loader2 size={16} className="spin-icon" /> 加载中…</>
+            ) : (
+              <><ListMusic size={16} /> 查看我的歌单</>
+            )}
+          </button>
+
+          {/* 歌单列表 */}
+          {playlists && playlists.length > 0 && (
+            <div style={{ width: '100%', marginTop: 16 }}>
+              <div style={{
+                fontSize: 13, fontWeight: 600, color: 'var(--text-secondary)',
+                marginBottom: 10, paddingLeft: 4,
+              }}>
+                我的歌单 ({playlists.length})
+              </div>
+              <div style={{
+                maxHeight: 300, overflowY: 'auto',
+                display: 'flex', flexDirection: 'column', gap: 8,
+              }}>
+                {playlists.map((pl) => (
+                  <div key={pl.id} className="glass-row" style={{
+                    padding: '10px 12px', borderRadius: 12,
+                    display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer',
+                  }} onClick={() => { /* 可扩展：跳转歌单详情 */ }}>
+                    {pl.cover ? (
+                      <img src={pl.cover} alt="" style={{ width: 40, height: 40, borderRadius: 8, objectFit: 'cover' }} />
+                    ) : (
+                      <div style={{
+                        width: 40, height: 40, borderRadius: 8,
+                        background: 'rgba(255,255,255,0.1)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      }}>
+                        <ListMusic size={16} color="var(--text-muted)" />
+                      </div>
+                    )}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{
+                        fontSize: 13, fontWeight: 600, color: 'var(--text-primary)',
+                        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                      }}>
+                        {pl.name}
+                      </div>
+                      <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                        {pl.songCount || 0} 首
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {playlists && playlists.length === 0 && (
+            <div style={{
+              marginTop: 16, fontSize: 13, color: 'var(--text-muted)', textAlign: 'center',
+            }}>
+              暂无歌单
+            </div>
+          )}
+
+          {/* 退出登录 */}
+          <button onClick={handleLogout} className="glass-button" style={{
+            marginTop: 20, width: '100%', padding: '10px 16px', borderRadius: 12,
+            fontSize: 13, fontWeight: 600, color: '#F87171',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+          }}>
+            <LogOut size={14} /> 退出登录
+          </button>
+        </div>
+      ) : (
+        /* ===== 二维码扫码页面 ===== */
         <>
           {/* 二维码卡片 */}
           <div className="glass-panel-strong" style={{
@@ -227,41 +345,16 @@ export default function Login({ onBack }) {
                     imageRendering: 'pixelated',
                     background: '#fff', padding: 10,
                     display: 'block',
-                    filter: phase === 'logging' ? 'blur(6px) opacity(0.4)' : phase === 'scanned' ? 'brightness(0.85)' : 'none',
+                    filter: phase === 'checking' ? 'blur(4px) opacity(0.5)' : 'none',
                     transition: 'filter 0.3s ease',
                   }}
                 />
-                {phase === 'scanned' && (
-                  <div style={{
-                    position: 'absolute', inset: 0,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: 48, color: '#4ADE80',
-                    textShadow: '0 0 20px rgba(74,222,128,0.6)',
-                  }}>
-                    ✓
-                  </div>
-                )}
-                {phase === 'logging' && (
+                {phase === 'checking' && (
                   <div style={{
                     position: 'absolute', inset: 0,
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                   }}>
                     <Loader2 size={28} style={{ animation: 'spin 1s linear infinite', color: 'var(--accent-dynamic)' }} />
-                  </div>
-                )}
-                {phase === 'expired' && (
-                  <div style={{
-                    position: 'absolute', inset: 0, borderRadius: 16,
-                    background: 'rgba(0,0,0,0.7)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  }}>
-                    <button onClick={fetchQr} className="glass-button" style={{
-                      padding: '8px 16px', borderRadius: 10,
-                      fontSize: 13, fontWeight: 600, color: '#fff',
-                      display: 'flex', alignItems: 'center', gap: 6,
-                    }}>
-                      <RefreshCw size={14} /> 点击刷新
-                    </button>
                   </div>
                 )}
               </div>
@@ -271,7 +364,15 @@ export default function Login({ onBack }) {
                 display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
                 color: 'var(--text-muted)', fontSize: 13, textAlign: 'center', padding: 20, gap: 12,
               }}>
+                <AlertCircle size={28} color="#F87171" />
                 <span>{errorMsg || '二维码加载失败'}</span>
+                <button onClick={fetchQr} className="glass-button" style={{
+                  padding: '6px 14px', borderRadius: 8,
+                  fontSize: 12, fontWeight: 600, color: '#fff',
+                  display: 'inline-flex', alignItems: 'center', gap: 6,
+                }}>
+                  <RefreshCw size={12} /> 重试
+                </button>
               </div>
             )}
           </div>
@@ -279,121 +380,80 @@ export default function Login({ onBack }) {
           {/* 状态文案 */}
           <div style={{
             marginTop: 20, fontSize: 15, fontWeight: 600, textAlign: 'center',
-            color: phase === 'scanned' ? '#4ADE80' : phase === 'logging' ? 'var(--accent-dynamic)' : 'var(--text-secondary)',
+            color: phase === 'checking' ? 'var(--accent-dynamic)' : 'var(--text-secondary)',
             zIndex: 1, transition: 'color 0.3s ease', minHeight: 22,
           }}>
             {tip}
           </div>
 
-          {/* 风控提示：扫码状态检测被风控时显示 */}
-          {errorMsg && phase === 'waiting' && (
-            <div className="glass-panel" style={{
-              marginTop: 14, padding: '10px 14px', borderRadius: 12, zIndex: 1,
-              maxWidth: 320, fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.5,
-            }}>
-              <div style={{ fontWeight: 600, color: '#FBBF24', marginBottom: 4 }}>扫码状态检测异常</div>
-              <div>可能是 QQ 接口被风控。请先扫码并确认登录，然后切换下方"Cookie 登录"完成最后一步。</div>
-            </div>
-          )}
-
-          {/* 错误提示（非风控） */}
-          {errorMsg && phase !== 'waiting' && phase !== 'expired' && (
+          {/* 错误提示 */}
+          {errorMsg && phase !== 'checking' && (
             <div style={{
-              marginTop: 8, fontSize: 12, color: '#F87171', textAlign: 'center', zIndex: 1,
-              maxWidth: 280, lineHeight: 1.5,
+              marginTop: 8, fontSize: 12, color: '#FBBF24', textAlign: 'center', zIndex: 1,
+              maxWidth: 300, lineHeight: 1.5,
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
             }}>
+              <AlertCircle size={13} style={{ flexShrink: 0 }} />
               {errorMsg}
             </div>
           )}
 
-          {/* 操作按钮区 */}
-          <div style={{ marginTop: 16, display: 'flex', gap: 10, zIndex: 1, flexWrap: 'wrap', justifyContent: 'center' }}>
-            {qrcode && !isBusy && (
-              <button onClick={fetchQr} className="glass-button" style={{
-                display: 'inline-flex', alignItems: 'center', gap: 6,
-                padding: '8px 16px', borderRadius: 10,
-                fontSize: 12, fontWeight: 500, color: 'var(--text-secondary)',
-              }}>
-                <RefreshCw size={13} /> 刷新二维码
-              </button>
-            )}
-          </div>
-        </>
-      ) : (
-        /* Cookie 登录模式 */
-        <div className="glass-panel-strong" style={{
-          position: 'relative', zIndex: 1,
-          padding: 20, borderRadius: 20, maxWidth: 360, width: '100%',
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-            <Cookie size={18} color="var(--accent-dynamic)" />
-            <span style={{ fontSize: 15, fontWeight: 700 }}>Cookie 登录</span>
-          </div>
-
-          <div style={{ fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.6, marginBottom: 14 }}>
-            当扫码登录失效时使用此方式。步骤：
-            <ol style={{ marginTop: 6, paddingLeft: 20 }}>
-              <li>在浏览器打开 <a href="https://y.qq.com" target="_blank" rel="noreferrer" style={{ color: 'var(--accent-dynamic)' }}>y.qq.com</a> 并登录</li>
-              <li>按 F12 → Application → Cookies → 复制全部</li>
-              <li>粘贴到下方输入框</li>
-            </ol>
-          </div>
-
-          <textarea
-            value={cookieInput}
-            onChange={(e) => { setCookieInput(e.target.value); setCookieError(''); }}
-            placeholder="uin=o1234567890; qqmusic_key=...; p_skey=..."
-            rows={4}
-            style={{
-              width: '100%', padding: '10px 12px', borderRadius: 10,
-              background: 'rgba(0,0,0,0.3)', border: '1px solid var(--glass-border)',
-              color: 'var(--text-primary)', fontSize: 12, fontFamily: 'monospace',
-              resize: 'vertical', minHeight: 80,
-            }}
-          />
-
-          {cookieError && (
-            <div style={{ marginTop: 8, fontSize: 12, color: '#F87171' }}>
-              {cookieError}
-            </div>
+          {/* 核心按钮：我已扫码登录 */}
+          {qrcode && phase !== 'loading' && (
+            <button
+              onClick={handleConfirmLogin}
+              disabled={isBusy}
+              className="glass-button-accent"
+              style={{
+                marginTop: 18, padding: '14px 32px', borderRadius: 14,
+                fontSize: 15, fontWeight: 700, color: '#0A0A0A',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                opacity: isBusy ? 0.6 : 1,
+                zIndex: 1,
+                boxShadow: '0 8px 30px rgba(79,195,247,0.35)',
+              }}
+            >
+              {phase === 'checking' ? (
+                <><Loader2 size={18} className="spin-icon" /> 正在检查…</>
+              ) : (
+                <><CheckCircle2 size={18} /> 我已扫码登录</>
+              )}
+            </button>
           )}
 
-          <button onClick={handleCookieLogin} disabled={cookieLogging} className="glass-button-accent" style={{
-            marginTop: 12, width: '100%', padding: '12px', borderRadius: 12,
-            fontSize: 14, fontWeight: 700, color: '#0A0A0A',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-            opacity: cookieLogging ? 0.6 : 1,
+          {/* 刷新二维码 */}
+          {qrcode && !isBusy && (
+            <button onClick={fetchQr} className="glass-button" style={{
+              marginTop: 12, padding: '8px 16px', borderRadius: 10,
+              fontSize: 12, fontWeight: 500, color: 'var(--text-secondary)',
+              display: 'inline-flex', alignItems: 'center', gap: 6,
+              zIndex: 1,
+            }}>
+              <RefreshCw size={13} /> 刷新二维码
+            </button>
+          )}
+
+          {/* 操作指引 */}
+          <div className="glass-panel" style={{
+            marginTop: 18, padding: '12px 16px', borderRadius: 12, zIndex: 1,
+            maxWidth: 320, fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.6,
           }}>
-            {cookieLogging
-              ? <><Loader2 size={14} className="spin-icon" /> 登录中…</>
-              : <>登录</>
-            }
-          </button>
-        </div>
+            <div style={{ fontWeight: 600, color: 'var(--accent-dynamic)', marginBottom: 4 }}>操作步骤</div>
+            <div>1. 用手机 QQ 扫描上方二维码</div>
+            <div>2. 在手机 QQ 上点击"确认登录"</div>
+            <div>3. 点击上方"我已扫码登录"按钮</div>
+          </div>
+
+          {/* 底部提示 */}
+          <div style={{
+            marginTop: 20, marginBottom: 20,
+            fontSize: 11, color: 'var(--text-muted)', textAlign: 'center', zIndex: 1,
+            padding: '0 24px', maxWidth: 400,
+          }}>
+            仅用于解锁 VIP 音源与同步歌单 · 登录后即可听歌
+          </div>
+        </>
       )}
-
-      {/* 模式切换 */}
-      <button onClick={() => setMode(mode === 'qr' ? 'cookie' : 'qr')} className="glass-button" style={{
-        marginTop: 18, padding: '8px 16px', borderRadius: 10,
-        fontSize: 12, fontWeight: 500, color: 'var(--text-secondary)',
-        display: 'inline-flex', alignItems: 'center', gap: 6,
-        zIndex: 1,
-      }}>
-        {mode === 'qr' ? (
-          <><Cookie size={13} /> Cookie 登录（扫码失败时使用）<ChevronDown size={12} /></>
-        ) : (
-          <><ChevronUp size={12} /> 返回扫码登录</>
-        )}
-      </button>
-
-      {/* 底部提示 */}
-      <div style={{
-        marginTop: 24,
-        fontSize: 11, color: 'var(--text-muted)', textAlign: 'center', zIndex: 1,
-        padding: '0 24px 20px', maxWidth: 400,
-      }}>
-        请使用已安装 QQ 的手机扫码并确认登录 · 仅用于解锁 VIP 与同步歌单
-      </div>
     </div>
   );
 }

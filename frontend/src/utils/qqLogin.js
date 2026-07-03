@@ -1,10 +1,14 @@
-// QQ 扫码登录前端 JSONP 检查 + 自动轮询
+// QQ 扫码登录前端 JSONP 检查
 //
 // 为什么用前端 JSONP：
 //   ptqrlogin 接口对服务器 IP 有风控（返回 403 空响应），
 //   用 <script> 标签从用户浏览器直接请求，绕过服务器 IP 限制。
 //   QQ 返回 ptuiCB('code','0','redirectUrl','0','msg','nick') 格式，
 //   浏览器会自动执行这个回调。
+//
+// 关键参数 login_sig：
+//   必须从后端 /login/qq/qrcode 返回的 login_sig 传入（来自 xlogin 的 pt_login_sig），
+//   否则 ptqrlogin 无法正确返回登录状态。
 
 function hash33(s) {
   let hash = 0;
@@ -16,7 +20,8 @@ function hash33(s) {
 
 // 一次性检查扫码状态
 // code: 66 等待扫码 / 67 已扫码待确认 / 0 成功 / 65 失效 / -1 网络/超时错误
-// loginSig: 从 xlogin 接口获取，ptqrlogin 必须带（否则扫码确认后不返回 redirectUrl）
+// qrsig: 从 /login/qq/qrcode 获取
+// loginSig: 从 /login/qq/qrcode 获取（来自 xlogin 的 pt_login_sig）
 export function qqQrCheckJsonp(qrsig, loginSig = '') {
   return new Promise((resolve) => {
     const ptqrtoken = hash33(qrsig);
@@ -24,7 +29,7 @@ export function qqQrCheckJsonp(qrsig, loginSig = '') {
 
     const cleanup = () => {
       if (window.ptuiCB === currentCb) delete window.ptuiCB;
-      if (script.parentNode) script.parentNode.removeChild(script);
+      if (script && script.parentNode) script.parentNode.removeChild(script);
       clearTimeout(timer);
     };
 
@@ -35,10 +40,8 @@ export function qqQrCheckJsonp(qrsig, loginSig = '') {
       resolve(data);
     };
 
-    // ptuiCB('code','status','redirectUrl','flag','msg','nickname')
-    // 成功时: ptuiCB('0','0','https://...','0','登录成功!','昵称')
-    // 注意: 第2/4参数可能是 '0' 或 '1'，不要硬编码
-    const currentCb = (code, _status, redirectUrl, _flag, msg, nickname) => {
+    // ptuiCB('code','0','redirectUrl','0','msg','nickname')
+    const currentCb = (code, _status, redirectUrl, _zero, msg, nickname) => {
       // redirectUrl 可能需要 URL 解码
       let url = redirectUrl || '';
       if (url && url.indexOf('%') !== -1) {
@@ -51,8 +54,7 @@ export function qqQrCheckJsonp(qrsig, loginSig = '') {
     const params = new URLSearchParams({
       u1: 'https://y.qq.com/',
       ptqrtoken: String(ptqrtoken),
-      // 关键：ptredirect=1 让 QQ 返回完整 redirectUrl（ptredirect=0 时可能返回空）
-      ptredirect: '1',
+      ptredirect: '0',
       h: '1',
       t: '1',
       g: '1',
@@ -61,7 +63,6 @@ export function qqQrCheckJsonp(qrsig, loginSig = '') {
       action: '0-0-' + Date.now(),
       js_ver: '24042410',
       js_type: '1',
-      // 关键：login_sig 不能为空，来自 xlogin 接口
       login_sig: loginSig || '',
       pt_uistyle: '40',
       aid: '716027609',
@@ -71,7 +72,6 @@ export function qqQrCheckJsonp(qrsig, loginSig = '') {
 
     const script = document.createElement('script');
     script.src = `https://ssl.ptlogin2.qq.com/ptqrlogin?${params}`;
-    // 触发场景：QQ 网关普遍 403（不是 CORS，不是浏览器拦截）
     script.onerror = () => finish({ code: -1, msg: '扫码状态检测失败（QQ 接口暂不可用）' });
     document.head.appendChild(script);
 
@@ -83,7 +83,7 @@ export function qqQrCheckJsonp(qrsig, loginSig = '') {
 // 自动轮询扫码状态
 //
 // 用法：
-//   const stop = qqQrPoll(qrsig, {
+//   const stop = qqQrPoll(qrsig, loginSig, {
 //     onWaiting: () => {},      // code 66 等待扫码
 //     onScanned: () => {},      // code 67 已扫码待确认
 //     onSuccess: (redirectUrl, nickname) => {},  // code 0 成功
@@ -91,12 +91,6 @@ export function qqQrCheckJsonp(qrsig, loginSig = '') {
 //     onError: (msg) => {},     // code -1 网络/超时
 //   });
 //   // 需要停止时调用 stop()
-//
-// 轮询策略：
-//   - 间隔 1.8~2.5s 随机抖动，避免被识别为机器人
-//   - 连续 3 次网络错误后停止（避免无限重试）
-//   - 成功/过期后自动停止
-//   - 返回 stop() 函数供外部中断
 export function qqQrPoll(qrsig, loginSig, callbacks) {
   const { onWaiting, onScanned, onSuccess, onExpired, onError } = callbacks;
   let stopped = false;
@@ -105,7 +99,6 @@ export function qqQrPoll(qrsig, loginSig, callbacks) {
 
   const sleep = (ms) => new Promise((r) => {
     timer = setTimeout(r, ms);
-    // 让 timer 可被 stop 清除
     return () => clearTimeout(timer);
   });
 
@@ -118,9 +111,8 @@ export function qqQrPoll(qrsig, loginSig, callbacks) {
       case 0:
         if (res.redirectUrl) {
           onSuccess && onSuccess(res.redirectUrl, res.nickname);
-          return; // 成功，停止轮询
+          return;
         }
-        // redirectUrl 为空视为异常
         onError && onError('登录信息异常，请刷新重试');
         return;
       case 66:
@@ -133,14 +125,11 @@ export function qqQrPoll(qrsig, loginSig, callbacks) {
         break;
       case 65:
         onExpired && onExpired();
-        return; // 过期，停止
+        return;
       default:
-        // -1 或未知
         errorStreak++;
-        // 风控场景下一直会 403，不要快速停止——给用户扫码留时间
-        // 改为只要 phase 还停留足够时间就继续重试
         if (errorStreak >= 6) {
-          onError && onError(res.msg || '扫码状态检测持续失败，请用 Cookie 模式登录');
+          onError && onError(res.msg || '扫码状态检测持续失败');
           return;
         }
         onError && onError(res.msg || '扫码状态检测重试中…');
@@ -154,10 +143,8 @@ export function qqQrPoll(qrsig, loginSig, callbacks) {
     }
   };
 
-  // 启动轮询
   pollOnce();
 
-  // 返回停止函数
   return () => {
     stopped = true;
     if (timer) clearTimeout(timer);

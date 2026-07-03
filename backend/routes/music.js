@@ -121,40 +121,39 @@ async function getQQUrl(songmid, cookie = '', uin = '0') {
 // 后端只负责：1. 获取二维码 (/login/qq/qrcode)  2. 收集登录 cookie (/login/qq/redirect)
 
 // 生成二维码（返回 QQ 原始图片 + qrsig + login_sig）
-// 关键：必须先请求 xlogin 接口拿 login_sig，否则 ptqrlogin 扫码确认后不返回 redirectUrl
+// 关键：先请求 xlogin 获取 pt_login_sig，否则 ptqrlogin 检查扫码状态会失败
 async function qqQrCreate() {
-  // 1. 请求 xlogin 获取 login_sig（在响应 Cookie 里）
+  // 1. 请求 xlogin 获取 pt_login_sig（login_sig）
   let loginSig = '';
   try {
     const xloginResp = await axios.get('https://xui.ptlogin2.qq.com/cgi-bin/xlogin', {
       params: {
-        proxy_url: 'https://qzs.qq.com/qzone/v6/portal/proxy.html',
-        daid: '383',
-        hide_title_bar: '1',
-        low_login: '0',
-        qlogin_auto_login: '1',
-        no_verifyimg: '1',
-        link_target: 'blank',
         appid: '716027609',
-        style: '22',
-        target: 'self',
+        daid: '383',
+        pt_skey_valid: '0',
+        pt_no_auth: '1',
         s_url: 'https://y.qq.com/',
-        pt_qr_app: 'QQ音乐',
-        pt_qr_link: 'https://y.qq.com/download/download.html',
-        self_regurl: 'https://y.qq.com/',
-        pt_qr_help_link: 'https://y.qq.com/',
-        pt_no_auth: '0',
+        referer: 'https://y.qq.com/',
+        self_regurl: '',
+        target: 'self',
+        style: '40',
+        pt_qzone_sig: '1',
+        proxy_url: 'https://xui.ptlogin2.qq.com/cgi-bin/xlogin',
+        aid: '716027609',
+        daid: '383',
+        pt_no_auth: '1',
       },
       headers: { 'User-Agent': UA, Referer: 'https://y.qq.com/' },
-      timeout: 10000,
+      timeout: 8000,
       maxRedirects: 0,
       validateStatus: () => true,
     });
-    // Cookie 名是 pt_login_sig（不是 login_sig）
     loginSig = parseSetCookies(xloginResp.headers?.['set-cookie'])?.pt_login_sig || '';
-  } catch (e) {}
+  } catch (e) {
+    // login_sig 获取失败不阻塞，但扫码状态检测可能会受影响
+  }
 
-  // 2. 请求 ptqrshow 获取二维码图片 + qrsig
+  // 2. 请求 ptqrshow 获取二维码
   const resp = await axios.get('https://ssl.ptlogin2.qq.com/ptqrshow', {
     params: {
       appid: '716027609',
