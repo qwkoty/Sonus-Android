@@ -8,7 +8,9 @@ function qqUrl(payload) {
 }
 
 async function nativeGet(url) {
-  const r = await CookieReader.httpGet(url);
+  // 强制从 y.qq.com 域读 Cookie（登录 Cookie 写在此域，子域请求也能用）
+  // QQ 音乐服务端只校验 Cookie 内容，不校验 domain
+  const r = await CookieReader.httpGet(url, 'https://y.qq.com');
   if (!r.ok || !r.body) throw new Error(`HTTP ${r.status}`);
   return JSON.parse(r.body);
 }
@@ -47,35 +49,49 @@ async function searchAPK(keyword, limit = 30) {
 }
 
 // ==================== 播放链接 ====================
+// 多策略 fallback：先试 m4a 标准音质，空了试 mp3，再试 songtype=1（VIP）
 async function urlAPK(id, cookie = '', uin = '0') {
   const rawId = String(id).replace(/^qq_/, '');
-  // filename 格式：C400<songmid>.m4a（标准音质），QQ 音乐 vkey 接口传 filename 命中率更高
-  const filename = `C400${rawId}.m4a`;
-  const d = await nativeGet(qqUrl({
-    req_0: {
-      module: 'music.vkey.GetVkeyServer',
-      method: 'CgiGetVkey',
-      param: {
-        guid: '10000',
-        songmid: [rawId],
-        songtype: [0],
-        uin: String(uin),
-        loginflag: cookie ? 1 : 0,
-        platform: '23',
-        h5to: 'speed',
-        filename: [filename],
-      },
-    },
-    comm: { uin: String(uin), format: 'json', ct: 24, cv: 0 },
-  }));
-  const item = d?.req_0?.data?.midurlinfo?.[0];
-  const sip = d?.req_0?.data?.sip?.[0];
-  if (item?.purl && sip) return sip + item.purl;
+  const uinStr = String(uin || '0');
+  const loginflag = cookie ? 1 : 0;
 
-  // fallback：旧版 mobile express 接口
+  // 策略列表：filename 格式 + songtype 组合
+  const strategies = [
+    { filename: `C400${rawId}.m4a`, songtype: 0 },
+    { filename: `M500${rawId}.mp3`, songtype: 0 },
+    { filename: `C400${rawId}.m4a`, songtype: 1 },
+    { filename: `M500${rawId}.mp3`, songtype: 1 },
+  ];
+
+  for (const s of strategies) {
+    try {
+      const d = await nativeGet(qqUrl({
+        req_0: {
+          module: 'music.vkey.GetVkeyServer',
+          method: 'CgiGetVkey',
+          param: {
+            guid: '10000',
+            songmid: [rawId],
+            songtype: [s.songtype],
+            uin: uinStr,
+            loginflag,
+            platform: '23',
+            h5to: 'speed',
+            filename: [s.filename],
+          },
+        },
+        comm: { uin: uinStr, format: 'json', ct: 24, cv: 0 },
+      }));
+      const item = d?.req_0?.data?.midurlinfo?.[0];
+      const sip = d?.req_0?.data?.sip?.[0];
+      if (item?.purl && sip) return sip + item.purl;
+    } catch {}
+  }
+
+  // 最后 fallback：旧版 mobile express 接口
   try {
     const fb = await nativeGet(
-      `https://c.y.qq.com/base/fcgi-bin/fcg_music_express_mobile3.fcg?format=json205361747&songmid=${rawId}&filename=${filename}&guid=10000&uin=${String(uin)}&platform=yqq&cid=205361747`
+      `https://c.y.qq.com/base/fcgi-bin/fcg_music_express_mobile3.fcg?format=json205361747&songmid=${rawId}&filename=C400${rawId}.m4a&guid=10000&uin=${uinStr}&platform=yqq&cid=205361747`
     );
     const fi = fb?.data?.items?.[0];
     if (fi?.url) return fi.url;

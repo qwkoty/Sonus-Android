@@ -103,80 +103,51 @@ export default function Player({ onProfile }) {
       {/* 错误提示 */}
       {error && <div className="glass-panel" style={{position:'absolute',top:'calc(60px + var(--safe-top))',left:'50%',transform:'translateX(-50%)',zIndex:300,padding:'8px 16px',borderRadius:12,fontSize:12,color:'#FCA5A5',background:'rgba(180,40,40,0.2)',borderColor:'rgba(248,113,113,0.3)'}}>{error}</div>}
 
-      {/* ===== 底部控制浮窗（可展开/收起，毛玻璃） ===== */}
-      <div className="glass-panel-strong" style={{
-        position:'absolute',
-        bottom:`calc(${panelOpen?'12px':'8px'} + var(--safe-bottom))`,
-        left:'calc(12px + var(--safe-left))',
-        right:'calc(12px + var(--safe-right))',
-        borderRadius:panelOpen?18:14,
-        padding:panelOpen?'12px 14px':'6px 14px',
-        zIndex:100,
-        transition:'all .3s ease',
-        maxHeight:panelOpen?'none':'44px',
-        overflow:'hidden',
-      }}>
-        {/* 收起态：只显示一行（标题 + 展开按钮 + 播放按钮） */}
-        {!panelOpen && (
-          <div style={{display:'flex',alignItems:'center',gap:10}}>
-            <button onClick={()=>setPanelOpen(true)} className="glass-button" style={{width:28,height:28,borderRadius:8,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}><ChevronUp size={15}/></button>
-            <div style={{flex:1,minWidth:0,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',fontSize:12,fontWeight:600,color:'var(--text-primary)'}}>
-              {currentTrack?`${currentTrack.title} · ${currentTrack.artist}`:'Sonus'}
+      {/* ===== 底部控制浮窗（超紧凑，可收起为右下角小圆按钮）===== */}
+      {panelOpen ? (
+        <div className="glass-panel-strong" style={{
+          position:'absolute',
+          bottom:'calc(10px + var(--safe-bottom))',
+          left:'calc(16px + var(--safe-left))',
+          right:'calc(16px + var(--safe-right))',
+          borderRadius:16,
+          padding:'8px 14px',
+          zIndex:100,
+        }}>
+          {/* 第一行：进度条 */}
+          <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:6}}>
+            <span style={{fontSize:9,color:'var(--text-secondary)',flexShrink:0,width:32,textAlign:'right'}}>{fmt(currentTime)}</span>
+            <div ref={pr} onMouseDown={hp} onTouchStart={hp} style={{flex:1,height:12,display:'flex',alignItems:'center',cursor:'pointer',touchAction:'none'}}>
+              <div style={{width:'100%',height:3,borderRadius:3,background:'rgba(255,255,255,0.12)',position:'relative',overflow:'visible'}}>
+                <div style={{width:`${pct}%`,height:'100%',borderRadius:3,background:ac,boxShadow:`0 0 6px ${ac}`,transition:sk?'none':'width .15s linear'}}/>
+                <div style={{position:'absolute',left:`calc(${pct}% - 4px)`,top:'50%',transform:'translateY(-50%)',width:8,height:8,borderRadius:'50%',background:'#fff',opacity:sk?1:0.4,transition:'opacity .2s'}}/>
+              </div>
             </div>
-            <button onClick={togglePlay} className="glass-button-accent" style={{width:32,height:32,borderRadius:'50%',display:'flex',alignItems:'center',justifyContent:'center',background:ac,flexShrink:0}}>
-              {isPlaying?<Pause size={16} fill="#000"/>:<Play size={16} fill="#000" style={{marginLeft:1}}/>}
-            </button>
+            <span style={{fontSize:9,color:'var(--text-secondary)',flexShrink:0,width:32}}>{fmt(duration)}</span>
           </div>
-        )}
-
-        {/* 展开态：完整控制面板 */}
-        {panelOpen && (
-          <>
-            {/* 头部：标题 + 收起按钮 */}
-            <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:10}}>
-              <div style={{flex:1,minWidth:0,textAlign:'center',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
-                <span style={{fontSize:14,fontWeight:700,color:'#fff'}}>{currentTrack?.title||'Sonus'}</span>
-                <span style={{fontSize:11,color:'var(--text-secondary)',marginLeft:6}}>{currentTrack?.artist||''}</span>
-              </div>
-              <button onClick={()=>setPanelOpen(false)} className="glass-button" style={{width:28,height:28,borderRadius:8,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}><ChevronDown size={15}/></button>
-            </div>
-
-            {/* 进度条 */}
-            <div style={{flex:1,minWidth:0,display:'flex',flexDirection:'column',gap:2,marginBottom:10}}>
-              <div ref={pr} onMouseDown={hp} onTouchStart={hp} style={{height:16,display:'flex',alignItems:'center',cursor:'pointer',touchAction:'none'}}>
-                <div style={{width:'100%',height:4,borderRadius:4,background:'rgba(255,255,255,0.12)',position:'relative',overflow:'visible'}}>
-                  <div style={{width:`${pct}%`,height:'100%',borderRadius:4,background:ac,boxShadow:`0 0 8px ${ac}`,transition:sk?'none':'width .15s linear'}}/>
-                  <div style={{position:'absolute',left:`calc(${pct}% - 5px)`,top:'50%',transform:'translateY(-50%)',width:10,height:10,borderRadius:'50%',background:'#fff',opacity:sk?1:0.5,transition:'opacity .2s',boxShadow:'0 0 6px rgba(0,0,0,0.4)'}}/>
-                </div>
-              </div>
-              <div style={{display:'flex',justifyContent:'space-between',fontSize:10,color:'var(--text-secondary)'}}>
-                <span>{fmt(currentTime)}</span>
-                <span>{fmt(duration)}</span>
-              </div>
-            </div>
-
-            {/* 播放控制 */}
-            <div style={{display:'flex',alignItems:'center',justifyContent:'center',gap:8,marginBottom:10}}>
-              <button onClick={toggleMode} className="glass-button" style={{width:34,height:34,borderRadius:9,display:'flex',alignItems:'center',justifyContent:'center',color:mc}} title="播放模式">{mi}</button>
-              <button onClick={prev} className="glass-button" style={{width:40,height:40,borderRadius:10,display:'flex',alignItems:'center',justifyContent:'center'}}><SkipBack size={20} fill="currentColor"/></button>
-              <button onClick={togglePlay} className="glass-button-accent" style={{width:52,height:52,borderRadius:'50%',display:'flex',alignItems:'center',justifyContent:'center',background:ac,boxShadow:`0 0 24px ${ac}55`}}>
-                {isPlaying?<Pause size={24} fill="#000"/>:<Play size={24} fill="#000" style={{marginLeft:2}}/>}
-              </button>
-              <button onClick={next} className="glass-button" style={{width:40,height:40,borderRadius:10,display:'flex',alignItems:'center',justifyContent:'center'}}><SkipForward size={20} fill="currentColor"/></button>
-              <button onClick={()=>setQo(true)} className="glass-button" style={{width:34,height:34,borderRadius:9,display:'flex',alignItems:'center',justifyContent:'center'}} title="播放队列"><ListMusic size={15} color="var(--text-secondary)"/></button>
-            </div>
-
-            {/* 底部：音量 + 可视化快捷切换 */}
-            <div style={{display:'flex',alignItems:'center',gap:10}}>
-              <Volume2 size={14} color="var(--text-secondary)" style={{flexShrink:0}}/>
-              <input type="range" min="0" max="1" step="0.01" value={volume} onChange={e=>setVolume(parseFloat(e.target.value))} style={{flex:1,accentColor:ac,height:4}}/>
-              <div style={{display:'flex',gap:3,flexShrink:0}}>
-                {VIZ_MODES.map(m=><button key={m.key} onClick={()=>{setVm(m.key);try{localStorage.setItem('sonus_viz_mode',m.key)}catch{}}} className={`glass-button${vm===m.key?' is-active':''}`} style={{width:34,height:26,borderRadius:8,display:'flex',alignItems:'center',justifyContent:'center',fontSize:13}} title={m.label}>{m.icon}</button>)}
-              </div>
-            </div>
-          </>
-        )}
-      </div>
+          {/* 第二行：播放控制（紧凑横排） */}
+          <div style={{display:'flex',alignItems:'center',justifyContent:'center',gap:6}}>
+            <button onClick={toggleMode} className="glass-button" style={{width:30,height:30,borderRadius:8,display:'flex',alignItems:'center',justifyContent:'center',color:mc,flexShrink:0}} title="播放模式">{mi}</button>
+            <button onClick={prev} className="glass-button" style={{width:34,height:34,borderRadius:9,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}><SkipBack size={18} fill="currentColor"/></button>
+            <button onClick={togglePlay} className="glass-button-accent" style={{width:42,height:42,borderRadius:'50%',display:'flex',alignItems:'center',justifyContent:'center',background:ac,boxShadow:`0 0 16px ${ac}55`,flexShrink:0}}>
+              {isPlaying?<Pause size={20} fill="#000"/>:<Play size={20} fill="#000" style={{marginLeft:2}}/>}
+            </button>
+            <button onClick={next} className="glass-button" style={{width:34,height:34,borderRadius:9,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}><SkipForward size={18} fill="currentColor"/></button>
+            <button onClick={()=>setQo(true)} className="glass-button" style={{width:30,height:30,borderRadius:8,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}} title="队列"><ListMusic size={14} color="var(--text-secondary)"/></button>
+            <button onClick={()=>setPanelOpen(false)} className="glass-button" style={{width:30,height:30,borderRadius:8,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}} title="收起"><ChevronDown size={14}/></button>
+          </div>
+        </div>
+      ) : (
+        /* 收起态：右下角小圆播放按钮 */
+        <div style={{position:'absolute',bottom:'calc(16px + var(--safe-bottom))',right:'calc(16px + var(--safe-right))',zIndex:100,display:'flex',gap:8}}>
+          <button onClick={()=>setPanelOpen(true)} className="glass-panel-strong" style={{width:44,height:44,borderRadius:'50%',display:'flex',alignItems:'center',justifyContent:'center',border:'none',cursor:'pointer',color:'var(--text-secondary)'}} title="展开">
+            <ChevronUp size={18}/>
+          </button>
+          <button onClick={togglePlay} className="glass-button-accent" style={{width:44,height:44,borderRadius:'50%',display:'flex',alignItems:'center',justifyContent:'center',background:ac,boxShadow:`0 0 16px ${ac}55`}} title="播放/暂停">
+            {isPlaying?<Pause size={20} fill="#000"/>:<Play size={20} fill="#000" style={{marginLeft:2}}/>}
+          </button>
+        </div>
+      )}
 
       {/* 搜索 Sheet */}
       <Sheet open={sq} onClose={()=>setSq(false)} title="搜索">
@@ -207,6 +178,15 @@ export default function Player({ onProfile }) {
               {VIZ_MODES.map(m=><button key={m.key} onClick={()=>{setVm(m.key);try{localStorage.setItem('sonus_viz_mode',m.key)}catch{}}} className={`glass-button${vm===m.key?' is-active':''}`} style={{flex:1,padding:'12px 4px',borderRadius:12,display:'flex',flexDirection:'column',alignItems:'center',gap:4,fontSize:11}}><span style={{fontSize:18}}>{m.icon}</span>{m.label}</button>)}
             </div>
             {vm==='3d' && <div style={{fontSize:10,color:'var(--text-muted)',marginTop:6,textAlign:'center',lineHeight:1.5}}>3D 模式：双指捏合缩放，双指划拉旋转</div>}
+          </div>
+          <div>
+            <div style={{fontSize:11,color:'var(--text-secondary)',marginBottom:8,display:'flex',alignItems:'center',gap:6}}>
+              <Volume2 size={12}/> 音量
+            </div>
+            <div style={{display:'flex',alignItems:'center',gap:10}}>
+              <input type="range" min="0" max="1" step="0.01" value={volume} onChange={e=>setVolume(parseFloat(e.target.value))} style={{flex:1,accentColor:ac,height:4}}/>
+              <span style={{fontSize:11,color:'var(--text-secondary)',width:32}}>{Math.round(volume*100)}%</span>
+            </div>
           </div>
           <div>
             <div style={{fontSize:11,color:'var(--text-secondary)',marginBottom:8}}>主题色</div>

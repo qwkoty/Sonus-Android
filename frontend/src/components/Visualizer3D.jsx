@@ -7,9 +7,8 @@ const FOV = 55;
 
 // 3D 封面粒子画：2 万粒子在 X-Y 平面排满封面图像（每粒子颜色 = 封面对应像素）
 // 电影镜头：用户双指捏合缩放 + 双指划拉旋转（手势驱动）
-// 呼吸动画：整体 scale 随时间正弦呼吸
-// 待机动画：无音频时粒子做径向涟漪 + 波浪起伏
-// 音频响应：中心 = 低频（bass），向外依次 mid / treble，频率随距中心距离递增
+// 风吹动画：粒子 Z 方向像旗帜被风吹起那样起伏，阵风强度随时间起伏
+// 音频响应：中心 = 低频（bass），向外依次 mid / treble，叠加到风吹位移上
 export default function Visualizer3D({ accent = '#4FC3F7', cover = '', onReady }) {
   const containerRef = useRef(null);
   const accentRef = useRef(accent);
@@ -225,6 +224,12 @@ export default function Visualizer3D({ accent = '#4FC3F7', cover = '', onReady }
 
       // 每帧更新 Z；无封面时同时更新 color
       const needColorUpdate = !hasCover;
+      // 风吹参数：风从左上吹向右下，强度随时间起伏
+      const windSpeed = 1.4;
+      const windFreqX = 2.2;   // X 方向波纹频率
+      const windFreqY = 1.6;   // Y 方向波纹频率
+      const windGust = 0.5 + Math.sin(time * 0.5) * 0.25 + bassSmooth * 0.6; // 阵风强度
+
       for (let i = 0; i < COUNT; i++) {
         const u = origUV[i * 2];
         const v = origUV[i * 2 + 1];
@@ -234,25 +239,29 @@ export default function Visualizer3D({ accent = '#4FC3F7', cover = '', onReady }
         const falloff = Math.pow(1 - dc, 1.6);
 
         // 音频响应：中心 = bass（低频），向外依次 mid、treble（高频）
-        // 用三个钟形分布叠加，分别覆盖中心、中圈、外圈
-        const bFreq = Math.max(0, 1 - dc * 1.8);                       // 中心强
-        const mFreq = Math.max(0, 1 - Math.abs(dc - 0.45) * 2.5);      // 中圈强
-        const tFreq = Math.max(0, 1 - Math.abs(dc - 0.85) * 3);        // 外圈强
+        const bFreq = Math.max(0, 1 - dc * 1.8);
+        const mFreq = Math.max(0, 1 - Math.abs(dc - 0.45) * 2.5);
+        const tFreq = Math.max(0, 1 - Math.abs(dc - 0.85) * 3);
         let localEnergy = bassSmooth * bFreq + midSmooth * mFreq * 0.8 + trebleSmooth * tFreq * 0.6;
 
-        // 独立呼吸相位，保证频谱为 0 也起伏（待机动画）
-        const phase = u * 21.5 + v * 17.3 + dc * 9;
-        const baseBreathe = (Math.sin(time * 1.6 + phase) * 0.5 + 0.5) * 0.18;
-        localEnergy = Math.max(localEnergy, baseBreathe);
+        // 风吹效果：粒子 Z 方向像旗帜被风吹起那样起伏
+        // 主波：沿 X 方向传播的风波
+        const wave1 = Math.sin(u * windFreqX * Math.PI + time * windSpeed) * 0.5;
+        // 次波：沿 Y 方向，频率不同形成交叉波纹
+        const wave2 = Math.sin(v * windFreqY * Math.PI + time * windSpeed * 0.7) * 0.3;
+        // 细节涟漪：高频小波，增加自然感
+        const ripple = Math.sin((u + v) * 8 + time * 2.5) * 0.08;
+        // 组合风吹位移
+        const windZ = (wave1 + wave2 + ripple) * windGust * falloff;
 
-        // 径向涟漪：从中心向外扩散的波纹（待机时也持续）
-        const ripple = Math.sin(dc * 14 - time * 2.2) * 0.10 * (0.4 + midSmooth);
-        const z = (localEnergy * 0.9 + ripple) * zAmp * falloff * breath;
-        posAttr.array[i * 3 + 2] = z;
+        // 音频能量叠加到 Z（中心低频推高）
+        const audioZ = localEnergy * 0.5 * falloff * breath;
+
+        posAttr.array[i * 3 + 2] = windZ * zAmp + audioZ * zAmp;
 
         if (needColorUpdate) {
-          // 无封面时：中心冷蓝 → 外圈紫红，随能量增亮
-          const intensity = 0.3 + localEnergy * 0.8;
+          // 无封面时：中心冷蓝 → 外圈紫红，随风强度增亮
+          const intensity = 0.3 + localEnergy * 0.6 + Math.abs(windZ) * 0.4;
           const r = (0.25 + dc * 0.55) * intensity;
           const g = (0.45 + (1 - dc) * 0.25) * intensity;
           const b = (0.85 - dc * 0.35) * intensity;
