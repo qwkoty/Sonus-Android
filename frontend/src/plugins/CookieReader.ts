@@ -11,6 +11,7 @@ export interface CookieReaderPlugin {
   getCookiesForUrl(options: { url: string }): Promise<CookieReaderResult>;
   clearCookiesForUrl(options: { url: string }): Promise<void>;
   httpGet(options: { url: string; cookieDomain?: string; cookies?: string }): Promise<HttpGetResult>;
+  syncStreamCookies(options: { url?: string }): Promise<void>;
   openLoginWebView(): Promise<{ loggedIn: boolean }>;
 }
 
@@ -44,6 +45,11 @@ export const CookieReader = {
     const payload: { url: string; cookieDomain?: string; cookies?: string } = { url, cookieDomain: domain };
     if (cookies) payload.cookies = cookies;
     return Native.httpGet(payload);
+  },
+  // 把 y.qq.com 登录 Cookie 同步到音频流域名，让 Audio 元素播放时带登录态
+  syncStreamCookies: async (url = 'https://y.qq.com') => {
+    if (!IS_CAP()) return;
+    return Native.syncStreamCookies({ url });
   },
   openLoginWebView: async () => {
     if (!IS_CAP()) throw new Error('Not in Capacitor');

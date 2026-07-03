@@ -38,6 +38,18 @@ public class MainActivity extends BridgeActivity {
         if (webView != null) {
             WebSettings settings = webView.getSettings();
             settings.setMediaPlaybackRequiresUserGesture(false);
+            // 允许 HTTP/HTTPS 混合内容：QQ 音乐部分旧资源可能返回 http 链接
+            settings.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
+            // 桌面端 UA，与原生 HTTP 请求保持一致，降低被风控概率
+            settings.setUserAgentString(
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
+                "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+            );
+            // 启用 DOM 存储和数据库（部分 Web API 需要）
+            settings.setDomStorageEnabled(true);
+            settings.setDatabaseEnabled(true);
+            settings.setAllowFileAccess(true);
+            settings.setAllowContentAccess(true);
             // 透明背景，避免启动时白屏/黑屏闪烁
             webView.setBackgroundColor(Color.TRANSPARENT);
             webView.setLayerType(View.LAYER_TYPE_HARDWARE, null);

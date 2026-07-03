@@ -156,6 +156,54 @@ public class CookieReaderPlugin extends Plugin {
         }
     }
 
+    /**
+     * 将 y.qq.com 的登录 Cookie 同步到 QQ 音乐音频流域名，
+     * 让 WebView 的 Audio 元素在请求播放链接时也能带上登录态。
+     */
+    @PluginMethod()
+    public void syncStreamCookies(PluginCall call) {
+        try {
+            String url = call.getString("url", "https://y.qq.com");
+            CookieManager cm = CookieManager.getInstance();
+            cm.flush();
+            String cookieString = cm.getCookie(url);
+            if (cookieString == null || cookieString.isEmpty()) {
+                call.resolve();
+                return;
+            }
+
+            String[] streamDomains = {
+                "https://dl.stream.qqmusic.qq.com",
+                "https://isure.stream.qqmusic.qq.com",
+                "https://stream.qqmusic.qq.com",
+                "https://aqqmusic.tc.qq.com",
+                "https://isure6.stream.qqmusic.qq.com"
+            };
+
+            for (String pair : cookieString.split(";")) {
+                String[] kv = pair.trim().split("=", 2);
+                if (kv.length != 2) continue;
+                String key = kv[0].trim();
+                String value = kv[1].trim();
+                if (key.isEmpty() || value.isEmpty()) continue;
+                // 只同步登录态相关 Cookie
+                if (key.equals("uin") || key.equals("wxuin") ||
+                    key.equals("qm_keyst") || key.equals("qqmusic_key") ||
+                    key.equals("wxskey") || key.equals("p_skey") || key.equals("skey") ||
+                    key.equals("login_type")) {
+                    String cookieValue = key + "=" + value + "; Domain=.qqmusic.qq.com; Path=/";
+                    for (String domain : streamDomains) {
+                        cm.setCookie(domain, cookieValue);
+                    }
+                }
+            }
+            cm.flush();
+            call.resolve();
+        } catch (Exception e) {
+            call.reject("Sync stream cookies failed: " + e.getMessage());
+        }
+    }
+
     @PluginMethod()
     public void openLoginWebView(PluginCall call) {
         try {

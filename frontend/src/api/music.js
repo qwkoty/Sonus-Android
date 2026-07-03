@@ -58,6 +58,11 @@ async function urlAPK(id, cookie = '', uin = '0') {
   const loginflag = cookie ? 1 : 0;
   const cookieStr = cookie || '';
 
+  // 把登录 Cookie 同步到音频流域名，让 WebView Audio 播放时带登录态
+  if (cookieStr) {
+    try { await CookieReader.syncStreamCookies('https://y.qq.com'); } catch {}
+  }
+
   // 策略列表：filename 格式 + songtype 组合
   const strategies = [
     { filename: `C400${rawId}.m4a`, songtype: 0 },
@@ -78,17 +83,23 @@ async function urlAPK(id, cookie = '', uin = '0') {
             songtype: [s.songtype],
             uin: uinStr,
             loginflag,
-            platform: '23',
-            h5to: 'speed',
+            platform: '20',
             filename: [s.filename],
           },
         },
         comm: { uin: uinStr, format: 'json', ct: 24, cv: 0 },
       }), cookieStr);
+      console.log('[vkey]', s.filename, s.songtype, JSON.stringify(d?.req_0?.data?.midurlinfo?.[0]));
       const item = d?.req_0?.data?.midurlinfo?.[0];
       const sip = d?.req_0?.data?.sip?.[0];
-      if (item?.purl && sip) return sip + item.purl;
-    } catch {}
+      if (item?.purl && sip) {
+        const url = sip + item.purl;
+        console.log('[stream url]', url);
+        return url;
+      }
+    } catch (e) {
+      console.warn('[vkey failed]', s.filename, e.message);
+    }
   }
 
   // 最后 fallback：旧版 mobile express 接口
@@ -97,10 +108,13 @@ async function urlAPK(id, cookie = '', uin = '0') {
       `https://c.y.qq.com/base/fcgi-bin/fcg_music_express_mobile3.fcg?format=json205361747&songmid=${rawId}&filename=C400${rawId}.m4a&guid=10000&uin=${uinStr}&platform=yqq&cid=205361747`,
       cookieStr
     );
+    console.log('[express fallback]', JSON.stringify(fb));
     const fi = fb?.data?.items?.[0];
     if (fi?.url) return fi.url;
     if (fi?.filename) return `https://dl.stream.qqmusic.qq.com/${fi.filename}`;
-  } catch {}
+  } catch (e) {
+    console.warn('[express fallback failed]', e.message);
+  }
   return '';
 }
 

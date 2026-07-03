@@ -83,8 +83,9 @@ export const usePlayerStore = create((set, get) => {
   });
 
   audio.addEventListener('error', () => {
-    console.error('Audio error', audio.error);
-    set({ isPlaying: false, isLoadingUrl: false, error: '音源加载失败，自动切换下一首' });
+    const err = audio.error;
+    console.error('Audio error', err?.code, err?.message, audio.src);
+    set({ isPlaying: false, isLoadingUrl: false, error: `音源加载失败 (${err?.code || '?'})，自动切换下一首` });
     setTimeout(() => {
       const { playMode, currentTrack } = get();
       if (currentTrack && playMode !== 'single') get().next();
@@ -151,17 +152,20 @@ export const usePlayerStore = create((set, get) => {
       }
 
       if (url) {
+        console.log('[playTrack] set src', url);
         audio.src = url;
         audio.volume = get().volume;
         audio.load();
         try {
           await audio.play();
+          console.log('[playTrack] play started');
           set({ isPlaying: true, isLoadingUrl: false, currentTrack: { ...track, url } });
         } catch (err) {
-          console.error('播放失败', err);
+          console.error('[playTrack] play() failed', err);
           set({ isPlaying: false, isLoadingUrl: false, error: '播放失败，可能是版权限制或网络问题' });
         }
       } else {
+        console.warn('[playTrack] no url');
         set({ isLoadingUrl: false, error: '暂无音源，换一首试试' });
       }
     },
