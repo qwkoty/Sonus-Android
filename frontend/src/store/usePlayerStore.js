@@ -133,15 +133,8 @@ export const usePlayerStore = create((set, get) => {
 
       let url = track.url || '';
       if (!url && track.rawId) {
-        // APK 模式优先用 Blob URL（绕过 CORS），浏览器模式用后端代理
-        if (music.streamBlob) {
-          const blobUrl = await music.streamBlob(track.rawId, cookie, uin);
-          if (blobUrl) url = blobUrl;
-        }
-        if (!url) {
-          const streamResult = music.stream(track.rawId, cookie, uin);
-          url = (typeof streamResult?.then === 'function') ? await streamResult : streamResult;
-        }
+        const s = music.stream(track.rawId, cookie, uin);
+        url = (s instanceof Promise || typeof s?.then === 'function') ? await s : s;
       }
 
       // 加载歌词
