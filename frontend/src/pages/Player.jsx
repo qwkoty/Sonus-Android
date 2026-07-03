@@ -2,13 +2,14 @@ import { useState, useRef, useEffect, lazy, Suspense } from 'react';
 import {
   Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Repeat1,
   ListMusic, Volume2, Search, X, Loader2, SlidersHorizontal,
-  User, Music2, Crown, Users, ChevronRight, ArrowLeft, LogOut, LogIn,
+  User, Music2, Crown, Users, ChevronRight, ArrowLeft, LogOut,
 } from 'lucide-react';
 import { usePlayerStore } from '../store/usePlayerStore';
 import { useAuthStore } from '../store/useAuthStore';
 import { music } from '../api/music';
 import Visualizer from '../components/Visualizer';
 import FloatingLyrics from '../components/FloatingLyrics';
+import InlineLogin from '../components/InlineLogin';
 
 const Visualizer3D = lazy(() => import('../components/Visualizer3D'));
 const Visualizer3DPulse = lazy(() => import('../components/Visualizer3DPulse'));
@@ -126,7 +127,6 @@ export default function Player() {
   } = usePlayerStore();
 
   const { isLoggedIn, userInfo, nickname, logout } = useAuthStore();
-  const setShowLogin = useAuthStore((s) => s.setShowLogin);
 
   // 面板状态
   const [searchOpen, setSearchOpen] = useState(false);
@@ -361,15 +361,15 @@ export default function Player() {
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         zIndex: 100, gap: 10,
       }}>
-        {/* 左：用户（未登录→进登录页，已登录→用户面板） */}
+        {/* 左：用户（始终打开"我的"面板，未登录时面板内扫码） */}
         <button
-          onClick={() => isLoggedIn ? openUserPanel() : setShowLogin(true)}
+          onClick={() => openUserPanel()}
           style={{ ...floatBtn, padding: 0, overflow: 'hidden' }}
           title={isLoggedIn ? '我的音乐' : '登录 QQ 音乐'}
         >
           {isLoggedIn && avatar
             ? <img src={music.cover(avatar)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-            : (isLoggedIn ? <User size={18} /> : <LogIn size={18} />)
+            : <User size={18} />
           }
         </button>
 
@@ -387,7 +387,7 @@ export default function Player() {
             fontSize: 11, color: 'var(--text-secondary)', marginTop: 2,
             whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
           }}>
-            {currentTrack?.artist || (isLoggedIn ? 'QQ音乐 · 点击搜索开始播放' : '请在左上方登录')}
+            {currentTrack?.artist || (isLoggedIn ? 'QQ音乐 · 点击搜索开始播放' : '点击左上角登录')}
           </div>
         </div>
 
@@ -625,7 +625,7 @@ export default function Player() {
               </>
             )}
           </>
-        ) : (
+        ) : isLoggedIn ? (
           <>
             {/* 用户信息卡 */}
             <div style={{
@@ -718,6 +718,9 @@ export default function Player() {
               <LogOut size={15} /> 退出登录
             </button>
           </>
+        ) : (
+          /* 未登录：内联二维码登录 */
+          <InlineLogin />
         )}
       </Sheet>
 
