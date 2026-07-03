@@ -16,6 +16,26 @@ async function get(path, timeout = 30000) {
   }
 }
 
+async function post(path, body, timeout = 30000) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeout);
+  try {
+    const res = await fetch(`${BASE}${path}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const json = await res.json();
+    if (json && typeof json === 'object' && 'data' in json) return json.data;
+    if (json && json.error) throw new Error(json.error);
+    return json;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 export const music = {
   // 搜索：仅 QQ 音乐
   search: (keyword, limit = 30) =>
@@ -42,6 +62,8 @@ export const music = {
     get(`/api/music/login/qq/qrcode`),
   loginCheck: (qrsig) =>
     get(`/api/music/login/qq/check?qrsig=${encodeURIComponent(qrsig)}`),
+  loginByCookie: (cookie) =>
+    post(`/api/music/login/qq/cookie`, { cookie }),
 
   // ===== 用户 =====
   userInfo: (cookie, uin) =>
