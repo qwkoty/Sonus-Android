@@ -133,7 +133,9 @@ export const usePlayerStore = create((set, get) => {
 
       let url = track.url || '';
       if (!url && track.rawId) {
-        url = music.stream(track.rawId, cookie, uin);
+        const streamResult = music.stream(track.rawId, cookie, uin);
+        // APK 模式返回 Promise，浏览器模式返回 string
+        url = (typeof streamResult?.then === 'function') ? await streamResult : streamResult;
       }
 
       // 加载歌词
