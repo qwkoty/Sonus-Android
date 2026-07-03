@@ -43,6 +43,10 @@
     </application>
 
     <!-- Permissions -->
-
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- 保持屏幕关闭时仍可播放（音频焦点由系统处理） -->
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <!-- 前台服务：用���实现后台播放（后续可按需接入 MediaSession） -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
 </manifest>

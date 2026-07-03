@@ -2,6 +2,8 @@ package com.sonus.app;
 
 import android.content.Intent;
 import android.os.Bundle;
+import android.webkit.WebSettings;
+import android.webkit.WebView;
 import com.getcapacitor.BridgeActivity;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginHandle;
@@ -12,6 +14,13 @@ public class MainActivity extends BridgeActivity {
     public void onCreate(Bundle savedInstanceState) {
         registerPlugin(CookieReaderPlugin.class);
         super.onCreate(savedInstanceState);
+
+        // 允许 WebView 在无用户手势的情况下播放媒体（关键：Audio 元素自动播放）
+        WebView webView = getBridge().getWebView();
+        if (webView != null) {
+            WebSettings settings = webView.getSettings();
+            settings.setMediaPlaybackRequiresUserGesture(false);
+        }
     }
 
     @Override

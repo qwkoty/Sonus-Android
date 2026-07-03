@@ -1,62 +1,39 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { RefreshCw, Loader2, Music, ArrowLeft, User, ListMusic, LogOut, CheckCircle2, AlertCircle, LogIn } from 'lucide-react';
-import { music } from '../api/music';
 import { useAuthStore } from '../store/useAuthStore';
-import { qqQrCheckJsonp } from '../utils/qqLogin';
-import { isAndroid, getLoginMode } from '../utils/platform';
 import { CookieReader } from '../plugins/CookieReader';
+import { music } from '../api/music';
 
-// 双模式登录：
-// - Capacitor Android: 点击登录 → 打开 WebView 加载 y.qq.com → 自动检测 Cookie → 登录完成
-// - 浏览器: ptlogin2 扫码 + "我已扫码登录"按钮（fallback）
 export default function Login({ onBack }) {
   const { setAuth, isLoggedIn, userInfo, cookie, uin, nickname, logout, fetchUserInfo } = useAuthStore();
 
-  const loginMode = getLoginMode();
-  const [view, setView] = useState(isLoggedIn ? 'account' : loginMode === 'webview' ? 'webview' : 'qr');
+  const [view, setView] = useState(isLoggedIn ? 'account' : 'webview');
 
-  // ===== WebView 模式状态 =====
-  const [webviewPhase, setWebviewPhase] = useState('idle'); // idle | opening | polling | success | error
+  const [webviewPhase, setWebviewPhase] = useState('idle');
   const [webviewTip, setWebviewTip] = useState('');
-  const pollTimerRef = useRef(null);
 
-  // ===== QR 扫码模式状态 =====
-  const [qrcode, setQrcode] = useState('');
-  const [phase, setPhase] = useState('loading');
-  const [tip, setTip] = useState('正在加载二维码…');
-  const [errorMsg, setErrorMsg] = useState('');
-  const qrsigRef = useRef('');
-  const loginSigRef = useRef('');
-
-  // ===== 账号页状态 =====
   const [playlists, setPlaylists] = useState(null);
   const [loadingPlaylists, setLoadingPlaylists] = useState(false);
 
-  // ===== WebView 登录逻辑 =====
   const startWebViewLogin = useCallback(async () => {
     setWebviewPhase('opening');
     setWebviewTip('正在打开 QQ 音乐登录页面…');
 
     try {
-      // 先检查当前是否已经有有效 Cookie（可能之前登录过）
       const currentCookies = await CookieReader.getCookiesForUrl('https://y.qq.com');
       if (currentCookies.loggedIn) {
         await handleCookieLogin(currentCookies);
         return;
       }
 
-      // 打开 WebView 登录窗口，Promise 在用户完成登录后 resolve
       setWebviewPhase('polling');
       setWebviewTip('请在弹出的窗口中登录 QQ 音乐…');
 
-      const result = await CookieReader.openLoginWebView();
-      // 用户登录成功，WebView 已关闭
+      await CookieReader.openLoginWebView();
       setWebviewTip('登录成功，正在同步账号…');
-      // 读取最终 Cookie
       const cookies = await CookieReader.getCookiesForUrl('https://y.qq.com');
       await handleCookieLogin(cookies);
     } catch (e) {
-      // 用户取消或失败
       setWebviewPhase('error');
       setWebviewTip('登录已取消：' + (e.message || ''));
     }
@@ -83,20 +60,25 @@ export default function Login({ onBack }) {
 
     setWebviewTip('登录成功，正在同步账号…');
     try {
-      // 传给后端验证并获取完整信息
       const loginRes = await music.loginByCookie(cookies.cookie);
-      if (Number(loginRes?.code) === 0 && loginRes?.cookie && loginRes?.uin) {
+      if (Number(loginRes?.code) === 0) {
         setAuth({
-          cookie: loginRes.cookie,
-          uin: loginRes.uin,
+          cookie: loginRes.cookie || cookies.cookie,
+          uin: loginRes.uin || cookies.uin,
           key: loginRes.key || cookies.qqmusic_key,
           nickname: loginRes.nickname || 'QQ音乐用户',
         });
-        setWebviewPhase('success');
-        setView('account');
-        return;
+      } else {
+        setAuth({
+          cookie: cookies.cookie,
+          uin: cookies.uin,
+          key: cookies.qqmusic_key,
+          nickname: 'QQ音乐用户',
+        });
       }
-      // 后端验证失败，但本地 Cookie 有效，直接用本地数据
+      setWebviewPhase('success');
+      setView('account');
+    } catch (e) {
       setAuth({
         cookie: cookies.cookie,
         uin: cookies.uin,
@@ -105,128 +87,37 @@ export default function Login({ onBack }) {
       });
       setWebviewPhase('success');
       setView('account');
-    } catch (e) {
-      // 后端不可用（离线场景），用本地 Cookie
-      setAuth({
-        cookie: cookies.cookie,
-        uin: cookies.uin,
-        key: cookies.qqmusic_key,
-        nickname: 'QQ音乐用户',
-      });
-      setWebviewPhase('success');
-      setView('account');
     }
   };
 
-  // ===== QR 扫码逻辑 =====
-  const fetchQr = async () => {
-    setPhase('loading');
-    setTip('正在加载二维码…');
-    setErrorMsg('');
-    setQrcode('');
-    try {
-      const data = await music.loginQrCode();
-      if (!data?.qrsig || !data?.qrcode) throw new Error('二维码获取失败');
-      qrsigRef.current = data.qrsig;
-      loginSigRef.current = data.login_sig || '';
-      setQrcode(data.qrcode);
-      setPhase('waiting');
-      setTip('请用 QQ 扫描二维码，并在手机上确认登录');
-    } catch (e) {
-      setErrorMsg(e.message || '获取二维码失败');
-      setPhase('error');
-      setTip('二维码加载失败');
-    }
-  };
-
-  const handleConfirmLogin = async () => {
-    if (!qrsigRef.current) { setErrorMsg('请先等待二维码加载'); return; }
-    setPhase('checking');
-    setTip('正在检查登录状态…');
-    setErrorMsg('');
-    const res = await qqQrCheckJsonp(qrsigRef.current, loginSigRef.current);
-    switch (res.code) {
-      case 0:
-        if (res.redirectUrl) {
-          setTip('登录成功，正在获取账号信息…');
-          try {
-            const loginRes = await music.loginByRedirect(res.redirectUrl, qrsigRef.current);
-            if (Number(loginRes?.code) === 0 && loginRes?.cookie && loginRes?.uin) {
-              setAuth({ cookie: loginRes.cookie, uin: loginRes.uin, key: loginRes.key, nickname: res.nickname || loginRes.nickname || 'QQ音乐用户' });
-              setView('account');
-              return;
-            }
-            setErrorMsg(loginRes?.msg || '登录信息收集失败');
-            setPhase('error');
-            setTip('登录失败');
-          } catch (e) {
-            setErrorMsg('登录失败：' + (e.message || ''));
-            setPhase('error');
-            setTip('登录失败');
-          }
-        } else {
-          setErrorMsg('登录信息异常');
-          setPhase('error');
-          setTip('登录失败');
-        }
-        break;
-      case 66:
-        setErrorMsg('还没有扫码');
-        setPhase('waiting');
-        setTip('请用 QQ 扫描二维码');
-        break;
-      case 67:
-        setErrorMsg('请在手机上点"确认登录"后再点此按钮');
-        setPhase('waiting');
-        setTip('请在手机上确认登录');
-        break;
-      case 65:
-        setErrorMsg('二维码已过期');
-        setPhase('error');
-        setTip('二维码已过期');
-        break;
-      default:
-        setErrorMsg(res.msg || '检查失败');
-        setPhase('waiting');
-        setTip('请确认已扫码并确认登录');
-        break;
-    }
-  };
-
-  // ===== 歌单加载 =====
   const handleLoadPlaylists = async () => {
     if (playlists) return;
     setLoadingPlaylists(true);
     try {
       const list = await music.userPlaylists(cookie, uin);
       setPlaylists(list || []);
-    } catch (e) { setPlaylists([]); } finally { setLoadingPlaylists(false); }
+    } catch (e) {
+      setPlaylists([]);
+    } finally {
+      setLoadingPlaylists(false);
+    }
   };
 
   const handleLogout = () => {
     logout();
-    // Android 环境下清除 WebView Cookie
-    if (isAndroid()) {
-      CookieReader.clearCookiesForUrl('https://y.qq.com').catch(() => {});
-    }
-    setView(loginMode === 'webview' ? 'webview' : 'qr');
+    CookieReader.clearCookiesForUrl('https://y.qq.com').catch(() => {});
+    setView('webview');
     setPlaylists(null);
-    if (loginMode === 'qr') setTimeout(fetchQr, 100);
+    setWebviewPhase('idle');
+    setWebviewTip('');
   };
 
   useEffect(() => {
-    if (view === 'qr' && !qrcode) fetchQr();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [view]);
-
-  // 清理轮询
-  useEffect(() => {
-    return () => {
-      if (pollTimerRef.current) { clearInterval(pollTimerRef.current); pollTimerRef.current = null; }
-    };
-  }, []);
-
-  const qrBusy = phase === 'loading' || phase === 'checking';
+    if (isLoggedIn) {
+      fetchUserInfo();
+      setView('account');
+    }
+  }, [isLoggedIn, fetchUserInfo]);
 
   return (
     <div style={{
@@ -235,12 +126,10 @@ export default function Login({ onBack }) {
       background: 'radial-gradient(ellipse at 50% 30%, color-mix(in srgb, var(--accent-dynamic) 12%, transparent) 0%, rgba(0,0,0,0.4) 60%, rgba(0,0,0,0.7) 100%)',
       padding: 20, overflow: 'auto',
     }}>
-      {/* 浮动光斑 */}
       <div className="glass-orb glass-orb-1" style={{ top: '15%', left: '10%' }} />
       <div className="glass-orb glass-orb-2" style={{ top: '50%', right: '5%' }} />
       <div className="glass-orb glass-orb-3" style={{ bottom: '10%', left: '30%' }} />
 
-      {/* 返回按钮 */}
       {onBack && (
         <button onClick={onBack} className="glass-button" style={{
           position: 'absolute', top: 'calc(16px + env(safe-area-inset-top))', left: 16,
@@ -251,7 +140,6 @@ export default function Login({ onBack }) {
         </button>
       )}
 
-      {/* Logo */}
       <div style={{
         display: 'flex', alignItems: 'center', gap: 10, marginTop: 50, marginBottom: 28, zIndex: 1,
       }}>
@@ -273,32 +161,22 @@ export default function Login({ onBack }) {
       </div>
 
       {view === 'account' ? (
-        /* ===== 账号页面 ===== */
         <AccountView
           userInfo={userInfo} nickname={nickname} uin={uin}
           playlists={playlists} loadingPlaylists={loadingPlaylists}
           onLoadPlaylists={handleLoadPlaylists} onLogout={handleLogout}
         />
-      ) : loginMode === 'webview' ? (
-        /* ===== WebView 登录模式 ===== */
+      ) : (
         <WebViewLoginView
           phase={webviewPhase} tip={webviewTip}
           onStartLogin={startWebViewLogin}
           onCheckStatus={extractCookieAndLogin}
-        />
-      ) : (
-        /* ===== QR 扫码模式 ===== */
-        <QrScanView
-          qrcode={qrcode} phase={phase} tip={tip} errorMsg={errorMsg}
-          isBusy={qrBusy}
-          onFetchQr={fetchQr} onConfirmLogin={handleConfirmLogin}
         />
       )}
     </div>
   );
 }
 
-// ===== 子组件：账号页面 =====
 function AccountView({ userInfo, nickname, uin, playlists, loadingPlaylists, onLoadPlaylists, onLogout }) {
   return (
     <div className="glass-panel-strong" style={{
@@ -306,7 +184,6 @@ function AccountView({ userInfo, nickname, uin, playlists, loadingPlaylists, onL
       padding: 24, borderRadius: 24, width: '100%', maxWidth: 400,
       display: 'flex', flexDirection: 'column', alignItems: 'center',
     }}>
-      {/* 头像 */}
       <div style={{
         width: 80, height: 80, borderRadius: '50%',
         background: 'rgba(255,255,255,0.1)',
@@ -316,13 +193,12 @@ function AccountView({ userInfo, nickname, uin, playlists, loadingPlaylists, onL
         boxShadow: '0 4px 20px rgba(0,0,0,0.3)',
       }}>
         {userInfo?.avatar ? (
-          <img src={userInfo.avatar} alt="头像" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          <img src={userInfo.avatar} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
         ) : (
           <User size={36} color="var(--text-secondary)" />
         )}
       </div>
 
-      {/* 昵称 + VIP */}
       <div style={{
         fontSize: 20, fontWeight: 700, color: 'var(--text-primary)',
         marginBottom: 6, display: 'flex', alignItems: 'center', gap: 8,
@@ -342,7 +218,6 @@ function AccountView({ userInfo, nickname, uin, playlists, loadingPlaylists, onL
         QQ: {uin}
       </div>
 
-      {/* 歌单按钮 */}
       <button onClick={onLoadPlaylists} disabled={loadingPlaylists} className="glass-button-accent" style={{
         width: '100%', padding: '12px 16px', borderRadius: 12,
         fontSize: 14, fontWeight: 700, color: '#0A0A0A',
@@ -352,7 +227,6 @@ function AccountView({ userInfo, nickname, uin, playlists, loadingPlaylists, onL
         {loadingPlaylists ? <><Loader2 size={16} className="spin-icon" /> 加载中…</> : <><ListMusic size={16} /> 查看我的歌单</>}
       </button>
 
-      {/* 歌单列表 */}
       {playlists && playlists.length > 0 && (
         <div style={{ width: '100%', marginTop: 16 }}>
           <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 10, paddingLeft: 4 }}>
@@ -392,11 +266,9 @@ function AccountView({ userInfo, nickname, uin, playlists, loadingPlaylists, onL
   );
 }
 
-// ===== 子组件：WebView 登录 =====
 function WebViewLoginView({ phase, tip, onStartLogin, onCheckStatus }) {
   return (
     <div style={{ zIndex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 }}>
-      {/* 登录入口卡片 */}
       <div className="glass-panel-strong" style={{
         padding: 32, borderRadius: 24, width: '100%', maxWidth: 360,
         display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16,
@@ -445,7 +317,6 @@ function WebViewLoginView({ phase, tip, onStartLogin, onCheckStatus }) {
           )}
         </button>
 
-        {/* 手动检查按钮（WebView 不可用时） */}
         {phase === 'polling' && (
           <button onClick={onCheckStatus} className="glass-button" style={{
             padding: '10px 16px', borderRadius: 10,
@@ -457,7 +328,6 @@ function WebViewLoginView({ phase, tip, onStartLogin, onCheckStatus }) {
         )}
       </div>
 
-      {/* 状态提示 */}
       {tip && (
         <div style={{
           fontSize: 13, fontWeight: 600, textAlign: 'center',
@@ -468,7 +338,6 @@ function WebViewLoginView({ phase, tip, onStartLogin, onCheckStatus }) {
         </div>
       )}
 
-      {/* 底部说明 */}
       <div style={{
         fontSize: 11, color: 'var(--text-muted)', textAlign: 'center', maxWidth: 300, lineHeight: 1.6,
       }}>
@@ -476,107 +345,5 @@ function WebViewLoginView({ phase, tip, onStartLogin, onCheckStatus }) {
         登录后即可听 VIP 歌曲 + 同步歌单
       </div>
     </div>
-  );
-}
-
-// ===== 子组件：QR 扫码模式 =====
-function QrScanView({ qrcode, phase, tip, errorMsg, isBusy, onFetchQr, onConfirmLogin }) {
-  return (
-    <>
-      {/* 二维码卡片 */}
-      <div className="glass-panel-strong" style={{
-        position: 'relative', zIndex: 1, padding: 18, borderRadius: 24,
-        boxShadow: '0 20px 60px rgba(0,0,0,0.5)',
-      }}>
-        {phase === 'loading' ? (
-          <div style={{ width: 200, height: 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <Loader2 size={32} style={{ animation: 'spin 1s linear infinite', color: 'var(--accent-dynamic)' }} />
-          </div>
-        ) : qrcode ? (
-          <div style={{ position: 'relative' }}>
-            <img src={qrcode} alt="登录二维码" style={{
-              width: 200, height: 200, borderRadius: 16, imageRendering: 'pixelated',
-              background: '#fff', padding: 10, display: 'block',
-              filter: phase === 'checking' ? 'blur(4px) opacity(0.5)' : 'none',
-              transition: 'filter 0.3s ease',
-            }} />
-            {phase === 'checking' && (
-              <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <Loader2 size={28} style={{ animation: 'spin 1s linear infinite', color: 'var(--accent-dynamic)' }} />
-              </div>
-            )}
-          </div>
-        ) : (
-          <div style={{
-            width: 200, height: 200, display: 'flex', flexDirection: 'column',
-            alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)',
-            fontSize: 13, textAlign: 'center', padding: 20, gap: 12,
-          }}>
-            <AlertCircle size={28} color="#F87171" />
-            <span>{errorMsg || '二维码加载失败'}</span>
-            <button onClick={onFetchQr} className="glass-button" style={{
-              padding: '6px 14px', borderRadius: 8, fontSize: 12, fontWeight: 600,
-              display: 'inline-flex', alignItems: 'center', gap: 6,
-            }}>
-              <RefreshCw size={12} /> 重试
-            </button>
-          </div>
-        )}
-      </div>
-
-      {/* 状态文案 */}
-      <div style={{
-        marginTop: 20, fontSize: 15, fontWeight: 600, textAlign: 'center',
-        color: phase === 'checking' ? 'var(--accent-dynamic)' : 'var(--text-secondary)',
-        zIndex: 1, transition: 'color 0.3s ease', minHeight: 22,
-      }}>
-        {tip}
-      </div>
-
-      {errorMsg && phase !== 'checking' && (
-        <div style={{
-          marginTop: 8, fontSize: 12, color: '#FBBF24', textAlign: 'center', zIndex: 1,
-          maxWidth: 300, lineHeight: 1.5, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-        }}>
-          <AlertCircle size={13} style={{ flexShrink: 0 }} /> {errorMsg}
-        </div>
-      )}
-
-      {/* 我已扫码登录按钮 */}
-      {qrcode && phase !== 'loading' && (
-        <button onClick={onConfirmLogin} disabled={isBusy} className="glass-button-accent" style={{
-          marginTop: 18, padding: '14px 32px', borderRadius: 14,
-          fontSize: 15, fontWeight: 700, color: '#0A0A0A',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-          opacity: isBusy ? 0.6 : 1, zIndex: 1,
-          boxShadow: '0 8px 30px rgba(79,195,247,0.35)',
-        }}>
-          {phase === 'checking' ? <><Loader2 size={18} className="spin-icon" /> 正在检查…</> : <><CheckCircle2 size={18} /> 我已扫码登录</>}
-        </button>
-      )}
-
-      {qrcode && !isBusy && (
-        <button onClick={onFetchQr} className="glass-button" style={{
-          marginTop: 12, padding: '8px 16px', borderRadius: 10, fontSize: 12, fontWeight: 500,
-          display: 'inline-flex', alignItems: 'center', gap: 6, zIndex: 1,
-        }}>
-          <RefreshCw size={13} /> 刷新二维码
-        </button>
-      )}
-
-      <div className="glass-panel" style={{
-        marginTop: 18, padding: '12px 16px', borderRadius: 12, zIndex: 1,
-        maxWidth: 320, fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.6,
-      }}>
-        <div style={{ fontWeight: 600, color: 'var(--accent-dynamic)', marginBottom: 4 }}>操作步骤</div>
-        <div>1. 用手机 QQ 扫描上方二维码</div>
-        <div>2. 在手机 QQ 上点击"确认登录"</div>
-        <div>3. 点击上方"我已扫码登录"按钮</div>
-      </div>
-
-      <div style={{ marginTop: 20, marginBottom: 20, fontSize: 11, color: 'var(--text-muted)', textAlign: 'center', zIndex: 1 }}>
-        仅用于解锁 VIP 音源与同步歌单 · 登录后即可听歌
-      </div>
-    </>
   );
 }

@@ -1,5 +1,5 @@
-// 平台检测工具
-// 区分 Capacitor APK 环境和浏览器环境
+// 平台检测工具 —— 仅 APK 模式
+// Sonus 只作为 Android App 运行，不再支持浏览器模式
 
 export function isCapacitor(): boolean {
   return typeof window !== 'undefined' &&
@@ -7,16 +7,11 @@ export function isCapacitor(): boolean {
 }
 
 export function isAndroid(): boolean {
-  return isCapacitor() && window.Capacitor?.getPlatform?.() === 'android';
+  return typeof window !== 'undefined' &&
+    window.Capacitor?.getPlatform?.() === 'android';
 }
 
-export function isBrowser(): boolean {
-  return !isCapacitor();
-}
-
-// 登录方式：
-// - Capacitor Android: WebView 内嵌 QQ 音乐官网 + CookieReader 自动读 Cookie
-// - 浏览器: ptlogin2 扫码 + JSONP 检查（有 bug，但作为 fallback）
-export function getLoginMode(): 'webview' | 'qrscan' {
-  return isAndroid() ? 'webview' : 'qrscan';
+// 兼容旧代码：始终为 true，表示“在原生应用内”
+export function isNativeApp(): boolean {
+  return true;
 }

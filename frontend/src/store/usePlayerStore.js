@@ -32,7 +32,6 @@ function getCurrentLyric(lyrics, time) {
   return current;
 }
 
-// 从 auth store 取登录态（用于解锁 VIP 音源）
 function authCreds() {
   const { cookie, uin } = useAuthStore.getState();
   return { cookie: cookie || '', uin: uin || '0' };
@@ -44,7 +43,6 @@ export const usePlayerStore = create((set, get) => {
   audio.addEventListener('timeupdate', () => {
     const time = audio.currentTime || 0;
     const { lyrics, duration } = get();
-    // 流式音频 duration 可能为 Infinity，尝试从 seekable 修复
     if ((!duration || !isFinite(duration)) && audio.seekable && audio.seekable.length > 0) {
       const d = audio.seekable.end(audio.seekable.length - 1);
       if (isFinite(d) && d > 0) set({ duration: d });
@@ -54,7 +52,6 @@ export const usePlayerStore = create((set, get) => {
 
   audio.addEventListener('loadedmetadata', () => {
     let d = audio.duration;
-    // 流代理下 duration 常为 Infinity，回退到 track 元数据
     if (!isFinite(d) || !d) {
       const { currentTrack } = get();
       d = currentTrack?.duration || 0;
@@ -63,7 +60,6 @@ export const usePlayerStore = create((set, get) => {
   });
 
   audio.addEventListener('progress', () => {
-    // duration 为 Infinity 时，从 seekable 末尾取真实时长
     if (audio.seekable && audio.seekable.length > 0) {
       const d = audio.seekable.end(audio.seekable.length - 1);
       if (isFinite(d) && d > 0) {
@@ -111,7 +107,6 @@ export const usePlayerStore = create((set, get) => {
 
     setPlaylist: (list) => set({ playlist: list }),
 
-    // 替换播放队列并播放指定曲目（用于歌单/搜索点击）
     playTrackFromList: (track, list) => {
       if (list && list.length) set({ playlist: list });
       get().playTrack(track);
@@ -120,28 +115,37 @@ export const usePlayerStore = create((set, get) => {
     playTrack: async (track) => {
       initAudioSystem();
       const { audio } = get();
-      // 立即用 track.duration 兜底，避免流式加载期间 duration=0 进度条不可用
-      set({ currentTrack: track, isPlaying: false, currentTime: 0, duration: track?.duration || 0, isLoadingUrl: true, lyrics: [], currentLyric: '', error: null });
+      set({
+        currentTrack: track,
+        isPlaying: false,
+        currentTime: 0,
+        duration: track?.duration || 0,
+        isLoadingUrl: true,
+        lyrics: [],
+        currentLyric: '',
+        error: null,
+      });
 
       const { playlist } = get();
       if (!playlist.some((t) => t.id === track.id)) {
         set({ playlist: [...playlist, track] });
       }
 
-      // 取登录态，解锁 VIP
       const { cookie, uin } = authCreds();
 
       let url = track.url || '';
       if (!url && track.rawId) {
-        const s = music.stream(track.rawId, cookie, uin);
-        url = (s instanceof Promise || typeof s?.then === 'function') ? await s : s;
+        try {
+          url = await music.stream(track.rawId, cookie, uin);
+        } catch (e) {
+          console.error('获取播放链接失败', e);
+        }
       }
 
-      // 加载歌词
       if (track.rawId) {
         try {
-          const lyricRes = await music.lyric(track.rawId);
-          const parsed = parseLyric(lyricRes?.lyric || '');
+          const lyricText = await music.lyric(track.rawId);
+          const parsed = parseLyric(lyricText || '');
           set({ lyrics: parsed });
         } catch (e) {}
       }
@@ -222,7 +226,6 @@ export const usePlayerStore = create((set, get) => {
     seek: (time) => {
       const { audio, duration } = get();
       if (!audio) return;
-      // audio.duration 可能是 Infinity，用 store 里的 duration（已用 track 元数据兜底）作为上限
       const maxTime = (isFinite(audio.duration) && audio.duration > 0) ? audio.duration : (duration || 0);
       if (maxTime > 0) {
         audio.currentTime = Math.max(0, Math.min(time, maxTime));
