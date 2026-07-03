@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, lazy, Suspense } from 'react';
 import {
   Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Repeat1,
   ListMusic, Volume2, Search, X, Loader2, SlidersHorizontal,
-  User, Music2, Crown, Users, ChevronRight, ArrowLeft, LogOut,
+  User, Music2,
 } from 'lucide-react';
 import { usePlayerStore } from '../store/usePlayerStore';
 import { useAuthStore } from '../store/useAuthStore';
@@ -116,21 +116,20 @@ function Sheet({ open, onClose, title, children, height = '78vh' }) {
   );
 }
 
-export default function Player() {
+export default function Player({ onProfile }) {
   const {
     currentTrack, isPlaying, currentTime, duration,
     volume, playMode, playlist,
     togglePlay, next, prev, seek, setVolume,
-    toggleMode, playTrack, playTrackFromList,
+    toggleMode, playTrack,
     lyrics, currentLyric, isLoadingUrl, error, clearError, setError,
   } = usePlayerStore();
 
-  const { isLoggedIn, userInfo, nickname, logout } = useAuthStore();
+  const { userInfo } = useAuthStore();
 
   // 面板状态
   const [searchOpen, setSearchOpen] = useState(false);
   const [queueOpen, setQueueOpen] = useState(false);
-  const [userOpen, setUserOpen] = useState(false);
   const [vizOpen, setVizOpen] = useState(false);
 
   // 搜索
@@ -138,12 +137,6 @@ export default function Player() {
   const [results, setResults] = useState([]);
   const [searching, setSearching] = useState(false);
   const searchTimerRef = useRef(null);
-
-  // 用户歌单
-  const [playlists, setPlaylists] = useState([]);
-  const [loadingPlaylists, setLoadingPlaylists] = useState(false);
-  const [playlistDetail, setPlaylistDetail] = useState(null); // { name, tracks }
-  const [loadingDetail, setLoadingDetail] = useState(false);
 
   // 可视化
   const [vizMode, setVizMode] = useState(() => {
@@ -204,47 +197,6 @@ export default function Player() {
     setSearchOpen(false);
   };
 
-  // ===== 用户歌单 =====
-  const openUserPanel = async () => {
-    setUserOpen(true);
-    setPlaylistDetail(null);
-    // 只有已登录才加载歌单
-    const { isLoggedIn, cookie, uin } = useAuthStore.getState();
-    if (!isLoggedIn || !cookie || !uin) return;
-    if (playlists.length === 0) {
-      setLoadingPlaylists(true);
-      try {
-        const list = await music.userPlaylists(cookie, uin);
-        setPlaylists(list || []);
-      } catch (e) {
-        setError('歌单加载失败');
-      } finally {
-        setLoadingPlaylists(false);
-      }
-    }
-  };
-  const openPlaylistDetail = async (pl) => {
-    const { cookie } = useAuthStore.getState();
-    setLoadingDetail(true);
-    setPlaylistDetail({ name: pl.name, tracks: [] });
-    try {
-      const detail = await music.playlist(pl.id, cookie);
-      setPlaylistDetail({ name: detail?.name || pl.name, tracks: detail?.tracks || [] });
-    } catch (e) {
-      setError('歌单详情加载失败');
-    } finally {
-      setLoadingDetail(false);
-    }
-  };
-  const playFromPlaylist = (track) => {
-    if (playlistDetail?.tracks?.length) {
-      playTrackFromList(track, playlistDetail.tracks);
-    } else {
-      playTrack(track);
-    }
-    setUserOpen(false);
-  };
-
   // ===== 进度条 =====
   const handleProgressDown = (e) => {
     if (!progressRef.current || !duration || !isFinite(duration)) return;
@@ -275,12 +227,11 @@ export default function Player() {
       if (e.code === 'Escape') {
         if (searchOpen) setSearchOpen(false);
         else if (queueOpen) setQueueOpen(false);
-        else if (userOpen) { playlistDetail ? setPlaylistDetail(null) : setUserOpen(false); }
         else if (vizOpen) setVizOpen(false);
         return;
       }
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
-      if (searchOpen || userOpen || queueOpen || vizOpen) return;
+      if (searchOpen || queueOpen || vizOpen) return;
       switch (e.code) {
         case 'Space': e.preventDefault(); togglePlay(); break;
         case 'ArrowRight':
@@ -300,7 +251,7 @@ export default function Player() {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [togglePlay, next, prev, seek, setVolume, toggleMode, duration, currentTime, volume, searchOpen, userOpen, queueOpen, vizOpen, playlistDetail]);
+  }, [togglePlay, next, prev, seek, setVolume, toggleMode, duration, currentTime, volume, searchOpen, queueOpen, vizOpen]);
 
   const progress = duration ? (currentTime / duration) * 100 : 0;
   const coverFor3D = currentTrack?.cover
@@ -362,13 +313,13 @@ export default function Player() {
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         zIndex: 100, gap: 10,
       }}>
-        {/* 左：用户（始终打开"我的"面板，未登录时面板内扫码） */}
+        {/* 左：头像，点击进入个人页（独立页面） */}
         <button
-          onClick={() => openUserPanel()}
+          onClick={onProfile}
           style={{ ...floatBtn, padding: 0, overflow: 'hidden' }}
-          title={isLoggedIn ? '我的音乐' : '登录 QQ 音乐'}
+          title="我的音乐"
         >
-          {isLoggedIn && avatar
+          {avatar
             ? <img src={music.cover(avatar)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
             : <User size={18} />
           }
@@ -388,7 +339,7 @@ export default function Player() {
             fontSize: 11, color: 'var(--text-secondary)', marginTop: 2,
             whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
           }}>
-            {currentTrack?.artist || (isLoggedIn ? 'QQ音乐 · 点击搜索开始播放' : '点击左上角登录')}
+            {currentTrack?.artist || '点击搜索开始播放'}
           </div>
         </div>
 
@@ -585,140 +536,6 @@ export default function Player() {
                 onPlay={(track) => { playTrack(track); setQueueOpen(false); }} />
             ))}
           </div>
-        )}
-      </Sheet>
-
-      {/* ====== 用户面板（个人信息 + 歌单） ====== */}
-      <Sheet open={userOpen} onClose={() => { setUserOpen(false); setPlaylistDetail(null); }}
-        title={playlistDetail ? playlistDetail.name : '我的音乐'}>
-        {playlistDetail ? (
-          <>
-            <button onClick={() => setPlaylistDetail(null)} style={{
-              display: 'inline-flex', alignItems: 'center', gap: 4, marginBottom: 10,
-              fontSize: 13, color: 'var(--text-secondary)', padding: '4px 8px',
-            }}>
-              <ArrowLeft size={15} /> 返回歌单
-            </button>
-            {loadingDetail ? (
-              <div style={{ display: 'flex', justifyContent: 'center', padding: 30 }}>
-                <Loader2 size={22} style={{ animation: 'spin 1s linear infinite', color: 'var(--text-secondary)' }} />
-              </div>
-            ) : playlistDetail.tracks.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: 30, color: 'var(--text-muted)', fontSize: 13 }}>
-                歌单暂无歌曲
-              </div>
-            ) : (
-              <>
-                <button onClick={() => playTrackFromList(playlistDetail.tracks[0], playlistDetail.tracks)} style={{
-                  width: '100%', marginBottom: 8, padding: '10px', borderRadius: 12,
-                  background: 'var(--accent-dynamic)', color: '#000', fontSize: 13, fontWeight: 600,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, cursor: 'pointer',
-                }}>
-                  <Play size={16} fill="currentColor" /> 播放全部 ({playlistDetail.tracks.length})
-                </button>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                  {playlistDetail.tracks.map((t, i) => (
-                    <TrackRow key={t.id} track={t} index={i}
-                      active={currentTrack?.id === t.id}
-                      onPlay={playFromPlaylist} />
-                  ))}
-                </div>
-              </>
-            )}
-          </>
-        ) : (
-          <>
-            {/* 用户信息卡 */}
-            <div style={{
-              display: 'flex', alignItems: 'center', gap: 14, padding: '14px 12px', marginBottom: 8,
-              borderRadius: 16, background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border)',
-            }}>
-              <div style={{
-                width: 56, height: 56, borderRadius: '50%', overflow: 'hidden', flexShrink: 0,
-                background: 'rgba(255,255,255,0.08)',
-              }}>
-                {avatar && <img src={music.cover(avatar)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />}
-              </div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <span style={{ fontSize: 16, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                    {nickname}
-                  </span>
-                  {userInfo?.vipLevel > 0 && (
-                    <span style={{
-                      display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 10,
-                      padding: '2px 7px', borderRadius: 6,
-                      background: 'linear-gradient(135deg, #FFD700, #FFA500)', color: '#3a2200', fontWeight: 700,
-                    }}>
-                      <Crown size={11} /> VIP {userInfo.vipLevel}
-                    </span>
-                  )}
-                </div>
-                <div style={{ display: 'flex', gap: 14, marginTop: 6, fontSize: 12, color: 'var(--text-secondary)' }}>
-                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                    <Users size={12} /> 关注 {userInfo?.follow ?? 0}
-                  </span>
-                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                    <Users size={12} /> 粉丝 {userInfo?.fans ?? 0}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* 歌单列表 */}
-            <div style={{ fontSize: 12, color: 'var(--text-secondary)', padding: '6px 12px', marginTop: 6 }}>
-              我的歌单
-            </div>
-            {loadingPlaylists ? (
-              <div style={{ display: 'flex', justifyContent: 'center', padding: 30 }}>
-                <Loader2 size={22} style={{ animation: 'spin 1s linear infinite', color: 'var(--text-secondary)' }} />
-              </div>
-            ) : playlists.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: 30, color: 'var(--text-muted)', fontSize: 13 }}>
-                暂无歌单
-              </div>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                {playlists.map((pl) => (
-                  <button key={pl.id} onClick={() => openPlaylistDetail(pl)} style={{
-                    display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px',
-                    borderRadius: 12, cursor: 'pointer', textAlign: 'left',
-                    background: 'transparent', transition: 'background 0.15s ease',
-                  }}>
-                    <div style={{
-                      width: 48, height: 48, borderRadius: 10, overflow: 'hidden', flexShrink: 0,
-                      background: 'rgba(255,255,255,0.06)',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    }}>
-                      {pl.cover
-                        ? <img src={music.cover(pl.cover)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                        : <Music2 size={18} color="var(--text-secondary)" />
-                      }
-                    </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 14, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                        {pl.name}
-                      </div>
-                      <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 2 }}>
-                        {pl.songCount ?? 0} 首
-                      </div>
-                    </div>
-                    <ChevronRight size={16} color="var(--text-muted)" />
-                  </button>
-                ))}
-              </div>
-            )}
-
-            {/* 退出登录 */}
-            <button onClick={() => { logout(); }} style={{
-              marginTop: 16, width: '100%', padding: '12px', borderRadius: 14,
-              background: 'rgba(248,113,113,0.1)', border: '1px solid rgba(248,113,113,0.3)',
-              color: '#F87171', fontSize: 13, fontWeight: 600, cursor: 'pointer',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-            }}>
-              <LogOut size={15} /> 退出登录
-            </button>
-          </>
         )}
       </Sheet>
 
