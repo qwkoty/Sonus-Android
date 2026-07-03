@@ -11,6 +11,7 @@ import Visualizer from '../components/Visualizer';
 import FloatingLyrics from '../components/FloatingLyrics';
 
 const Visualizer3D = lazy(() => import('../components/Visualizer3D'));
+const Visualizer3DPulse = lazy(() => import('../components/Visualizer3DPulse'));
 
 function formatTime(s) {
   if (!s || isNaN(s)) return '0:00';
@@ -23,6 +24,7 @@ const VIZ_MODES = [
   { key: 'ring', label: '环', icon: '◯' },
   { key: 'wave', label: '波', icon: '〜' },
   { key: '3d', label: '3D', icon: '◆' },
+  { key: 'pulse', label: '脉冲', icon: '✦' },
 ];
 
 const ACCENT_PRESETS = [
@@ -158,7 +160,7 @@ export default function Player() {
 
   const changeVizMode = (m) => {
     setVizMode(m);
-    if (m === '3d') setViz3DReady(false);
+    if (m === '3d' || m === 'pulse') setViz3DReady(false);
     try { localStorage.setItem('sonus_viz_mode', m); } catch {}
   };
   const changeAccent = (c) => {
@@ -326,12 +328,16 @@ export default function Player() {
           ? <Suspense fallback={null}>
               <Visualizer3D accent={accentColor} cover={coverFor3D} onReady={() => setViz3DReady(true)} />
             </Suspense>
+          : vizMode === 'pulse'
+          ? <Suspense fallback={null}>
+              <Visualizer3DPulse accent={accentColor} onReady={() => setViz3DReady(true)} />
+            </Suspense>
           : <Visualizer isPlaying={isPlaying} mode={vizMode} accent={accentColor} />
         }
       </div>
 
       {/* ====== 加载指示 ====== */}
-      {(isLoadingUrl || (vizMode === '3d' && !viz3DReady)) && (
+      {(isLoadingUrl || ((vizMode === '3d' || vizMode === 'pulse') && !viz3DReady)) && (
         <div style={{
           position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', zIndex: 10,
           display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10,
@@ -343,7 +349,7 @@ export default function Player() {
             <Loader2 size={24} color="#fff" style={{ animation: 'spin 1s linear infinite' }} />
           </div>
           <span style={{ fontSize: 12, color: 'var(--text-secondary)', textShadow: '0 2px 8px rgba(0,0,0,0.8)' }}>
-            {vizMode === '3d' && !viz3DReady ? '正在构建粒子封面…' : '正在加载音源…'}
+            {(vizMode === '3d' || vizMode === 'pulse') && !viz3DReady ? '正在加载可视化…' : '正在加载音源…'}
           </span>
         </div>
       )}
