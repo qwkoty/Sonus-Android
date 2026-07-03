@@ -16,13 +16,32 @@ import android.webkit.WebView;
 import com.getcapacitor.BridgeActivity;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginHandle;
+import org.nanohttpd.NanoHTTPD;
 
 public class MainActivity extends BridgeActivity {
+
+    private static AudioProxyServer audioProxy = null;
+
+    /** 返回音频代理服务器端口；未启动时返回 0 */
+    public static int getAudioProxyPort() {
+        return audioProxy != null ? audioProxy.getListeningPort() : 0;
+    }
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
         registerPlugin(CookieReaderPlugin.class);
         super.onCreate(savedInstanceState);
+
+        // 启动本地音频代理服务器（端口 0 = 让系统随机分配可用端口）
+        // 解决 WebView Audio 元素直接请求 QQ 音乐 CDN 被 403/CORS 拦截的问题
+        try {
+            audioProxy = new AudioProxyServer(0);
+            audioProxy.start(NanoHTTPD.SOCKET_READ_TIMEOUT, false);
+            android.util.Log.i("Sonus", "AudioProxyServer started on port " + audioProxy.getListeningPort());
+        } catch (Exception e) {
+            android.util.Log.e("Sonus", "AudioProxyServer start failed", e);
+            audioProxy = null;
+        }
 
         // 沉浸式全屏：彻底隐藏系统状态栏/导航栏/手势提示线
         hideSystemBars();

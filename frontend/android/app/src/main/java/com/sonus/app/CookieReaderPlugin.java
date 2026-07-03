@@ -216,6 +216,21 @@ public class CookieReaderPlugin extends Plugin {
         }
     }
 
+    /**
+     * 返回本地音频代理服务器端口。
+     * 前端拿到端口后，把 QQ 音乐 CDN 播放链接包装成
+     * http://localhost:PORT/?url=<encoded stream url>
+     * 通过代理播放，避免 WebView Audio 直接请求被 403/CORS 拦截。
+     */
+    @PluginMethod()
+    public void getProxyPort(PluginCall call) {
+        int port = MainActivity.getAudioProxyPort();
+        JSObject ret = new JSObject();
+        ret.put("port", port);
+        ret.put("available", port > 0);
+        call.resolve(ret);
+    }
+
     public void notifyLoginResult(boolean loggedIn) {
         if (pendingLoginCall == null) return;
         JSObject ret = new JSObject();

@@ -13,6 +13,7 @@ export interface CookieReaderPlugin {
   httpGet(options: { url: string; cookieDomain?: string; cookies?: string }): Promise<HttpGetResult>;
   syncStreamCookies(options: { url?: string }): Promise<void>;
   openLoginWebView(): Promise<{ loggedIn: boolean }>;
+  getProxyPort(): Promise<{ port: number; available: boolean }>;
 }
 
 const Native = registerPlugin<CookieReaderPlugin>('CookieReader');
@@ -54,6 +55,11 @@ export const CookieReader = {
   openLoginWebView: async () => {
     if (!IS_CAP()) throw new Error('Not in Capacitor');
     return Native.openLoginWebView();
+  },
+  // 获取本地音频代理服务器端口；非原生环境返回 0
+  getProxyPort: async (): Promise<{ port: number; available: boolean }> => {
+    if (!IS_CAP()) return { port: 0, available: false };
+    return Native.getProxyPort();
   },
 };
 export default CookieReader;

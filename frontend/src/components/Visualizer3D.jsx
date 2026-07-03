@@ -259,16 +259,12 @@ export default function Visualizer3D({ accent = '#4FC3F7', cover = '', onReady }
         const tFreq = Math.max(0, 1 - Math.abs(dc - 0.85) * 3);
         let localEnergy = bassSmooth * bFreq + midSmooth * mFreq * 0.8 + trebleSmooth * tFreq * 0.6;
 
-        // 风吹效果：右边两个角飘动（右上 + 右下），向左侧扩散
-        const corner = (cu, cv, phase) => {
-          const dx = u - cu, dy = v - cv;
-          const dist = Math.sqrt(dx * dx + dy * dy);
-          const strength = Math.max(0, 1 - dist * 1.6);
-          return Math.sin(dist * windFreqX * Math.PI * 2 - time * windSpeed + phase) * strength;
-        };
-        const windTR = corner(1, 0, 0);      // 右上
-        const windBR = corner(1, 1, 1.6);    // 右下
-        const windZ = (windTR + windBR) * windGust;
+        // 风吹效果：整个面一起飘动，像旗帜被风吹起
+        const wave1 = Math.sin(u * windFreqX * Math.PI + time * windSpeed) * 0.6;
+        const wave2 = Math.sin(v * windFreqY * Math.PI + time * windSpeed * 0.7) * 0.4;
+        const ripple = Math.sin((u + v) * 10 + time * 3.0) * 0.12;
+        const swirl = Math.sin(u * 6 + v * 4 + time * 1.4) * 0.15;
+        const windZ = (wave1 + wave2 + ripple + swirl) * windGust;
 
         // 音频能量叠加到 Z（中心低频推高）
         const audioZ = localEnergy * 0.8 * falloff * breath;
