@@ -1,5 +1,12 @@
 apply plugin: 'com.android.application'
 
+// 读取签名信息（由 CI 注入；本地缺失时回退到 debug 签名）
+def sonusKeystorePath = System.getenv('SONUS_KEYSTORE_PATH') ?: ''
+def sonusKeystorePass = System.getenv('SONUS_KEYSTORE_PASS') ?: 'sonus123456'
+def sonusKeyAlias = System.getenv('SONUS_KEY_ALIAS') ?: 'sonus'
+def sonusKeyPass = System.getenv('SONUS_KEY_PASS') ?: 'sonus123456'
+def hasReleaseKeystore = sonusKeystorePath != '' && new File(sonusKeystorePath).exists()
+
 android {
     namespace = "com.sonus.app"
     compileSdk = rootProject.ext.compileSdkVersion
@@ -7,19 +14,31 @@ android {
         applicationId "com.sonus.app"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0"
+        // versionCode / versionName 由 CI 通过 -P 注入，默认值用于本地
+        versionCode (project.hasProperty('versionCode') ? project.ext.versionCode : 1)
+        versionName (project.hasProperty('versionName') ? project.ext.versionName : '1.0')
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
-             // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
-             // Default: https://android.googlesource.com/platform/frameworks/base/+/282e181b58cf72b6ca770dc7ca5f91f135444502/tools/aapt/AaptAssets.cpp#61
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
+        }
+    }
+    signingConfigs {
+        release {
+            if (hasReleaseKeystore) {
+                storeFile file(sonusKeystorePath)
+                storePassword sonusKeystorePass
+                keyAlias sonusKeyAlias
+                keyPassword sonusKeyPass
+            }
         }
     }
     buildTypes {
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            if (hasReleaseKeystore) {
+                signingConfig signingConfigs.release
+            }
         }
     }
 }

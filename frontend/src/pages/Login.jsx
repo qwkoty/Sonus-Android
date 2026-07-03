@@ -20,6 +20,7 @@ export default function Login({ onBack }) {
     setWebviewTip('正在打开 QQ 音乐登录页面…');
 
     try {
+      // 先检查是否已有有效 Cookie（避免重复登录触发风控）
       const currentCookies = await CookieReader.getCookiesForUrl('https://y.qq.com');
       if (currentCookies.loggedIn) {
         await handleCookieLogin(currentCookies);
@@ -30,8 +31,14 @@ export default function Login({ onBack }) {
       setWebviewTip('请在弹出的窗口中登录 QQ 音乐…');
 
       await CookieReader.openLoginWebView();
-      setWebviewTip('登录成功，正在同步账号…');
-      const cookies = await CookieReader.getCookiesForUrl('https://y.qq.com');
+      // 登录返回后，flush + 多次读取确保 Cookie 完整同步
+      setWebviewTip('登录成功，正在同步账号信息…');
+      let cookies = await CookieReader.getCookiesForUrl('https://y.qq.com');
+      // 若第一次没读到票据，重试 3 次（间隔 800ms）
+      for (let i = 0; i < 3 && (!cookies.qqmusic_key); i++) {
+        await new Promise(r => setTimeout(r, 800));
+        cookies = await CookieReader.getCookiesForUrl('https://y.qq.com');
+      }
       await handleCookieLogin(cookies);
     } catch (e) {
       setWebviewPhase('error');

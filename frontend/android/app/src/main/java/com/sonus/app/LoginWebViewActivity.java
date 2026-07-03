@@ -15,16 +15,23 @@ import android.webkit.WebViewClient;
 
 /**
  * QQ 音乐登录 WebView 窗口。
- * 加载 y.qq.com，用户在其中完成扫码/密码登录。
- * WebViewClient.onPageFinished 检测 Cookie 中出现 uin → 自动关闭窗口。
+ * 流程：
+ * 1. 先预热访问 y.qq.com 首页（建立基础 Cookie，降低风控）
+ * 2. 跳转个人主页触发登录界面
+ * 3. 检测到 uin 后，跳到 player 页等待 qm_keyst（播放票据）写入
+ * 4. 拿到 qm_keyst 才 finish，确保登录态完整
  */
 @SuppressLint("SetJavaScriptEnabled")
 public class LoginWebViewActivity extends Activity {
 
     private WebView webView;
     private boolean loginDetected = false;
+    private boolean warmedUp = false;
     private int pollCount = 0;
-    private static final int MAX_POLL = 200; // 最多轮询 200 次 (~240s)
+    private static final int MAX_POLL = 250; // 最多轮询 250 次 (~300s)
+    private static final String HOME_URL = "https://y.qq.com/";
+    private static final String PROFILE_URL = "https://y.qq.com/n/ryqq/profile";
+    private static final String PLAYER_URL = "https://y.qq.com/n/ryqq/player";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -53,7 +60,7 @@ public class LoginWebViewActivity extends Activity {
         settings.setMediaPlaybackRequiresUserGesture(false);
         settings.setSupportMultipleWindows(false);
         settings.setJavaScriptCanOpenWindowsAutomatically(false);
-        // 设置桌面端 UA，避免 QQ 音乐显示移动端限制
+        // 桌面端 UA，与后续 API 请求 UA 保持一致
         settings.setUserAgentString(
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
             "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
@@ -63,32 +70,40 @@ public class LoginWebViewActivity extends Activity {
         CookieManager cookieManager = CookieManager.getInstance();
         cookieManager.setAcceptCookie(true);
         cookieManager.setAcceptThirdPartyCookies(webView, true);
+        // 预先把已有 Cookie 应用到 y.qq.com 域（自动登录/记住状态）
+        cookieManager.flush();
 
         webView.setWebViewClient(new WebViewClient() {
             @Override
             public void onPageStarted(WebView view, String url, Bitmap favicon) {
                 super.onPageStarted(view, url, favicon);
-                // 每次页面加载开始时检查 Cookie
                 checkLoginCookie();
             }
 
             @Override
             public void onPageFinished(WebView view, String url) {
                 super.onPageFinished(view, url);
+                // 首页预热完成后跳到个人主页
+                if (!warmedUp && (url.startsWith(HOME_URL) || url.contains("y.qq.com/"))) {
+                    warmedUp = true;
+                    webView.postDelayed(() -> {
+                        CookieManager.getInstance().flush();
+                        webView.loadUrl(PROFILE_URL);
+                    }, 800);
+                }
                 checkLoginCookie();
             }
 
             @Override
             public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
                 String url = request.getUrl().toString();
-                // 只允许 y.qq.com 和 ptlogin2.qq.com 的 URL 在 WebView 内跳转
                 if (url.startsWith("https://y.qq.com/") ||
                     url.startsWith("https://xui.ptlogin2.qq.com/") ||
                     url.startsWith("https://ssl.ptlogin2.qq.com/") ||
-                    url.startsWith("https://ptlogin2.qq.com/")) {
-                    return false; // 在 WebView 内加载
+                    url.startsWith("https://ptlogin2.qq.com/") ||
+                    url.startsWith("https://i.y.qq.com/")) {
+                    return false;
                 }
-                // 其他外部 URL 在系统浏览器打开
                 try {
                     Intent intent = new Intent(Intent.ACTION_VIEW, request.getUrl());
                     intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
@@ -98,13 +113,16 @@ public class LoginWebViewActivity extends Activity {
             }
         });
 
-        // 加载 QQ 音乐个人主页（未登录时自动显示登录界面）
-        webView.loadUrl("https://y.qq.com/n/ryqq/profile");
+        // 先加载首页预热（建立 ts_uid 等基础 Cookie，降低"网络环境有风险"概率）
+        webView.loadUrl(HOME_URL);
 
         // 启动定时轮询检查 Cookie
         startCookiePoll();
     }
 
+    /**
+     * 检查登录态：必须有 uin 且 qm_keyst（或等效票据）齐全才 finish。
+     */
     private void checkLoginCookie() {
         if (loginDetected) return;
 
@@ -113,44 +131,85 @@ public class LoginWebViewActivity extends Activity {
         String cookies = cm.getCookie("https://y.qq.com");
         if (cookies == null) return;
 
-        // 检测 uin 出现且不以 o 开头（o 开头是加密后的，不是真正的登录态）
+        boolean hasUin = false;
+        String musicKey = "";
+        String uinValue = "";
+
         for (String pair : cookies.split(";")) {
             String[] kv = pair.trim().split("=", 2);
             if (kv.length == 2) {
                 String key = kv[0];
                 String value = kv[1];
                 if ((key.equals("uin") || key.equals("wxuin")) && !value.startsWith("o")) {
-                    // 检测到登录！
-                    loginDetected = true;
-
-                    // warmup: 跳到播放器页等待 qm_keyst / qqmusic_key
-                    String musicKey = "";
-                    for (String p : cookies.split(";")) {
-                        String[] kv2 = p.trim().split("=", 2);
-                        if (kv2.length == 2 && (kv2[0].equals("qm_keyst") || kv2[0].equals("qqmusic_key") || kv2[0].equals("music_key") || kv2[0].equals("wxskey"))) {
-                            musicKey = kv2[1];
-                        }
-                    }
-                    if (!musicKey.isEmpty()) {
-                        // 已有播放票据，直接关闭
-                        finishWithResult(true);
-                    } else {
-                        // 没有 playKey，先 warmup 到播放器页
-                        webView.loadUrl("https://y.qq.com/n/ryqq/player");
-                        // 等 3 秒后再检查
-                        webView.postDelayed(() -> {
-                            cm.flush();
-                            finishWithResult(true);
-                        }, 3000);
-                    }
-                    return;
+                    hasUin = true;
+                    uinValue = value;
                 }
+                if (key.equals("qm_keyst") || key.equals("qqmusic_key") || key.equals("music_key")) {
+                    if (musicKey.isEmpty() || key.equals("qm_keyst")) musicKey = value;
+                } else if (key.equals("wxskey") && musicKey.isEmpty()) {
+                    musicKey = value;
+                }
+            }
+        }
+
+        if (hasUin) {
+            loginDetected = true;
+            if (!musicKey.isEmpty()) {
+                // 票据齐全，可以完成登录
+                finishWithResult(true);
+            } else {
+                // 缺票据，跳到播放器页触发 qm_keyst 写入，轮询等待
+                webView.loadUrl(PLAYER_URL);
+                // 等待票据写入，最多再轮询 30 次
+                waitForMusicKey(30);
             }
         }
     }
 
+    /**
+     * 轮询等待 qm_keyst 写入。
+     */
+    private void waitForMusicKey(final int maxRetry) {
+        final int[] count = {0};
+        final Runnable[] holder = new Runnable[1];
+        holder[0] = new Runnable() {
+            @Override
+            public void run() {
+                CookieManager cm = CookieManager.getInstance();
+                cm.flush();
+                String cookies = cm.getCookie("https://y.qq.com");
+                String musicKey = "";
+                if (cookies != null) {
+                    for (String pair : cookies.split(";")) {
+                        String[] kv = pair.trim().split("=", 2);
+                        if (kv.length == 2) {
+                            String key = kv[0];
+                            if (key.equals("qm_keyst") || key.equals("qqmusic_key") || key.equals("music_key")) {
+                                musicKey = kv[1];
+                            }
+                        }
+                    }
+                }
+                count[0]++;
+                if (!musicKey.isEmpty()) {
+                    // 拿到票据，再 flush 一次确保持久化
+                    cm.flush();
+                    finishWithResult(true);
+                } else if (count[0] >= maxRetry) {
+                    // 超时，仍返回成功（至少有 uin），让前端尝试
+                    cm.flush();
+                    finishWithResult(true);
+                } else {
+                    webView.postDelayed(this, 1000);
+                }
+            }
+        };
+        webView.postDelayed(holder[0], 1500);
+    }
+
     private void finishWithResult(boolean loggedIn) {
-        // 通过 Intent 回传结果给 MainActivity
+        // 最终 flush，确保 Cookie 持久化到磁盘
+        CookieManager.getInstance().flush();
         Intent resultIntent = new Intent();
         resultIntent.putExtra("loggedIn", loggedIn);
         setResult(loggedIn ? RESULT_OK : RESULT_CANCELED, resultIntent);
@@ -173,12 +232,11 @@ public class LoginWebViewActivity extends Activity {
                 webView.postDelayed(this, 1200);
             }
         };
-        webView.postDelayed(pollRunnable, 1200);
+        webView.postDelayed(pollRunnable, 1500);
     }
 
     @Override
     public boolean onKeyDown(int keyCode, KeyEvent event) {
-        // 允许返回键在 WebView 内后退
         if (keyCode == KeyEvent.KEYCODE_BACK && webView.canGoBack()) {
             webView.goBack();
             return true;
