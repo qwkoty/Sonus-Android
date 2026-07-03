@@ -15,8 +15,8 @@ android {
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         // versionCode / versionName 由 CI 通过 -P 注入，默认值用于本地
-        versionCode (project.hasProperty('versionCode') ? project.ext.versionCode : 1)
-        versionName (project.hasProperty('versionName') ? project.ext.versionName : '1.0')
+        versionCode (project.findProperty('versionCode') ? project.findProperty('versionCode') as int : 1)
+        versionName (project.findProperty('versionName') ?: '1.0')
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
