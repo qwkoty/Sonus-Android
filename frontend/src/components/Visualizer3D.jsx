@@ -96,7 +96,7 @@ export default function Visualizer3D({ accent = '#4FC3F7', cover = '', onReady }
     container.appendChild(renderer.domElement);
 
     const FILL = 1.0;            // 平面占可见区比例，1.0 = 撑满短边
-    const MAX_Z_RATIO = 0.34;    // Z 起伏最大占可见半边比例（增强飘动）
+    const MAX_Z_RATIO = 0.14;    // Z 起伏最大占可见半边比例（风吹幅度收敛）
 
     let planeSize, cameraZ;
 
@@ -236,11 +236,11 @@ export default function Visualizer3D({ accent = '#4FC3F7', cover = '', onReady }
 
       // 每帧更新 Z；无封面时同时更新 color
       const needColorUpdate = !hasCover;
-      // 风吹参数：风从右侧两角吹向左侧，强度随时间起伏
-      const windSpeed = 2.4;
-      const windFreqX = 3.6;   // X 方向波纹频率（从右向左）
-      const windFreqY = 2.4;   // Y 方向波纹频率
-      const windGust = 1.0 + Math.sin(time * 0.75) * 0.45 + bassSmooth * 1.1; // 阵风强度
+      // 风吹参数：整个面轻柔飘动，幅度收敛避免画面剧烈起伏
+      const windSpeed = 2.0;
+      const windFreqX = 3.0;   // X 方向波纹频率
+      const windFreqY = 2.0;   // Y 方向波纹频率
+      const windGust = 1.0 + Math.sin(time * 0.7) * 0.2 + bassSmooth * 0.5; // 阵风强度（收敛）
 
       // 主题色解析
       const accentRGB = hexToRGB(accentRef.current || '#4FC3F7');
@@ -259,11 +259,11 @@ export default function Visualizer3D({ accent = '#4FC3F7', cover = '', onReady }
         const tFreq = Math.max(0, 1 - Math.abs(dc - 0.85) * 3);
         let localEnergy = bassSmooth * bFreq + midSmooth * mFreq * 0.8 + trebleSmooth * tFreq * 0.6;
 
-        // 风吹效果：整个面一起飘动，像旗帜被风吹起
-        const wave1 = Math.sin(u * windFreqX * Math.PI + time * windSpeed) * 0.6;
-        const wave2 = Math.sin(v * windFreqY * Math.PI + time * windSpeed * 0.7) * 0.4;
-        const ripple = Math.sin((u + v) * 10 + time * 3.0) * 0.12;
-        const swirl = Math.sin(u * 6 + v * 4 + time * 1.4) * 0.15;
+        // 风吹效果：整个面一起轻柔飘动，像旗帜被微风吹起
+        const wave1 = Math.sin(u * windFreqX * Math.PI + time * windSpeed) * 0.22;
+        const wave2 = Math.sin(v * windFreqY * Math.PI + time * windSpeed * 0.7) * 0.15;
+        const ripple = Math.sin((u + v) * 10 + time * 3.0) * 0.05;
+        const swirl = Math.sin(u * 6 + v * 4 + time * 1.4) * 0.06;
         const windZ = (wave1 + wave2 + ripple + swirl) * windGust;
 
         // 音频能量叠加到 Z（中心低频推高）
