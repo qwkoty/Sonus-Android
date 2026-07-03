@@ -1,0 +1,13 @@
+{
+  "appId": "com.sonus.app",
+  "appName": "Sonus",
+  "webDir": "dist",
+  "server": {
+    "androidScheme": "https"
+  },
+  "plugins": {
+    "CapacitorCookies": {
+      "enabled": true
+    }
+  }
+}

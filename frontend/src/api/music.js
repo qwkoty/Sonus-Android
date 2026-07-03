@@ -62,6 +62,9 @@ export const music = {
     get(`/api/music/login/qq/qrcode`),
   loginByRedirect: (redirectUrl, qrsig) =>
     post(`/api/music/login/qq/redirect`, { redirectUrl, qrsig }),
+  // WebView 登录后前端传入 Cookie（APK 模式）
+  loginByCookie: (cookie) =>
+    post(`/api/music/login/qq/cookie`, { cookie }),
 
   // ===== 用户 =====
   userInfo: (cookie, uin) =>

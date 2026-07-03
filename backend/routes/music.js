@@ -491,6 +491,18 @@ router.post('/login/qq/redirect', async (req, res) => {
   }
 });
 
+// WebView 登录后前端传入 Cookie（APK 模式）
+// 前端从 CookieReader 读取完整 cookie 字符串后 POST 到此接口验证
+router.post('/login/qq/cookie', async (req, res) => {
+  try {
+    const { cookie } = req.body || {};
+    const result = await qqCookieLogin(cookie || '');
+    res.json({ code: 200, data: result });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // 用户信息
 router.get('/user/qq/info', async (req, res) => {
   try {
