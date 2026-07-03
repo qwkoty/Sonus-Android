@@ -21,6 +21,7 @@ export default function Login({ onBack }) {
   const [tip, setTip] = useState('正在加载二维码…');
   const [errorMsg, setErrorMsg] = useState('');
   const qrsigRef = useRef('');
+  const loginSigRef = useRef(''); // 关键：xlogin 返回的 login_sig，ptqrlogin 必须带
   const stopPollRef = useRef(null);
 
   // Cookie 模式状态
@@ -38,6 +39,7 @@ export default function Login({ onBack }) {
       const data = await music.loginQrCode();
       if (!data?.qrsig || !data?.qrcode) throw new Error('二维码获取失败');
       qrsigRef.current = data.qrsig;
+      loginSigRef.current = data.login_sig || '';
       setQrcode(data.qrcode);
       setPhase('waiting');
       setTip('请使用 QQ 扫描二维码');
@@ -51,7 +53,7 @@ export default function Login({ onBack }) {
 
   const startPoll = (qrsig) => {
     if (stopPollRef.current) { stopPollRef.current(); stopPollRef.current = null; }
-    stopPollRef.current = qqQrPoll(qrsig, {
+    stopPollRef.current = qqQrPoll(qrsig, loginSigRef.current, {
       onWaiting: () => {
         if (phase !== 'logging') {
           setPhase('waiting');

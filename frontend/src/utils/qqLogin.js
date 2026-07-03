@@ -16,7 +16,8 @@ function hash33(s) {
 
 // 一次性检查扫码状态
 // code: 66 等待扫码 / 67 已扫码待确认 / 0 成功 / 65 失效 / -1 网络/超时错误
-export function qqQrCheckJsonp(qrsig) {
+// loginSig: 从 xlogin 接口获取，ptqrlogin 必须带（否则扫码确认后不返回 redirectUrl）
+export function qqQrCheckJsonp(qrsig, loginSig = '') {
   return new Promise((resolve) => {
     const ptqrtoken = hash33(qrsig);
     let done = false;
@@ -34,16 +35,24 @@ export function qqQrCheckJsonp(qrsig) {
       resolve(data);
     };
 
-    // ptuiCB('code','0','redirectUrl','0','msg','nickname')
-    const currentCb = (code, _status, redirectUrl, _zero, msg, nickname) => {
-      finish({ code: Number(code), redirectUrl, msg, nickname });
+    // ptuiCB('code','status','redirectUrl','flag','msg','nickname')
+    // 成功时: ptuiCB('0','0','https://...','0','登录成功!','昵称')
+    // 注意: 第2/4参数可能是 '0' 或 '1'，不要硬编码
+    const currentCb = (code, _status, redirectUrl, _flag, msg, nickname) => {
+      // redirectUrl 可能需要 URL 解码
+      let url = redirectUrl || '';
+      if (url && url.indexOf('%') !== -1) {
+        try { url = decodeURIComponent(url); } catch {}
+      }
+      finish({ code: Number(code), redirectUrl: url, msg, nickname });
     };
     window.ptuiCB = currentCb;
 
     const params = new URLSearchParams({
       u1: 'https://y.qq.com/',
       ptqrtoken: String(ptqrtoken),
-      ptredirect: '0',
+      // 关键：ptredirect=1 让 QQ 返回完整 redirectUrl（ptredirect=0 时可能返回空）
+      ptredirect: '1',
       h: '1',
       t: '1',
       g: '1',
@@ -52,7 +61,8 @@ export function qqQrCheckJsonp(qrsig) {
       action: '0-0-' + Date.now(),
       js_ver: '24042410',
       js_type: '1',
-      login_sig: '',
+      // 关键：login_sig 不能为空，来自 xlogin 接口
+      login_sig: loginSig || '',
       pt_uistyle: '40',
       aid: '716027609',
       daid: '383',
@@ -87,7 +97,7 @@ export function qqQrCheckJsonp(qrsig) {
 //   - 连续 3 次网络错误后停止（避免无限重试）
 //   - 成功/过期后自动停止
 //   - 返回 stop() 函数供外部中断
-export function qqQrPoll(qrsig, callbacks) {
+export function qqQrPoll(qrsig, loginSig, callbacks) {
   const { onWaiting, onScanned, onSuccess, onExpired, onError } = callbacks;
   let stopped = false;
   let errorStreak = 0;
@@ -101,7 +111,7 @@ export function qqQrPoll(qrsig, callbacks) {
 
   const pollOnce = async () => {
     if (stopped) return;
-    const res = await qqQrCheckJsonp(qrsig);
+    const res = await qqQrCheckJsonp(qrsig, loginSig);
     if (stopped) return;
 
     switch (res.code) {

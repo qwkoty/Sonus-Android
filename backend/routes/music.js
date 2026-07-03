@@ -120,8 +120,41 @@ async function getQQUrl(songmid, cookie = '', uin = '0') {
 // 注：扫码状态检查（ptqrlogin）已改为前端 JSONP，绕过服务器 IP 风控（服务器请求会 403）
 // 后端只负责：1. 获取二维码 (/login/qq/qrcode)  2. 收集登录 cookie (/login/qq/redirect)
 
-// 生成二维码（返回 QQ 原始图片 + qrsig）
+// 生成二维码（返回 QQ 原始图片 + qrsig + login_sig）
+// 关键：必须先请求 xlogin 接口拿 login_sig，否则 ptqrlogin 扫码确认后不返回 redirectUrl
 async function qqQrCreate() {
+  // 1. 请求 xlogin 获取 login_sig（在响应 Cookie 里）
+  let loginSig = '';
+  try {
+    const xloginResp = await axios.get('https://xui.ptlogin2.qq.com/cgi-bin/xlogin', {
+      params: {
+        proxy_url: 'https://qzs.qq.com/qzone/v6/portal/proxy.html',
+        daid: '383',
+        hide_title_bar: '1',
+        low_login: '0',
+        qlogin_auto_login: '1',
+        no_verifyimg: '1',
+        link_target: 'blank',
+        appid: '716027609',
+        style: '22',
+        target: 'self',
+        s_url: 'https://y.qq.com/',
+        pt_qr_app: 'QQ音乐',
+        pt_qr_link: 'https://y.qq.com/download/download.html',
+        self_regurl: 'https://y.qq.com/',
+        pt_qr_help_link: 'https://y.qq.com/',
+        pt_no_auth: '0',
+      },
+      headers: { 'User-Agent': UA, Referer: 'https://y.qq.com/' },
+      timeout: 10000,
+      maxRedirects: 0,
+      validateStatus: () => true,
+    });
+    // Cookie 名是 pt_login_sig（不是 login_sig）
+    loginSig = parseSetCookies(xloginResp.headers?.['set-cookie'])?.pt_login_sig || '';
+  } catch (e) {}
+
+  // 2. 请求 ptqrshow 获取二维码图片 + qrsig
   const resp = await axios.get('https://ssl.ptlogin2.qq.com/ptqrshow', {
     params: {
       appid: '716027609',
@@ -144,7 +177,7 @@ async function qqQrCreate() {
   if (!qrsig) throw new Error('获取二维码失败');
   // 直接返回 QQ 原始二维码图片，不做二次加工（重生成会触发风控）
   const base64 = Buffer.from(resp.data).toString('base64');
-  return { qrsig, qrcode: `data:image/png;base64,${base64}` };
+  return { qrsig, login_sig: loginSig, qrcode: `data:image/png;base64,${base64}` };
 }
 
 // ==================== QQ 音乐 Cookie 登录（免扫码，备用） ====================
