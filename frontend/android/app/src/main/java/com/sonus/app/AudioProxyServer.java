@@ -1,7 +1,7 @@
 package com.sonus.app;
 
 import android.webkit.CookieManager;
-import org.nanohttpd.NanoHTTPD;
+import fi.iki.elonen.NanoHTTPD;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;

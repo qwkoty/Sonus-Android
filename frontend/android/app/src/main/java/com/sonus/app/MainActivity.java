@@ -16,7 +16,7 @@ import android.webkit.WebView;
 import com.getcapacitor.BridgeActivity;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginHandle;
-import org.nanohttpd.NanoHTTPD;
+import fi.iki.elonen.NanoHTTPD;
 
 public class MainActivity extends BridgeActivity {
 
