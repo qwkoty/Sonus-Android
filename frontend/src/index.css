@@ -1,6 +1,7 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
 :root {
+  /* ===== 基础色板 ===== */
   --bg-primary: #0A0A0A;
   --bg-secondary: #141414;
   --bg-elevated: #1A1A1A;
@@ -18,19 +19,39 @@
   --radius-md: 14px;
   --radius-lg: 22px;
   --radius-xl: 32px;
-  /* 统一玻璃面板色（替代各处硬编码 rgba(20,20,24,...)） */
-  --glass-1: rgba(30,30,36,0.7);
-  --glass-2: rgba(20,20,24,0.85);
-  --glass-3: rgba(40,40,46,0.7);
   --danger: rgba(180,40,40,0.92);
+
+  /* ===== 液态玻璃核心变量 ===== */
+  --glass-bg: rgba(255, 255, 255, 0.07);
+  --glass-bg-hover: rgba(255, 255, 255, 0.11);
+  --glass-bg-active: rgba(255, 255, 255, 0.15);
+  --glass-bg-strong: rgba(255, 255, 255, 0.1);
+  --glass-border: rgba(255, 255, 255, 0.16);
+  --glass-border-light: rgba(255, 255, 255, 0.08);
+  --glass-border-strong: rgba(255, 255, 255, 0.22);
+  --glass-blur: 20px;
+  --glass-blur-heavy: 40px;
+  --glass-saturate: 180%;
+  --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.37);
+  --glass-shadow-lg: 0 16px 48px rgba(0, 0, 0, 0.5);
+  --glass-highlight: inset 0 1px 1px rgba(255, 255, 255, 0.15);
+  --glass-highlight-strong: inset 0 1px 1px rgba(255, 255, 255, 0.28), inset 0 -1px 1px rgba(0, 0, 0, 0.08);
+  --glass-danger-bg: rgba(220, 60, 60, 0.18);
+  --glass-danger-border: rgba(248, 113, 113, 0.35);
+
   /* safe-area 统一变量 */
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
   --safe-left: env(safe-area-inset-left, 0px);
   --safe-right: env(safe-area-inset-right, 0px);
+
+  /* 兼容旧变量 */
+  --glass-1: rgba(30, 30, 36, 0.7);
+  --glass-2: rgba(20, 20, 24, 0.85);
+  --glass-3: rgba(40, 40, 46, 0.7);
 }
 
-/* 动态主色背景光晕：跟随用户 DIY 颜色，增加全局氛围层次 */
+/* 动态主色背景光晕：跟随用户 DIY 颜色 */
 body::before {
   content: '';
   position: fixed;
@@ -49,12 +70,10 @@ body::before {
   outline: none;
 }
 
-/* 彻底清除所有原生聚焦轮廓（用自定义主色光晕替代） */
 *:focus { outline: none !important; }
 button::-moz-focus-inner,
 input::-moz-focus-inner { border: 0; padding: 0; }
 
-/* select 美化 */
 select {
   -webkit-appearance: none;
   appearance: none;
@@ -80,9 +99,6 @@ html, body, #root {
 
 body {
   overflow: hidden;
-}
-
-body {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   background: var(--bg-primary);
   color: var(--text-primary);
@@ -90,59 +106,201 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-::-webkit-scrollbar {
-  width: 4px;
-  height: 4px;
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.25); }
+::selection { background: rgba(255,255,255,0.15); }
+
+/* ===== 液态玻璃工具类 ===== */
+
+/* 玻璃面板：用于弹窗、卡片、栏 */
+.glass-panel {
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow), var(--glass-highlight);
 }
-::-webkit-scrollbar-track {
+
+.glass-panel-strong {
+  background: var(--glass-bg-strong);
+  backdrop-filter: blur(var(--glass-blur-heavy)) saturate(var(--glass-saturate));
+  -webkit-backdrop-filter: blur(var(--glass-blur-heavy)) saturate(var(--glass-saturate));
+  border: 1px solid var(--glass-border-strong);
+  box-shadow: var(--glass-shadow-lg), var(--glass-highlight-strong);
+}
+
+/* 玻璃按钮：用于圆形/方形操作按钮 */
+.glass-button {
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-highlight);
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: pointer;
+  color: var(--text-primary);
+}
+.glass-button:hover {
+  background: var(--glass-bg-hover);
+  transform: translateY(-1px);
+  box-shadow: var(--glass-shadow), var(--glass-highlight-strong);
+  border-color: var(--glass-border-strong);
+}
+.glass-button:active {
+  background: var(--glass-bg-active);
+  transform: translateY(0) scale(0.97);
+}
+.glass-button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* 玻璃按钮-激活态 */
+.glass-button.is-active {
+  background: var(--glass-bg-active);
+  border-color: var(--glass-border-strong);
+  box-shadow: var(--glass-highlight-strong), 0 0 12px color-mix(in srgb, var(--accent-dynamic) 30%, transparent);
+}
+
+/* 玻璃危险按钮（退出登录等） */
+.glass-button-danger {
+  background: var(--glass-danger-bg);
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  border: 1px solid var(--glass-danger-border);
+  color: #F87171;
+  box-shadow: var(--glass-highlight);
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: pointer;
+}
+.glass-button-danger:hover {
+  background: rgba(220, 60, 60, 0.28);
+  transform: translateY(-1px);
+  box-shadow: 0 8px 24px rgba(180,40,40,0.3), var(--glass-highlight-strong);
+}
+.glass-button-danger:active {
+  transform: translateY(0) scale(0.98);
+}
+
+/* 玻璃主色按钮（播放全部等强调操作） */
+.glass-button-accent {
+  background: linear-gradient(135deg,
+    color-mix(in srgb, var(--accent-dynamic) 85%, transparent),
+    color-mix(in srgb, var(--accent-dynamic) 70%, transparent));
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  border: 1px solid color-mix(in srgb, var(--accent-dynamic) 50%, transparent);
+  color: #0A0A0A;
+  font-weight: 700;
+  box-shadow: 0 8px 24px color-mix(in srgb, var(--accent-dynamic) 35%, transparent), var(--glass-highlight);
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: pointer;
+}
+.glass-button-accent:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 32px color-mix(in srgb, var(--accent-dynamic) 45%, transparent), var(--glass-highlight-strong);
+  filter: brightness(1.08);
+}
+.glass-button-accent:active {
+  transform: translateY(0) scale(0.98);
+}
+
+/* 玻璃列表行 */
+.glass-row {
   background: transparent;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  transition: all 0.18s ease;
+  cursor: pointer;
 }
-::-webkit-scrollbar-thumb {
-  background: rgba(255,255,255,0.15);
-  border-radius: 4px;
+.glass-row:hover {
+  background: var(--glass-bg-hover);
+  border-color: var(--glass-border-light);
 }
-::-webkit-scrollbar-thumb:hover {
-  background: rgba(255,255,255,0.25);
+.glass-row.is-active {
+  background: var(--glass-bg-active);
+  border-color: var(--glass-border);
+  box-shadow: var(--glass-highlight);
 }
 
-::selection {
-  background: rgba(255,255,255,0.15);
+/* 玻璃输入框容器 */
+.glass-input-wrap {
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-highlight);
+  border-radius: 14px;
+  transition: all 0.25s ease;
+}
+.glass-input-wrap:focus-within {
+  background: var(--glass-bg-hover);
+  border-color: var(--glass-border-strong);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-dynamic) 18%, transparent), var(--glass-highlight-strong);
 }
 
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
+/* ===== 浮动光斑装饰（液态玻璃标志性背景） ===== */
+.glass-orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(60px);
+  pointer-events: none;
+  opacity: 0.35;
+  will-change: transform;
 }
-@keyframes slideUp {
-  from { transform: translateY(20px); opacity: 0; }
-  to { transform: translateY(0); opacity: 1; }
+.glass-orb-1 {
+  width: 380px; height: 380px;
+  background: var(--accent-dynamic);
+  animation: orbDrift1 18s ease-in-out infinite;
 }
-@keyframes scaleIn {
-  from { transform: scale(0.95); opacity: 0; }
-  to { transform: scale(1); opacity: 1; }
+.glass-orb-2 {
+  width: 320px; height: 320px;
+  background: #9F87C0;
+  animation: orbDrift2 22s ease-in-out infinite;
 }
-@keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
+.glass-orb-3 {
+  width: 280px; height: 280px;
+  background: #FF6B9D;
+  animation: orbDrift3 26s ease-in-out infinite;
+  opacity: 0.22;
 }
-@keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+
+@keyframes orbDrift1 {
+  0%, 100% { transform: translate(-30%, -20%) scale(1); }
+  33% { transform: translate(20%, 10%) scale(1.15); }
+  66% { transform: translate(-10%, 30%) scale(0.9); }
 }
-@keyframes eqBar {
-  0% { transform: scaleY(0.3); }
-  100% { transform: scaleY(1); }
+@keyframes orbDrift2 {
+  0%, 100% { transform: translate(40%, 20%) scale(1); }
+  50% { transform: translate(-20%, -30%) scale(1.2); }
 }
+@keyframes orbDrift3 {
+  0%, 100% { transform: translate(10%, 40%) scale(0.9); }
+  50% { transform: translate(30%, -20%) scale(1.1); }
+}
+
+/* ===== 动画 ===== */
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+@keyframes scaleIn { from { transform: scale(0.95); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+@keyframes eqBar { 0% { transform: scaleY(0.3); } 100% { transform: scaleY(1); } }
 
 .animate-fadeIn { animation: fadeIn 0.3s ease both; }
 .animate-slideUp { animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) both; }
 .animate-scaleIn { animation: scaleIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.spin-icon { animation: spin 1s linear infinite; }
 
+/* 旧 glass 类保留兼容 */
 .glass {
-  background: rgba(20, 20, 20, 0.8);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border-top: 1px solid var(--border);
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  border-top: 1px solid var(--glass-border);
 }
 
 .text-gradient {
@@ -168,7 +326,7 @@ button {
   -webkit-tap-highlight-color: transparent;
 }
 
-/* 统一聚焦反馈：用主色光晕代替浏览器默认 outline */
+/* 统一聚焦反馈：主色光晕 */
 button:focus-visible,
 input:focus-visible,
 label:focus-visible {
@@ -187,21 +345,10 @@ input {
   appearance: none;
 }
 
-/* placeholder 统一样式，去除浏览器默认浅灰 */
-input::placeholder {
-  color: var(--text-muted);
-  opacity: 1;
-}
-input::-moz-placeholder {
-  color: var(--text-muted);
-  opacity: 1;
-}
-input::-webkit-input-placeholder {
-  color: var(--text-muted);
-  opacity: 1;
-}
+input::placeholder { color: var(--text-muted); opacity: 1; }
+input::-moz-placeholder { color: var(--text-muted); opacity: 1; }
+input::-webkit-input-placeholder { color: var(--text-muted); opacity: 1; }
 
-/* 覆盖浏览器自动填充的黄色背景，保持深色主题一致 */
 input:-webkit-autofill,
 input:-webkit-autofill:hover,
 input:-webkit-autofill:focus,
@@ -212,7 +359,6 @@ input:-webkit-autofill:active {
   transition: background-color 9999s ease-in-out 0s;
 }
 
-/* 隐藏 color input 原生外观 */
 input[type="color"] {
   -webkit-appearance: none;
   appearance: none;
@@ -224,7 +370,6 @@ input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; }
 input[type="color"]::-webkit-color-swatch { border: none; border-radius: 50%; }
 input[type="color"]::-moz-color-swatch { border: none; border-radius: 50%; }
 
-/* 隐藏 number input 上下箭头 */
 input[type="number"]::-webkit-outer-spin-button,
 input[type="number"]::-webkit-inner-spin-button {
   -webkit-appearance: none;
@@ -232,12 +377,9 @@ input[type="number"]::-webkit-inner-spin-button {
 }
 input[type="number"] { -moz-appearance: textfield; }
 
-img {
-  display: block;
-  max-width: 100%;
-}
+img { display: block; max-width: 100%; }
 
-/* range 滑块统一美化 */
+/* range 滑块美化 */
 input[type="range"] {
   -webkit-appearance: none;
   appearance: none;
@@ -254,9 +396,7 @@ input[type="range"]::-webkit-slider-thumb {
   box-shadow: 0 0 8px var(--accent-dynamic);
   transition: transform 0.15s ease;
 }
-input[type="range"]::-webkit-slider-thumb:active {
-  transform: scale(1.25);
-}
+input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.25); }
 input[type="range"]::-moz-range-thumb {
   width: 12px; height: 12px; border-radius: 50%;
   background: #fff; border: none;

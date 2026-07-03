@@ -1,95 +1,106 @@
 import { useState, useRef, useEffect } from 'react';
-import { RefreshCw, Loader2, Music, ArrowLeft, CheckCircle2 } from 'lucide-react';
+import { RefreshCw, Loader2, Music, ArrowLeft } from 'lucide-react';
 import { music } from '../api/music';
 import { useAuthStore } from '../store/useAuthStore';
-import { qqQrCheckJsonp } from '../utils/qqLogin';
+import { qqQrPoll } from '../utils/qqLogin';
 
-// 流程：
-// 1. 进入页面 → 显示二维码 + "请使用 QQ 扫描二维码"
-// 2. 用户去手机 QQ 扫码 + 确认登录
-// 3. 用户点"我已扫码"按钮 → 一次性请求 ptqrlogin 检查
-//    - code 0：后端收集 cookie → setAuth → 拉取昵称/头像 → 进播放器（歌单在 Profile 页拉）
-//    - code 67：提示"已扫码，请在手机上确认登录后再次点击"
-//    - code 66：提示"还未检测到扫码"
-//    - code 65：二维码过期
+// 自动轮询扫码登录流程：
+// 1. 进入页面 → 获取二维码 + qrsig → 自动开始轮询
+// 2. 前端 JSONP 轮询 ptqrlogin（从用户浏览器发出，绕过服务器 IP 风控）
+// 3. code 0 → POST 后端 /login/qq/redirect 收集 cookie → setAuth → 进播放器
+// 4. code 65 → 二维码过期，提示刷新
 export default function Login({ onBack }) {
   const setAuth = useAuthStore((s) => s.setAuth);
 
   const [qrcode, setQrcode] = useState('');
-  const [loadingQr, setLoadingQr] = useState(true);
-  // 'idle'：等待用户扫码+点按钮；'logging'：点了按钮后的登录流程中
-  const [phase, setPhase] = useState('idle');
-  const [tip, setTip] = useState('请使用 QQ 扫描二维码');
+  // phase: loading(获取二维码中) | waiting(等待扫码) | scanned(已扫码待确认) | logging(收集中) | expired(过期) | error
+  const [phase, setPhase] = useState('loading');
+  const [tip, setTip] = useState('正在加载二维码…');
   const [errorMsg, setErrorMsg] = useState('');
   const qrsigRef = useRef('');
+  const stopPollRef = useRef(null);
 
   const fetchQr = async () => {
-    setLoadingQr(true);
+    // 停止旧轮询
+    if (stopPollRef.current) { stopPollRef.current(); stopPollRef.current = null; }
+    setPhase('loading');
+    setTip('正在加载二维码…');
     setErrorMsg('');
-    setPhase('idle');
-    setTip('请使用 QQ 扫描二维码');
+    setQrcode('');
     try {
       const data = await music.loginQrCode();
       if (!data?.qrsig || !data?.qrcode) throw new Error('二维码获取失败');
       qrsigRef.current = data.qrsig;
       setQrcode(data.qrcode);
+      setPhase('waiting');
+      setTip('请使用 QQ 扫描二维码');
+      startPoll(data.qrsig);
     } catch (e) {
       setErrorMsg(e.message || '获取二维码失败');
-      setQrcode('');
-    } finally {
-      setLoadingQr(false);
+      setPhase('error');
+      setTip('二维码加载失败');
     }
+  };
+
+  const startPoll = (qrsig) => {
+    if (stopPollRef.current) { stopPollRef.current(); stopPollRef.current = null; }
+    stopPollRef.current = qqQrPoll(qrsig, {
+      onWaiting: () => {
+        if (phase !== 'logging') {
+          setPhase('waiting');
+          setTip('请使用 QQ 扫描二维码');
+        }
+      },
+      onScanned: () => {
+        setPhase('scanned');
+        setTip('已扫码，请在手机上确认登录');
+        setErrorMsg('');
+      },
+      onSuccess: async (redirectUrl, nickname) => {
+        setPhase('logging');
+        setTip('正在登录…');
+        setErrorMsg('');
+        try {
+          const loginRes = await music.loginByRedirect(redirectUrl, qrsigRef.current);
+          if (Number(loginRes?.code) === 0 && loginRes?.cookie && loginRes?.uin) {
+            setAuth({
+              cookie: loginRes.cookie,
+              uin: loginRes.uin,
+              key: loginRes.key,
+              nickname: nickname || loginRes.nickname || 'QQ音乐用户',
+            });
+            // setAuth 触发 fetchUserInfo + App 自动切到播放器
+            return;
+          }
+          setErrorMsg(loginRes?.msg || '登录信息收集失败，请刷新重试');
+          setPhase('error');
+          setTip('登录失败');
+        } catch (e) {
+          setErrorMsg('登录失败：' + (e.message || ''));
+          setPhase('error');
+          setTip('登录失败');
+        }
+      },
+      onExpired: () => {
+        setPhase('expired');
+        setTip('二维码已过期');
+        setErrorMsg('二维码已过期，请刷新');
+      },
+      onError: (msg) => {
+        setErrorMsg(msg);
+      },
+    });
   };
 
   useEffect(() => {
     fetchQr();
+    return () => {
+      if (stopPollRef.current) stopPollRef.current();
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // 用户点"我已扫码"：一次性检查 + 登录
-  const onScanned = async () => {
-    if (!qrsigRef.current || phase === 'logging') return;
-    setPhase('logging');
-    setErrorMsg('');
-    setTip('正在登录…');
-    try {
-      const res = await qqQrCheckJsonp(qrsigRef.current);
-
-      if (res.code === 0 && res.redirectUrl) {
-        // 检查通过，后端收集 cookie
-        const loginRes = await music.loginByRedirect(res.redirectUrl, qrsigRef.current);
-        if (Number(loginRes?.code) === 0 && loginRes?.cookie && loginRes?.uin) {
-          setAuth({
-            cookie: loginRes.cookie,
-            uin: loginRes.uin,
-            key: loginRes.key,
-            nickname: res.nickname || loginRes.nickname || 'QQ音乐用户',
-          });
-          // setAuth 触发 fetchUserInfo（拉昵称+头像）+ App 自动切到播放器
-          // 歌单在 Profile 页加载
-          return;
-        }
-        setErrorMsg(loginRes?.msg || '登录信息收集失败，请刷新重试');
-        setTip('请使用 QQ 扫描二维码');
-      } else if (res.code === 67) {
-        setErrorMsg('已扫码，请在手机上确认登录后再次点击');
-        setTip('请使用 QQ 扫描二维码');
-      } else if (res.code === 66) {
-        setErrorMsg('还未检测到扫码，请先用 QQ 扫描二维码');
-        setTip('请使用 QQ 扫描二维码');
-      } else if (res.code === 65) {
-        setErrorMsg('二维码已过期，请刷新');
-        setTip('二维码已过期');
-      } else {
-        setErrorMsg(res.msg || '登录失败，请重试');
-        setTip('请使用 QQ 扫描二维码');
-      }
-    } catch (e) {
-      setErrorMsg('网络错误：' + (e.message || ''));
-      setTip('请使用 QQ 扫描二维码');
-    }
-    setPhase('idle');
-  };
+  const isBusy = phase === 'loading' || phase === 'logging';
 
   return (
     <div style={{
@@ -98,23 +109,18 @@ export default function Login({ onBack }) {
       background: 'radial-gradient(ellipse at center, #1a1a2e 0%, #0a0a0f 100%)',
       padding: 20, overflow: 'hidden',
     }}>
-      {/* 背景装饰光晕 */}
-      <div style={{
-        position: 'absolute', width: 400, height: 400, borderRadius: '50%',
-        background: 'radial-gradient(circle, var(--accent-dynamic) 0%, transparent 70%)',
-        opacity: 0.08, filter: 'blur(40px)',
-        top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
-        pointerEvents: 'none',
-      }} />
+      {/* 浮动光斑背景 */}
+      <div className="glass-orb glass-orb-1" style={{ top: '15%', left: '10%' }} />
+      <div className="glass-orb glass-orb-2" style={{ top: '50%', right: '5%' }} />
+      <div className="glass-orb glass-orb-3" style={{ bottom: '10%', left: '30%' }} />
 
-      {/* 左上角返回按钮（不登录也能用） */}
+      {/* 返回按钮 */}
       {onBack && (
-        <button onClick={onBack} style={{
+        <button onClick={onBack} className="glass-button" style={{
           position: 'absolute', top: 'calc(16px + env(safe-area-inset-top))', left: 16,
-          width: 40, height: 40, borderRadius: 12, cursor: 'pointer',
-          background: 'rgba(255,255,255,0.06)', border: '1px solid var(--border)',
+          width: 40, height: 40, borderRadius: 12,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          color: 'var(--text-primary)', zIndex: 2,
+          zIndex: 2,
         }} title="返回播放器">
           <ArrowLeft size={18} />
         </button>
@@ -142,16 +148,13 @@ export default function Login({ onBack }) {
         </span>
       </div>
 
-      {/* 二维码卡片 */}
-      <div style={{
+      {/* 二维码卡片 - 液态玻璃 */}
+      <div className="glass-panel-strong" style={{
         position: 'relative', zIndex: 1,
         padding: 18, borderRadius: 24,
-        background: 'rgba(255,255,255,0.04)',
-        border: '1px solid rgba(255,255,255,0.08)',
-        backdropFilter: 'blur(20px)',
         boxShadow: '0 20px 60px rgba(0,0,0,0.5)',
       }}>
-        {loadingQr ? (
+        {phase === 'loading' ? (
           <div style={{
             width: 200, height: 200, display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}>
@@ -167,16 +170,44 @@ export default function Login({ onBack }) {
                 imageRendering: 'pixelated',
                 background: '#fff', padding: 10,
                 display: 'block',
-                filter: phase === 'logging' ? 'blur(6px) opacity(0.4)' : 'none',
+                filter: phase === 'logging' ? 'blur(6px) opacity(0.4)' : phase === 'scanned' ? 'brightness(0.85)' : 'none',
                 transition: 'filter 0.3s ease',
               }}
             />
+            {/* 扫码成功对勾覆盖 */}
+            {phase === 'scanned' && (
+              <div style={{
+                position: 'absolute', inset: 0,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: 48, color: '#4ADE80',
+                textShadow: '0 0 20px rgba(74,222,128,0.6)',
+              }}>
+                ✓
+              </div>
+            )}
+            {/* 登录中 loading */}
             {phase === 'logging' && (
               <div style={{
                 position: 'absolute', inset: 0,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
               }}>
                 <Loader2 size={28} style={{ animation: 'spin 1s linear infinite', color: 'var(--accent-dynamic)' }} />
+              </div>
+            )}
+            {/* 过期遮罩 */}
+            {phase === 'expired' && (
+              <div style={{
+                position: 'absolute', inset: 0, borderRadius: 16,
+                background: 'rgba(0,0,0,0.7)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}>
+                <button onClick={fetchQr} className="glass-button" style={{
+                  padding: '8px 16px', borderRadius: 10,
+                  fontSize: 13, fontWeight: 600, color: '#fff',
+                  display: 'flex', alignItems: 'center', gap: 6,
+                }}>
+                  <RefreshCw size={14} /> 点击刷新
+                </button>
               </div>
             )}
           </div>
@@ -194,13 +225,14 @@ export default function Login({ onBack }) {
       {/* 状态文案 */}
       <div style={{
         marginTop: 24, fontSize: 15, fontWeight: 600, textAlign: 'center',
-        color: 'var(--text-secondary)', zIndex: 1,
+        color: phase === 'scanned' ? '#4ADE80' : phase === 'logging' ? 'var(--accent-dynamic)' : 'var(--text-secondary)',
+        zIndex: 1, transition: 'color 0.3s ease',
       }}>
         {tip}
       </div>
 
       {/* 错误提示 */}
-      {errorMsg && (
+      {errorMsg && phase !== 'expired' && (
         <div style={{
           marginTop: 8, fontSize: 12, color: '#F87171', textAlign: 'center', zIndex: 1,
           maxWidth: 280, lineHeight: 1.5,
@@ -209,28 +241,13 @@ export default function Login({ onBack }) {
         </div>
       )}
 
-      {/* "我已扫码"按钮：登录流程中隐藏 */}
-      {qrcode && phase === 'idle' && (
-        <button onClick={onScanned} style={{
-          marginTop: 18, display: 'inline-flex', alignItems: 'center', gap: 8,
-          padding: '12px 28px', borderRadius: 14, cursor: 'pointer',
-          fontSize: 14, fontWeight: 700,
-          background: 'var(--accent-dynamic)', color: '#0A0A0A',
-          border: 'none', zIndex: 1,
-          boxShadow: '0 8px 24px rgba(79,195,247,0.35)',
-        }}>
-          <CheckCircle2 size={16} /> 我已扫码
-        </button>
-      )}
-
-      {/* 刷新二维码按钮：登录流程中隐藏 */}
-      {!loadingQr && phase !== 'logging' && (
-        <button onClick={fetchQr} style={{
-          marginTop: 14, display: 'inline-flex', alignItems: 'center', gap: 6,
-          padding: '8px 16px', borderRadius: 10, cursor: 'pointer',
-          fontSize: 12, fontWeight: 500,
-          background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border)',
-          color: 'var(--text-secondary)', zIndex: 1,
+      {/* 刷新按钮：非忙碌状态显示 */}
+      {qrcode && !isBusy && (
+        <button onClick={fetchQr} className="glass-button" style={{
+          marginTop: 18, display: 'inline-flex', alignItems: 'center', gap: 6,
+          padding: '8px 16px', borderRadius: 10,
+          fontSize: 12, fontWeight: 500, color: 'var(--text-secondary)',
+          zIndex: 1,
         }}>
           <RefreshCw size={13} /> 刷新二维码
         </button>

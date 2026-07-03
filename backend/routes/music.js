@@ -117,22 +117,11 @@ async function getQQUrl(songmid, cookie = '', uin = '0') {
 }
 
 // ==================== QQ 音乐扫码登录 ====================
+// 注：扫码状态检查（ptqrlogin）已改为前端 JSONP，绕过服务器 IP 风控（服务器请求会 403）
+// 后端只负责：1. 获取二维码 (/login/qq/qrcode)  2. 收集登录 cookie (/login/qq/redirect)
 
-function hash33(s) {
-  let hash = 0;
-  for (let i = 0; i < s.length; i++) {
-    hash += (hash << 5) + s.charCodeAt(i);
-  }
-  return hash & 0x7FFFFFFF;
-}
-
-// 登录结果缓存，防止并发轮询重复处理
-const loginResults = new Map();
-const processing = new Set();
-
+// 生成二维码（返回 QQ 原始图片 + qrsig）
 async function qqQrCreate() {
-  // ssl.pt.qq.com 在本服务器 DNS 返回 NXDOMAIN，只能用 ssl.ptlogin2.qq.com
-  // 参数沿用上一代风格：l=L / da=25 / pt_3rd_aid=0
   const resp = await axios.get('https://ssl.ptlogin2.qq.com/ptqrshow', {
     params: {
       appid: '716027609',
@@ -153,140 +142,12 @@ async function qqQrCreate() {
   });
   const qrsig = parseSetCookies(resp.headers?.['set-cookie'])?.qrsig;
   if (!qrsig) throw new Error('获取二维码失败');
-  // 直接返回 QQ 原始二维码图片，不做任何二次加工
-  // （重新生成会触发 QQ 风控：提示"不能用长按识别只能用摄像头"）
-  // 前端用 CSS image-rendering: pixelated 放大显示保持清晰
+  // 直接返回 QQ 原始二维码图片，不做二次加工（重生成会触发风控）
   const base64 = Buffer.from(resp.data).toString('base64');
   return { qrsig, qrcode: `data:image/png;base64,${base64}` };
 }
 
-async function qqQrCheck(qrsig) {
-  // 如果已有结果，直接返回
-  const cached = loginResults.get(qrsig);
-  if (cached) return cached;
-
-  // 提前加锁，防止并发请求重复请求 ptqrlogin 消费 QQ 登录态
-  if (processing.has(qrsig)) {
-    return { code: 67, msg: '正在登录，请稍候…' };
-  }
-  processing.add(qrsig);
-
-  try {
-    const ptqrtoken = hash33(qrsig);
-    const resp = await axios.get('https://ssl.ptlogin2.qq.com/ptqrlogin', {
-      params: {
-        u1: 'https://y.qq.com/',
-        ptqrtoken,
-        ptredirect: '0',
-        h: '1',
-        t: '1',
-        g: '1',
-        from_ui: '1',
-        ptlang: '2052',
-        action: '0-0-' + Date.now(),
-        js_ver: '24042410',
-        js_type: '1',
-        login_sig: '',
-        pt_uistyle: '40',
-        aid: '716027609',
-        daid: '383',
-        pt_3rd_aid: '0',
-      },
-      headers: { 'User-Agent': UA, Referer: 'https://y.qq.com/', Cookie: `qrsig=${qrsig}` },
-      timeout: 30000,
-      maxRedirects: 0,
-      validateStatus: () => true,
-    });
-
-    const text = typeof resp.data === 'string' ? resp.data : '';
-    // 宽松正则：不硬编码第 2/4 参数为 '0'，兼容 QQ 格式变动
-    let match = text.match(/ptuiCB\('(\d+)','[^']*','([^']*)','[^']*','([^']*)','([^']*)'\)/);
-    // fallback：严格正则（老格式）
-    if (!match) {
-      match = text.match(/ptuiCB\('(\d+)','0','([^']*)','0','([^']*)','([^']*)'\)/);
-    }
-    if (!match) {
-      // 正则都没匹配，返回诊断信息帮助定位
-      const preview = text.slice(0, 200).replace(/[\r\n]+/g, ' ');
-      return { code: 66, msg: '等待扫码', _diag: `status=${resp.status} body="${preview}"` };
-    }
-
-    const [, code, redirectUrl, msg, nickname] = match;
-
-    if (code !== '0' || !redirectUrl) {
-      return { code: Number(code), msg };
-    }
-
-    // 登录成功，跟随重定向链收集 Cookie
-    const jar = { qrsig };
-    let currentUrl = redirectUrl;
-
-    for (let hop = 0; hop < 10; hop++) {
-      const hopResp = await axios.get(currentUrl, {
-        headers: { 'User-Agent': UA, Cookie: cookieToString(jar) },
-        timeout: 8000,
-        maxRedirects: 0,
-        validateStatus: () => true,
-      });
-      Object.assign(jar, parseSetCookies(hopResp.headers?.['set-cookie']));
-
-      // HTTP 重定向
-      if (hopResp.status >= 300 && hopResp.status < 400 && hopResp.headers?.location) {
-        currentUrl = hopResp.headers.location;
-        continue;
-      }
-
-      // JS 重定向
-      const body = typeof hopResp.data === 'string' ? hopResp.data : '';
-      const jsMatch = body.match(/window\.location(?:\.href)?\s*=\s*["']([^"']+)["']/);
-      const metaMatch = body.match(/<meta[^>]*url=([^"'>]+)["']/i);
-      const nextUrl = jsMatch?.[1] || metaMatch?.[1];
-      if (nextUrl) {
-        currentUrl = nextUrl.startsWith('http') ? nextUrl : new URL(nextUrl, currentUrl).href;
-        continue;
-      }
-      break;
-    }
-
-    // 补充访问 QQ 音乐主页获取 qqmusic_key
-    if (!jar.qqmusic_key) {
-      try {
-        const homeResp = await axios.get('https://y.qq.com/', {
-          headers: { 'User-Agent': UA, Cookie: cookieToString(jar) },
-          timeout: 8000,
-          maxRedirects: 5,
-          validateStatus: () => true,
-        });
-        Object.assign(jar, parseSetCookies(homeResp.headers?.['set-cookie']));
-      } catch (e) {}
-    }
-
-    // uin 解析：优先 jar，兜底从 cookie 字符串正则提取
-    let uin = (jar.uin || jar.wxuin || '').toString().replace(/^o0*/, '');
-    if (!uin) {
-      const m = cookieToString(jar).match(/(?:^|;\s*)(?:uin|wxuin)=o?(\d+)/);
-      if (m) uin = m[1];
-    }
-    const key = jar.qqmusic_key || jar.p_skey || jar.skey || '';
-    const result = {
-      code: 0,
-      msg: '登录成功',
-      cookie: cookieToString(jar),
-      uin,
-      key,
-      nickname: nickname || 'QQ音乐用户',
-    };
-    loginResults.set(qrsig, result);
-    setTimeout(() => loginResults.delete(qrsig), 60000);
-    return result;
-  } catch (e) {
-    return { code: 800, msg: '登录跳转失败: ' + e.message };
-  } finally {
-    processing.delete(qrsig);
-  }
-}
-
-// ==================== QQ 音乐 Cookie 登录（免扫码） ====================
+// ==================== QQ 音乐 Cookie 登录（免扫码，备用） ====================
 // 用户从浏览器复制 QQ 音乐的 Cookie 粘贴进来，后端验证并补全 qqmusic_key
 async function qqCookieLogin(rawCookie) {
   if (!rawCookie) return { code: 800, msg: 'Cookie 不能为空' };

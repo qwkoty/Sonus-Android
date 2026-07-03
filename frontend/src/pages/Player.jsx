@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, lazy, Suspense } from 'react';
 import {
   Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Repeat1,
   ListMusic, Volume2, Search, X, Loader2, SlidersHorizontal,
-  User, Music2,
+  User,
 } from 'lucide-react';
 import { usePlayerStore } from '../store/usePlayerStore';
 import { useAuthStore } from '../store/useAuthStore';
@@ -32,16 +32,13 @@ const ACCENT_PRESETS = [
   '#FB923C', '#F87171', '#A78BFA', '#FFFFFF',
 ];
 
-function TrackRow({ track, active, onPlay, index }) {
+function TrackRow({ track, active, onPlay }) {
   const cover = track.cover
     ? (track.cover.startsWith('http') ? music.cover(track.cover) : track.cover)
     : `https://picsum.photos/seed/${track.id}/400/400`;
   return (
-    <div onClick={() => onPlay(track)} style={{
+    <div className={`glass-row ${active ? 'is-active' : ''}`} onClick={() => onPlay(track)} style={{
       display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px',
-      borderRadius: 12, cursor: 'pointer',
-      background: active ? 'rgba(255,255,255,0.06)' : 'transparent',
-      transition: 'background 0.15s ease',
     }}>
       <div style={{ position: 'relative', width: 44, height: 44, borderRadius: 8, overflow: 'hidden', flexShrink: 0 }}>
         <img src={cover} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
@@ -80,30 +77,29 @@ function Sheet({ open, onClose, title, children, height = '78vh' }) {
   return (
     <div style={{
       position: 'absolute', inset: 0, zIndex: 200,
-      background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)',
+      background: 'rgba(0,0,0,0.35)', backdropFilter: 'blur(6px)',
+      WebkitBackdropFilter: 'blur(6px)',
       animation: 'fadeIn 0.2s ease both',
       display: 'flex', alignItems: 'flex-end',
     }} onClick={onClose}>
       <div
-        className="animate-slideUp"
+        className="glass-panel-strong animate-slideUp"
         onClick={(e) => e.stopPropagation()}
         style={{
           width: '100%', maxHeight: height, borderRadius: '24px 24px 0 0',
-          background: 'linear-gradient(180deg, rgba(28,28,34,0.98), rgba(16,16,20,0.99))',
-          border: '1px solid rgba(255,255,255,0.1)', borderBottom: 'none',
-          boxShadow: '0 -16px 48px rgba(0,0,0,0.6)',
+          borderBottom: 'none',
           display: 'flex', flexDirection: 'column', overflow: 'hidden',
         }}
       >
         <div style={{
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          padding: '16px 18px 12px', borderBottom: '1px solid var(--border)',
+          padding: '16px 18px 12px', borderBottom: '1px solid var(--glass-border-light)',
         }}>
           <span style={{ fontSize: 15, fontWeight: 700 }}>{title}</span>
-          <button onClick={onClose} aria-label="关闭" style={{
-            width: 30, height: 30, borderRadius: 9, display: 'flex',
-            alignItems: 'center', justifyContent: 'center',
-            background: 'rgba(255,255,255,0.06)', color: 'var(--text-secondary)',
+          <button onClick={onClose} aria-label="关闭" className="glass-button" style={{
+            width: 30, height: 30, borderRadius: 9,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            color: 'var(--text-secondary)',
           }}>
             <X size={16} />
           </button>
@@ -127,18 +123,15 @@ export default function Player({ onProfile }) {
 
   const { userInfo, isLoggedIn } = useAuthStore();
 
-  // 面板状态
   const [searchOpen, setSearchOpen] = useState(false);
   const [queueOpen, setQueueOpen] = useState(false);
   const [vizOpen, setVizOpen] = useState(false);
 
-  // 搜索
   const [query, setQuery] = useState('');
   const [results, setResults] = useState([]);
   const [searching, setSearching] = useState(false);
   const searchTimerRef = useRef(null);
 
-  // 可视化
   const [vizMode, setVizMode] = useState(() => {
     try { return localStorage.getItem('sonus_viz_mode') || 'ring'; } catch { return 'ring'; }
   });
@@ -164,7 +157,6 @@ export default function Player({ onProfile }) {
     document.documentElement.style.setProperty('--accent-dynamic', accentColor);
   }, [accentColor]);
 
-  // 错误自动消失
   useEffect(() => {
     if (error) {
       const t = setTimeout(() => clearError(), 5000);
@@ -172,7 +164,6 @@ export default function Player({ onProfile }) {
     }
   }, [error, clearError]);
 
-  // ===== 搜索（仅 QQ 音乐，单列） =====
   const doSearch = async (kw) => {
     if (!kw.trim()) { setResults([]); return; }
     setSearching(true);
@@ -197,7 +188,6 @@ export default function Player({ onProfile }) {
     setSearchOpen(false);
   };
 
-  // ===== 进度条 =====
   const handleProgressDown = (e) => {
     if (!progressRef.current || !duration || !isFinite(duration)) return;
     setSeeking(true);
@@ -221,7 +211,6 @@ export default function Player({ onProfile }) {
     document.addEventListener('touchend', onUp);
   };
 
-  // ===== 键盘快捷键 =====
   useEffect(() => {
     const onKey = (e) => {
       if (e.code === 'Escape') {
@@ -259,21 +248,12 @@ export default function Player({ onProfile }) {
     : '';
   const avatar = userInfo?.avatar;
 
-  const floatBtn = {
-    width: 40, height: 40, borderRadius: 12,
-    background: 'var(--glass-1)', backdropFilter: 'blur(16px)',
-    WebkitBackdropFilter: 'blur(16px)', border: '1px solid var(--border)',
-    display: 'flex', alignItems: 'center', justifyContent: 'center',
-    color: 'var(--text-primary)', boxShadow: '0 4px 16px rgba(0,0,0,0.3)',
-    transition: 'all 0.2s ease', cursor: 'pointer',
-  };
-
   const modeIcon = playMode === 'single' ? <Repeat1 size={18} /> : playMode === 'random' ? <Shuffle size={18} /> : <Repeat size={18} />;
   const modeColor = playMode === 'list' ? 'var(--text-secondary)' : 'var(--accent-dynamic)';
 
   return (
     <div style={{ height: '100%', background: 'var(--bg-primary)', position: 'relative', overflow: 'hidden' }}>
-      {/* ====== 全屏可视化 ====== */}
+      {/* 全屏可视化 */}
       <div style={{ position: 'absolute', inset: 0 }}>
         <FloatingLyrics lyrics={lyrics} isPlaying={isPlaying} />
         {vizMode === '3d'
@@ -288,15 +268,15 @@ export default function Player({ onProfile }) {
         }
       </div>
 
-      {/* ====== 加载指示 ====== */}
+      {/* 加载指示 */}
       {(isLoadingUrl || ((vizMode === '3d' || vizMode === 'pulse') && !viz3DReady)) && (
         <div style={{
           position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', zIndex: 10,
           display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10,
         }}>
-          <div style={{
-            width: 56, height: 56, borderRadius: '50%', background: 'rgba(0,0,0,0.5)',
-            backdropFilter: 'blur(12px)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+          <div className="glass-panel" style={{
+            width: 56, height: 56, borderRadius: '50%',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}>
             <Loader2 size={24} color="#fff" style={{ animation: 'spin 1s linear infinite' }} />
           </div>
@@ -306,17 +286,17 @@ export default function Player({ onProfile }) {
         </div>
       )}
 
-      {/* ====== 顶部栏 ====== */}
+      {/* 顶部栏 */}
       <div style={{
         position: 'absolute', top: 0, left: 0, right: 0,
         padding: 'calc(12px + env(safe-area-inset-top)) 16px 12px',
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         zIndex: 100, gap: 10,
       }}>
-        {/* 左：头像，点击进入个人页（未登录则进登录页） */}
         <button
           onClick={onProfile}
-          style={{ ...floatBtn, padding: 0, overflow: 'hidden' }}
+          className="glass-button"
+          style={{ width: 40, height: 40, borderRadius: 12, padding: 0, overflow: 'hidden' }}
           title={isLoggedIn ? '我的音乐' : '登录 QQ 音乐'}
         >
           {isLoggedIn && avatar
@@ -325,10 +305,7 @@ export default function Player({ onProfile }) {
           }
         </button>
 
-        {/* 中：歌曲信息 */}
-        <div style={{
-          flex: 1, textAlign: 'center', minWidth: 0, pointerEvents: 'none',
-        }}>
+        <div style={{ flex: 1, textAlign: 'center', minWidth: 0, pointerEvents: 'none' }}>
           <div style={{
             fontSize: 14, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
             textShadow: '0 2px 8px rgba(0,0,0,0.6)',
@@ -343,16 +320,11 @@ export default function Player({ onProfile }) {
           </div>
         </div>
 
-        {/* 右：搜索 + 可视化 */}
         <div style={{ display: 'flex', gap: 8 }}>
-          <button onClick={() => setSearchOpen(true)} style={floatBtn} title="搜索 (F)">
+          <button onClick={() => setSearchOpen(true)} className="glass-button" style={{ width: 40, height: 40, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center' }} title="搜索 (F)">
             <Search size={18} />
           </button>
-          <button onClick={() => setVizOpen(true)} style={{
-            ...floatBtn,
-            background: vizOpen ? 'rgba(50,50,56,0.9)' : 'var(--glass-1)',
-            position: 'relative',
-          }} title="可视化设置">
+          <button onClick={() => setVizOpen(true)} className={`glass-button ${vizOpen ? 'is-active' : ''}`} style={{ width: 40, height: 40, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }} title="可视化设置">
             <SlidersHorizontal size={18} />
             <span style={{
               position: 'absolute', bottom: 5, right: 5, width: 8, height: 8, borderRadius: '50%',
@@ -362,7 +334,7 @@ export default function Player({ onProfile }) {
         </div>
       </div>
 
-      {/* ====== 当前歌词 ====== */}
+      {/* 当前歌词 */}
       <div style={{
         position: 'absolute', bottom: 168, left: 0, right: 0,
         display: 'flex', justifyContent: 'center', padding: '0 32px', zIndex: 10, pointerEvents: 'none',
@@ -377,11 +349,13 @@ export default function Player({ onProfile }) {
         </p>
       </div>
 
-      {/* ====== 底部控制 ====== */}
-      <div style={{
+      {/* 底部控制栏 - 液态玻璃 */}
+      <div className="glass-panel" style={{
         position: 'absolute', bottom: 0, left: 0, right: 0, zIndex: 50,
         padding: '12px 18px calc(14px + env(safe-area-inset-bottom))',
-        background: 'linear-gradient(180deg, transparent, rgba(0,0,0,0.55))',
+        borderRadius: '24px 24px 0 0',
+        borderTop: '1px solid var(--glass-border)',
+        borderLeft: 'none', borderRight: 'none', borderBottom: 'none',
       }}>
         {/* 进度条 */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
@@ -392,9 +366,7 @@ export default function Player({ onProfile }) {
             ref={progressRef}
             onMouseDown={handleProgressDown}
             onTouchStart={handleProgressDown}
-            style={{
-              flex: 1, height: 16, display: 'flex', alignItems: 'center', cursor: 'pointer', touchAction: 'none',
-            }}
+            style={{ flex: 1, height: 16, display: 'flex', alignItems: 'center', cursor: 'pointer', touchAction: 'none' }}
           >
             <div style={{
               width: '100%', height: 4, borderRadius: 4,
@@ -409,7 +381,7 @@ export default function Player({ onProfile }) {
               <div style={{
                 position: 'absolute', left: `calc(${progress}% - 6px)`, top: '50%', transform: 'translateY(-50%)',
                 width: 12, height: 12, borderRadius: '50%', background: '#fff',
-                boxShadow: '0 0 8px var(--accent-dynamic)',
+                boxShadow: `0 0 8px var(--accent-dynamic)`,
                 opacity: seeking ? 1 : 0.6, transition: 'opacity 0.2s ease',
               }} />
             </div>
@@ -421,31 +393,29 @@ export default function Player({ onProfile }) {
 
         {/* 控制按钮 */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-          <button onClick={toggleMode} style={{
-            width: 38, height: 38, borderRadius: 10, display: 'flex',
-            alignItems: 'center', justifyContent: 'center', color: modeColor, cursor: 'pointer',
+          <button onClick={toggleMode} className="glass-button" style={{
+            width: 38, height: 38, borderRadius: 10,
+            display: 'flex', alignItems: 'center', justifyContent: 'center', color: modeColor,
           }} title="播放模式 (M)">
             {modeIcon}
           </button>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <button onClick={prev} style={{
-              width: 44, height: 44, borderRadius: 12, display: 'flex',
-              alignItems: 'center', justifyContent: 'center', color: 'var(--text-primary)', cursor: 'pointer',
+            <button onClick={prev} className="glass-button" style={{
+              width: 44, height: 44, borderRadius: 12,
+              display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-primary)',
             }} title="上一首">
               <SkipBack size={22} fill="currentColor" />
             </button>
-            <button onClick={togglePlay} style={{
+            <button onClick={togglePlay} className="glass-button-accent" style={{
               width: 58, height: 58, borderRadius: '50%',
-              background: 'var(--accent-dynamic)', color: '#000',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
-              boxShadow: `0 6px 24px color-mix(in srgb, var(--accent-dynamic) 45%, transparent)`,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
             }} title="播放/暂停 (空格)">
               {isPlaying ? <Pause size={26} fill="currentColor" /> : <Play size={26} fill="currentColor" style={{ marginLeft: 2 }} />}
             </button>
-            <button onClick={next} style={{
-              width: 44, height: 44, borderRadius: 12, display: 'flex',
-              alignItems: 'center', justifyContent: 'center', color: 'var(--text-primary)', cursor: 'pointer',
+            <button onClick={next} className="glass-button" style={{
+              width: 44, height: 44, borderRadius: 12,
+              display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-primary)',
             }} title="下一首">
               <SkipForward size={22} fill="currentColor" />
             </button>
@@ -458,9 +428,9 @@ export default function Player({ onProfile }) {
               onChange={(e) => setVolume(parseFloat(e.target.value))}
               style={{ width: 64, accentColor: 'var(--accent-dynamic)' }}
             />
-            <button onClick={() => setQueueOpen(true)} style={{
-              width: 38, height: 38, borderRadius: 10, display: 'flex',
-              alignItems: 'center', justifyContent: 'center', color: 'var(--text-secondary)', cursor: 'pointer',
+            <button onClick={() => setQueueOpen(true)} className="glass-button" style={{
+              width: 38, height: 38, borderRadius: 10,
+              display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-secondary)',
             }} title="播放队列">
               <ListMusic size={20} />
             </button>
@@ -468,25 +438,24 @@ export default function Player({ onProfile }) {
         </div>
       </div>
 
-      {/* ====== 错误提示 ====== */}
+      {/* 错误提示 - 玻璃危险卡片 */}
       {error && (
-        <div style={{
+        <div className="glass-panel" style={{
           position: 'absolute', top: 'calc(64px + env(safe-area-inset-top))', left: '50%',
           transform: 'translateX(-50%)', zIndex: 300,
           padding: '10px 18px', borderRadius: 14,
-          background: 'var(--danger)', color: '#fff', fontSize: 13,
-          boxShadow: '0 8px 24px rgba(0,0,0,0.4)', maxWidth: '80vw',
+          background: 'var(--glass-danger-bg)', borderColor: 'var(--glass-danger-border)',
+          color: '#FCA5A5', fontSize: 13, maxWidth: '80vw',
         }}>
           {error}
         </div>
       )}
 
-      {/* ====== 搜索面板（仅 QQ 音乐） ====== */}
+      {/* 搜索面板 */}
       <Sheet open={searchOpen} onClose={() => setSearchOpen(false)} title="搜索 · QQ音乐">
-        <div style={{ position: 'sticky', top: 0, padding: '4px 4px 10px', background: 'rgba(28,28,34,0.98)', zIndex: 2 }}>
-          <div style={{
+        <div style={{ position: 'sticky', top: 0, padding: '4px 4px 10px', zIndex: 2 }}>
+          <div className="glass-input-wrap" style={{
             display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px',
-            borderRadius: 14, background: 'rgba(255,255,255,0.06)', border: '1px solid var(--border)',
           }}>
             <Search size={16} color="var(--text-secondary)" />
             <input
@@ -505,7 +474,7 @@ export default function Player({ onProfile }) {
         </div>
         {searching && results.length === 0 ? (
           <div style={{ display: 'flex', justifyContent: 'center', padding: 30 }}>
-            <Loader2 size={22} style={{ animation: 'spin 1s linear infinite', color: 'var(--text-secondary)' }} />
+            <Loader2 size={22} className="spin-icon" style={{ color: 'var(--text-secondary)' }} />
           </div>
         ) : results.length === 0 ? (
           <div style={{ textAlign: 'center', padding: 30, color: 'var(--text-muted)', fontSize: 13 }}>
@@ -513,8 +482,8 @@ export default function Player({ onProfile }) {
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-            {results.map((t, i) => (
-              <TrackRow key={t.id} track={t} index={i}
+            {results.map((t) => (
+              <TrackRow key={t.id} track={t}
                 active={currentTrack?.id === t.id}
                 onPlay={handlePlaySearch} />
             ))}
@@ -522,7 +491,7 @@ export default function Player({ onProfile }) {
         )}
       </Sheet>
 
-      {/* ====== 播放队列 ====== */}
+      {/* 播放队列 */}
       <Sheet open={queueOpen} onClose={() => setQueueOpen(false)} title={`播放队列 · ${playlist.length}`}>
         {playlist.length === 0 ? (
           <div style={{ textAlign: 'center', padding: 30, color: 'var(--text-muted)', fontSize: 13 }}>
@@ -530,8 +499,8 @@ export default function Player({ onProfile }) {
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-            {playlist.map((t, i) => (
-              <TrackRow key={t.id} track={t} index={i}
+            {playlist.map((t) => (
+              <TrackRow key={t.id} track={t}
                 active={currentTrack?.id === t.id}
                 onPlay={(track) => { playTrack(track); setQueueOpen(false); }} />
             ))}
@@ -539,18 +508,16 @@ export default function Player({ onProfile }) {
         )}
       </Sheet>
 
-      {/* ====== 可视化设置 ====== */}
+      {/* 可视化设置 */}
       <Sheet open={vizOpen} onClose={() => setVizOpen(false)} title="可视化设置" height="auto">
         <div style={{ display: 'flex', flexDirection: 'column', gap: 18, padding: '8px 4px' }}>
           <div>
             <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 10 }}>可视化模式</div>
             <div style={{ display: 'flex', gap: 10 }}>
               {VIZ_MODES.map((m) => (
-                <button key={m.key} onClick={() => changeVizMode(m.key)} style={{
-                  flex: 1, padding: '14px 8px', borderRadius: 14, cursor: 'pointer',
+                <button key={m.key} onClick={() => changeVizMode(m.key)} className={`glass-button ${vizMode === m.key ? 'is-active' : ''}`} style={{
+                  flex: 1, padding: '14px 8px', borderRadius: 14,
                   display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
-                  background: vizMode === m.key ? 'rgba(79,195,247,0.15)' : 'rgba(255,255,255,0.04)',
-                  border: `1px solid ${vizMode === m.key ? 'var(--accent-dynamic)' : 'var(--border)'}`,
                   color: vizMode === m.key ? 'var(--accent-dynamic)' : 'var(--text-secondary)',
                 }}>
                   <span style={{ fontSize: 20 }}>{m.icon}</span>

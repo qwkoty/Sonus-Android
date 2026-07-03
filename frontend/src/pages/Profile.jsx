@@ -11,11 +11,10 @@ function TrackRow({ track, index, active, onPlay }) {
   return (
     <button
       onClick={() => onPlay(track)}
+      className={`glass-row ${active ? 'is-active' : ''}`}
       style={{
         display: 'flex', alignItems: 'center', gap: 10, width: '100%',
-        padding: '8px 10px', borderRadius: 10, cursor: 'pointer', textAlign: 'left',
-        background: active ? 'rgba(79,195,247,0.12)' : 'transparent',
-        transition: 'background 0.15s ease',
+        padding: '8px 10px', textAlign: 'left',
       }}
     >
       <span style={{
@@ -62,7 +61,6 @@ export default function Profile({ onBack }) {
   const [playlistDetail, setPlaylistDetail] = useState(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
 
-  // 加载歌单列表
   const loadPlaylists = useCallback(async () => {
     if (!isLoggedIn || !cookie || !uin) return;
     setLoadingPlaylists(true);
@@ -84,7 +82,6 @@ export default function Profile({ onBack }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isLoggedIn]);
 
-  // 打开歌单详情
   const openPlaylistDetail = async (pl) => {
     setLoadingDetail(true);
     setPlaylistDetail({ name: pl.name, tracks: [] });
@@ -119,16 +116,15 @@ export default function Profile({ onBack }) {
       display: 'flex', flexDirection: 'column',
       overflow: 'hidden',
     }}>
-      {/* ====== 顶部导航栏 ====== */}
-      <div style={{
+      {/* 顶部导航栏 - 液态玻璃 */}
+      <div className="glass-panel" style={{
         padding: 'calc(12px + env(safe-area-inset-top)) 16px 12px',
         display: 'flex', alignItems: 'center', gap: 12,
-        borderBottom: '1px solid var(--border)',
+        borderRadius: 0, borderLeft: 'none', borderRight: 'none', borderTop: 'none',
         flexShrink: 0,
       }}>
-        <button onClick={onBack} style={{
-          width: 36, height: 36, borderRadius: 10, cursor: 'pointer',
-          background: 'rgba(255,255,255,0.06)', border: 'none',
+        <button onClick={onBack} className="glass-button" style={{
+          width: 36, height: 36, borderRadius: 10,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           color: 'var(--text-primary)',
         }}>
@@ -137,9 +133,8 @@ export default function Profile({ onBack }) {
         <span style={{ fontSize: 16, fontWeight: 700, flex: 1 }}>
           {playlistDetail ? playlistDetail.name : '我的音乐'}
         </span>
-        <button onClick={() => { fetchUserInfo(); loadPlaylists(); }} style={{
-          width: 36, height: 36, borderRadius: 10, cursor: 'pointer',
-          background: 'rgba(255,255,255,0.06)', border: 'none',
+        <button onClick={() => { fetchUserInfo(); loadPlaylists(); }} className="glass-button" style={{
+          width: 36, height: 36, borderRadius: 10,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           color: 'var(--text-secondary)',
         }} title="刷新">
@@ -147,34 +142,32 @@ export default function Profile({ onBack }) {
         </button>
       </div>
 
-      {/* ====== 内容区 ====== */}
+      {/* 内容区 */}
       <div style={{
         flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch',
         padding: '16px',
       }}>
         {playlistDetail ? (
-          /* ===== 歌单详情 ===== */
+          /* 歌单详情 */
           <div>
-            <button onClick={() => setPlaylistDetail(null)} style={{
+            <button onClick={() => setPlaylistDetail(null)} className="glass-button" style={{
               display: 'inline-flex', alignItems: 'center', gap: 4, marginBottom: 12,
               fontSize: 13, color: 'var(--text-secondary)', padding: '6px 10px',
-              borderRadius: 8, background: 'rgba(255,255,255,0.04)',
-              border: 'none', cursor: 'pointer',
+              borderRadius: 8,
             }}>
               <ArrowLeft size={15} /> 返回歌单
             </button>
 
             {loadingDetail ? (
               <div style={{ display: 'flex', justifyContent: 'center', padding: 40 }}>
-                <Loader2 size={24} style={{ animation: 'spin 1s linear infinite', color: 'var(--accent-dynamic)' }} />
+                <Loader2 size={24} className="spin-icon" style={{ color: 'var(--accent-dynamic)' }} />
               </div>
             ) : playlistDetail.tracks.length > 0 ? (
               <>
-                <button onClick={playAll} style={{
+                <button onClick={playAll} className="glass-button-accent" style={{
                   display: 'flex', alignItems: 'center', gap: 8, width: '100%',
                   padding: '12px 14px', marginBottom: 12, borderRadius: 12,
-                  background: 'var(--accent-dynamic)', color: '#0A0A0A',
-                  border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 700,
+                  fontSize: 13,
                 }}>
                   <Play size={16} fill="currentColor" /> 播放全部 ({playlistDetail.tracks.length})
                 </button>
@@ -193,13 +186,12 @@ export default function Profile({ onBack }) {
             )}
           </div>
         ) : (
-          /* ===== 个人主页：用户信息 + 歌单列表 ===== */
+          /* 个人主页 */
           <div>
-            {/* 用户信息卡 */}
-            <div style={{
+            {/* 用户信息卡 - 液态玻璃 */}
+            <div className="glass-panel" style={{
               display: 'flex', alignItems: 'center', gap: 14, padding: '16px 14px', marginBottom: 16,
-              borderRadius: 16, background: 'rgba(255,255,255,0.04)',
-              border: '1px solid var(--border)',
+              borderRadius: 16,
             }}>
               <div style={{
                 width: 64, height: 64, borderRadius: '50%', overflow: 'hidden', flexShrink: 0,
@@ -234,10 +226,10 @@ export default function Profile({ onBack }) {
               </span>
             </div>
 
-            {/* 歌单列表 */}
+            {/* 歌单列表 - 玻璃行 */}
             {loadingPlaylists ? (
               <div style={{ display: 'flex', justifyContent: 'center', padding: 40 }}>
-                <Loader2 size={24} style={{ animation: 'spin 1s linear infinite', color: 'var(--accent-dynamic)' }} />
+                <Loader2 size={24} className="spin-icon" style={{ color: 'var(--accent-dynamic)' }} />
               </div>
             ) : playlists.length === 0 ? (
               <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)', fontSize: 13 }}>
@@ -246,12 +238,9 @@ export default function Profile({ onBack }) {
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                 {playlists.map((pl) => (
-                  <button key={pl.id} onClick={() => openPlaylistDetail(pl)} style={{
+                  <button key={pl.id} onClick={() => openPlaylistDetail(pl)} className="glass-row" style={{
                     display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px',
-                    borderRadius: 14, cursor: 'pointer', textAlign: 'left',
-                    background: 'rgba(255,255,255,0.03)',
-                    border: '1px solid var(--border)',
-                    transition: 'background 0.15s ease',
+                    borderRadius: 14, textAlign: 'left',
                   }}>
                     <div style={{
                       width: 52, height: 52, borderRadius: 12, overflow: 'hidden', flexShrink: 0,
@@ -280,12 +269,10 @@ export default function Profile({ onBack }) {
               </div>
             )}
 
-            {/* 退出登录 */}
-            <button onClick={logout} style={{
+            {/* 退出登录 - 玻璃危险按钮 */}
+            <button onClick={logout} className="glass-button-danger" style={{
               marginTop: 24, width: '100%', padding: '13px', borderRadius: 14,
-              background: 'rgba(248,113,113,0.1)',
-              border: '1px solid rgba(248,113,113,0.3)',
-              color: '#F87171', fontSize: 13, fontWeight: 600, cursor: 'pointer',
+              fontSize: 13, fontWeight: 600,
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
             }}>
               <LogOut size={15} /> 退出登录

@@ -1,6 +1,10 @@
-// QQ 扫码登录前端 JSONP 检查
-// ptqrlogin 返回 ptuiCB('code','0','redirectUrl','0','msg','nick') 格式
-// 用 <script> 标签请求，从用户浏览器直接发出，不经过服务器，不受服务器 IP 风控影响
+// QQ 扫码登录前端 JSONP 检查 + 自动轮询
+//
+// 为什么用前端 JSONP：
+//   ptqrlogin 接口对服务器 IP 有风控（返回 403 空响应），
+//   用 <script> 标签从用户浏览器直接请求，绕过服务器 IP 限制。
+//   QQ 返回 ptuiCB('code','0','redirectUrl','0','msg','nick') 格式，
+//   浏览器会自动执行这个回调。
 
 function hash33(s) {
   let hash = 0;
@@ -10,7 +14,7 @@ function hash33(s) {
   return hash & 0x7FFFFFFF;
 }
 
-// 检查扫码状态，返回 { code, redirectUrl, msg, nickname }
+// 一次性检查扫码状态
 // code: 66 等待扫码 / 67 已扫码待确认 / 0 成功 / 65 失效 / -1 网络/超时错误
 export function qqQrCheckJsonp(qrsig) {
   return new Promise((resolve) => {
@@ -56,11 +60,93 @@ export function qqQrCheckJsonp(qrsig) {
     });
 
     const script = document.createElement('script');
-    // QQ 返回的 ptuiCB 调用会被浏览器执行，触发 window.__ptuiCB
     script.src = `https://ssl.ptlogin2.qq.com/ptqrlogin?${params}`;
-    script.onerror = () => finish({ code: -1, msg: '网络错误，请检查网络连接' });
+    script.onerror = () => finish({ code: -1, msg: '网络错误，可能是浏览器拦截了 ptlogin2 域名' });
     document.head.appendChild(script);
 
-    const timer = setTimeout(() => finish({ code: -1, msg: '请求超时' }), 10000);
+    // 15s 超时（原 10s 偶尔在弱网下不够）
+    const timer = setTimeout(() => finish({ code: -1, msg: '请求超时' }), 15000);
   });
+}
+
+// 自动轮询扫码状态
+//
+// 用法：
+//   const stop = qqQrPoll(qrsig, {
+//     onWaiting: () => {},      // code 66 等待扫码
+//     onScanned: () => {},      // code 67 已扫码待确认
+//     onSuccess: (redirectUrl, nickname) => {},  // code 0 成功
+//     onExpired: () => {},      // code 65 二维码过期
+//     onError: (msg) => {},     // code -1 网络/超时
+//   });
+//   // 需要停止时调用 stop()
+//
+// 轮询策略：
+//   - 间隔 1.8~2.5s 随机抖动，避免被识别为机器人
+//   - 连续 3 次网络错误后停止（避免无限重试）
+//   - 成功/过期后自动停止
+//   - 返回 stop() 函数供外部中断
+export function qqQrPoll(qrsig, callbacks) {
+  const { onWaiting, onScanned, onSuccess, onExpired, onError } = callbacks;
+  let stopped = false;
+  let errorStreak = 0;
+  let timer = null;
+
+  const sleep = (ms) => new Promise((r) => {
+    timer = setTimeout(r, ms);
+    // 让 timer 可被 stop 清除
+    return () => clearTimeout(timer);
+  });
+
+  const pollOnce = async () => {
+    if (stopped) return;
+    const res = await qqQrCheckJsonp(qrsig);
+    if (stopped) return;
+
+    switch (res.code) {
+      case 0:
+        if (res.redirectUrl) {
+          onSuccess && onSuccess(res.redirectUrl, res.nickname);
+          return; // 成功，停止轮询
+        }
+        // redirectUrl 为空视为异常
+        onError && onError('登录信息异常，请刷新重试');
+        return;
+      case 66:
+        errorStreak = 0;
+        onWaiting && onWaiting();
+        break;
+      case 67:
+        errorStreak = 0;
+        onScanned && onScanned();
+        break;
+      case 65:
+        onExpired && onExpired();
+        return; // 过期，停止
+      default:
+        // -1 或未知
+        errorStreak++;
+        if (errorStreak >= 3) {
+          onError && onError(res.msg || '网络异常，已停止轮询');
+          return;
+        }
+        onError && onError(res.msg || '网络异常，重试中…');
+        break;
+    }
+
+    if (!stopped) {
+      const delay = 1800 + Math.random() * 700;
+      await sleep(delay);
+      if (!stopped) pollOnce();
+    }
+  };
+
+  // 启动轮询
+  pollOnce();
+
+  // 返回停止函数
+  return () => {
+    stopped = true;
+    if (timer) clearTimeout(timer);
+  };
 }
