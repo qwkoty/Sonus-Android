@@ -56,7 +56,7 @@ jobs:
       - name: Build release APK
         working-directory: frontend/android
         env:
-          SONUS_KEYSTORE_PATH: app/sonus-release.keystore
+          SONUS_KEYSTORE_PATH: sonus-release.keystore
           SONUS_KEYSTORE_PASS: sonus123456
           SONUS_KEY_ALIAS: sonus
           SONUS_KEY_PASS: sonus123456
