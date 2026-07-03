@@ -70,10 +70,20 @@ export default function Login({ onBack }) {
             key: res.key,
             nickname: res.nickname,
           });
+        } else if (code === 0 && (!res?.cookie || !res?.uin)) {
+          // 登录成功但后端未收集到完整信息（cookie/uin 缺失），停止并报错
+          stop();
+          setErrorMsg('登录信息收集失败，请重试');
+          setStatus(66);
         } else if (code === 65) {
           // 二维码失效
           stop();
           setErrorMsg('二维码已过期，请刷新');
+          setStatus(66);
+        } else if (code === 800) {
+          // 后端重定向链失败，停止轮询避免继续消费已失效的 qrsig
+          stop();
+          setErrorMsg(res?.msg || '登录失败，请重试');
           setStatus(66);
         } else {
           // 其他错误码继续等待

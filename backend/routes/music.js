@@ -165,50 +165,50 @@ async function qqQrCheck(qrsig) {
   const cached = loginResults.get(qrsig);
   if (cached) return cached;
 
-  // 如果正在处理，返回等待状态
+  // 提前加锁，防止并发请求重复请求 ptqrlogin 消费 QQ 登录态
   if (processing.has(qrsig)) {
     return { code: 67, msg: '正在登录，请稍候…' };
   }
-
-  const ptqrtoken = hash33(qrsig);
-  const resp = await axios.get('https://ssl.ptlogin2.qq.com/ptqrlogin', {
-    params: {
-      u1: 'https://y.qq.com/',
-      ptqrtoken,
-      ptredirect: '0',
-      h: '1',
-      t: '1',
-      g: '1',
-      from_ui: '1',
-      ptlang: '2052',
-      action: '0-0-' + Date.now(),
-      js_ver: '24042410',
-      js_type: '1',
-      login_sig: '',
-      pt_uistyle: '40',
-      aid: '716027609',
-      daid: '383',
-      pt_3rd_aid: '0',
-    },
-    headers: { 'User-Agent': UA, Referer: 'https://y.qq.com/', Cookie: `qrsig=${qrsig}` },
-    timeout: 30000,
-    maxRedirects: 0,
-    validateStatus: () => true,
-  });
-
-  const text = typeof resp.data === 'string' ? resp.data : '';
-  const match = text.match(/ptuiCB\('(\d+)','0','([^']*)','0','([^']*)','([^']*)'\)/);
-  if (!match) return { code: 66, msg: '等待扫码' };
-
-  const [, code, redirectUrl, msg, nickname] = match;
-
-  if (code !== '0' || !redirectUrl) {
-    return { code: Number(code), msg };
-  }
-
-  // 登录成功，跟随重定向链收集 Cookie
   processing.add(qrsig);
+
   try {
+    const ptqrtoken = hash33(qrsig);
+    const resp = await axios.get('https://ssl.ptlogin2.qq.com/ptqrlogin', {
+      params: {
+        u1: 'https://y.qq.com/',
+        ptqrtoken,
+        ptredirect: '0',
+        h: '1',
+        t: '1',
+        g: '1',
+        from_ui: '1',
+        ptlang: '2052',
+        action: '0-0-' + Date.now(),
+        js_ver: '24042410',
+        js_type: '1',
+        login_sig: '',
+        pt_uistyle: '40',
+        aid: '716027609',
+        daid: '383',
+        pt_3rd_aid: '0',
+      },
+      headers: { 'User-Agent': UA, Referer: 'https://y.qq.com/', Cookie: `qrsig=${qrsig}` },
+      timeout: 30000,
+      maxRedirects: 0,
+      validateStatus: () => true,
+    });
+
+    const text = typeof resp.data === 'string' ? resp.data : '';
+    const match = text.match(/ptuiCB\('(\d+)','0','([^']*)','0','([^']*)','([^']*)'\)/);
+    if (!match) return { code: 66, msg: '等待扫码' };
+
+    const [, code, redirectUrl, msg, nickname] = match;
+
+    if (code !== '0' || !redirectUrl) {
+      return { code: Number(code), msg };
+    }
+
+    // 登录成功，跟随重定向链收集 Cookie
     const jar = { qrsig };
     let currentUrl = redirectUrl;
 
@@ -252,7 +252,12 @@ async function qqQrCheck(qrsig) {
       } catch (e) {}
     }
 
-    const uin = (jar.uin || jar.wxuin || '').toString().replace(/^o0*/, '');
+    // uin 解析：优先 jar，兜底从 cookie 字符串正则提取
+    let uin = (jar.uin || jar.wxuin || '').toString().replace(/^o0*/, '');
+    if (!uin) {
+      const m = cookieToString(jar).match(/(?:^|;\s*)(?:uin|wxuin)=o?(\d+)/);
+      if (m) uin = m[1];
+    }
     const key = jar.qqmusic_key || jar.p_skey || jar.skey || '';
     const result = {
       code: 0,
