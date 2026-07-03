@@ -64,19 +64,14 @@ async function searchAPK(keyword, limit = 30) {
 }
 
 // ==================== 播放链接 ====================
-// 参照 Mineradio 实现：
-// - filename = prefix + mediaId + ext（mediaId 优先用 mediaMid，其次 songmid）
-// - 一次性发送所有音质候选，取第一个有 purl 的
-// - musicKey 从 cookie 中提取 qm_keyst，作为 comm.authst
-// - 有 musicKey 时 ct=19，无时 ct=24
+// 安卓端 QQ 音乐播放链接获取
+// 策略：先无登录态请求（免费歌曲可播），失败再用登录态重试（VIP 歌曲）
 async function urlAPK(id, cookie = '', uin = '0', _key = '', mediaMid = '') {
   const songmid = String(id).replace(/^qq_/, '');
-  const uinStr = String(uin || '0');
   const cookieStr = cookie || '';
 
   // 从 cookie 中提取播放授权票据
   const musicKey = extractMusicKey(cookieStr);
-  const loginflag = musicKey ? 1 : 0;
 
   // 把登录 Cookie 同步到音频流域名，让 WebView Audio 播放时带登录态
   if (cookieStr) {
@@ -91,12 +86,12 @@ async function urlAPK(id, cookie = '', uin = '0', _key = '', mediaMid = '') {
   if (mediaMid) mediaIds.push(mediaMid);
   if (songmid && !mediaIds.includes(songmid)) mediaIds.push(songmid);
 
-  // 音质候选（从高到低）
+  // 音质候选（从低到高，低音质更容易免费）
   const qualityCandidates = [
-    { prefix: 'F000', ext: '.flac' },
-    { prefix: 'M800', ext: '.mp3' },
-    { prefix: 'C400', ext: '.m4a' },
     { prefix: 'M500', ext: '.mp3' },
+    { prefix: 'C400', ext: '.m4a' },
+    { prefix: 'M800', ext: '.mp3' },
+    { prefix: 'F000', ext: '.flac' },
   ];
 
   // 生成所有 filename 候选
@@ -105,54 +100,58 @@ async function urlAPK(id, cookie = '', uin = '0', _key = '', mediaMid = '') {
   );
   const filenames = fileCandidates.map(item => item.filename);
 
-  const param = {
-    guid,
-    songmid: filenames.map(() => songmid),
-    songtype: filenames.map(() => 0),
-    uin: uinStr,
-    loginflag,
-    platform: '20',
-    filename: filenames,
-  };
-
-  const comm = { uin: uinStr, format: 'json', ct: musicKey ? 19 : 24, cv: 0 };
-  if (musicKey) comm.authst = musicKey;
-
-  const payload = {
-    comm,
-    req_0: {
-      module: 'vkey.GetVkeyServer',
-      method: 'CgiGetVkey',
-      param,
-    },
-  };
-
-  try {
-    const url = qqUrl(payload);
-    const d = await nativeGet(url, cookieStr);
-    const data = d?.req_0?.data;
-    const infos = Array.isArray(data?.midurlinfo) ? data.midurlinfo : [];
-    const info = infos.find(item => item && item.purl) || infos[0];
-    const purl = info?.purl;
-
-    if (purl) {
-      const sip = (data?.sip?.[0]) || 'https://ws.stream.qqmusic.qq.com/';
-      const streamUrl = sip + purl;
-      console.log('[stream url]', streamUrl);
-      return streamUrl;
-    }
-
-    const qqCode = info?.result || info?.code || info?.errtype;
-    console.warn('[vkey] no purl, qqCode:', qqCode, 'playbackKey:', !!musicKey, 'tried:', filenames.slice(0, 3));
-
-    // 104003 = 缺少播放授权，提示重新登录
-    if (qqCode === 104003 && !musicKey) {
-      console.error('[vkey] 104003: 缺少 qm_keyst 播放授权，请重新登录 QQ 音乐');
-    }
-  } catch (e) {
-    console.warn('[vkey failed]', e.message);
+  // 请求 vkey：先无登录态（免费歌曲），失败再用登录态
+  const attempts = [
+    { uin: '0', loginflag: 0, ct: 24, authst: null, label: '匿名' },
+  ];
+  if (musicKey) {
+    attempts.push({ uin: String(uin || '0'), loginflag: 1, ct: 19, authst: musicKey, label: '登录态' });
   }
 
+  for (const attempt of attempts) {
+    try {
+      const param = {
+        guid,
+        songmid: filenames.map(() => songmid),
+        songtype: filenames.map(() => 0),
+        uin: attempt.uin,
+        loginflag: attempt.loginflag,
+        platform: '20',
+        filename: filenames,
+      };
+      const comm = { uin: attempt.uin, format: 'json', ct: attempt.ct, cv: 0 };
+      if (attempt.authst) comm.authst = attempt.authst;
+
+      const payload = {
+        comm,
+        req_0: {
+          module: 'vkey.GetVkeyServer',
+          method: 'CgiGetVkey',
+          param,
+        },
+      };
+
+      const url = qqUrl(payload);
+      const d = await nativeGet(url, attempt.loginflag ? cookieStr : '');
+      const data = d?.req_0?.data;
+      const infos = Array.isArray(data?.midurlinfo) ? data.midurlinfo : [];
+      const info = infos.find(item => item && item.purl) || infos[0];
+      const purl = info?.purl;
+
+      console.log(`[vkey:${attempt.label}]`, 'purl:', purl ? 'YES' : 'NO', 'code:', info?.result || info?.code || '-');
+
+      if (purl) {
+        const sip = (data?.sip?.[0]) || 'https://ws.stream.qqmusic.qq.com/';
+        const streamUrl = sip + purl;
+        console.log('[stream url]', streamUrl);
+        return streamUrl;
+      }
+    } catch (e) {
+      console.warn(`[vkey:${attempt.label} failed]`, e.message);
+    }
+  }
+
+  console.warn('[vkey] all attempts failed, tried:', filenames.slice(0, 4));
   return '';
 }
 
