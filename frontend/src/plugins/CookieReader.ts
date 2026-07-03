@@ -5,21 +5,25 @@
 import { registerPlugin } from '@capacitor/core';
 
 export interface CookieReaderResult {
-  cookie: string;       // 完整 cookie 字符串（如 "uin=123; qqmusic_key=abc; ..."）
-  uin: string;          // QQ 号（已去除 o 前缀）
-  qqmusic_key: string;  // 播放票据（qm_keyst > qqmusic_key > p_skey > skey 优先级）
-  login_type: string;   // "1"=QQ登录, "2"=微信登录
-  loggedIn: boolean;    // 是否已登录（uin 非空 + key 非空）
+  cookie: string;
+  uin: string;
+  qqmusic_key: string;
+  login_type: string;
+  loggedIn: boolean;
+}
+
+export interface OpenLoginResult {
+  loggedIn: boolean;
 }
 
 export interface CookieReaderPlugin {
   getCookiesForUrl(options: { url: string }): Promise<CookieReaderResult>;
   clearCookiesForUrl(options: { url: string }): Promise<void>;
+  openLoginWebView(): Promise<OpenLoginResult>;
 }
 
 const CookieReaderNative = registerPlugin<CookieReaderPlugin>('CookieReader');
 
-// 导出包装函数，自动处理 Capacitor/浏览器环境
 export const CookieReader = {
   isAvailable: () => {
     return typeof window !== 'undefined' && window.Capacitor?.isNativePlatform?.();
@@ -37,23 +41,12 @@ export const CookieReader = {
     return await CookieReaderNative.clearCookiesForUrl({ url });
   },
 
-  // 打开 QQ 音乐登录 WebView（通过 AndroidBridge）
-  openLoginWebView: async (): Promise<boolean> => {
-    if (!CookieReader.isAvailable()) return false;
-    try {
-      // 通过 Capacitor 的 AndroidBridge 调用 MainActivity 的方法
-      const bridge = window.Capacitor?.getPlatform?.() === 'android'
-        ? (window as any).AndroidBridge
-        : null;
-      if (bridge && bridge.openQQLoginWebView) {
-        bridge.openQQLoginWebView();
-        return true;
-      }
-      // 如果没有 AndroidBridge，尝试用 Intent 方式
-      return false;
-    } catch {
-      return false;
+  // 通过 Capacitor 插件打开 QQ 音乐登录 WebView，Promise 在用户登录完成后 resolve
+  openLoginWebView: async (): Promise<OpenLoginResult> => {
+    if (!CookieReader.isAvailable()) {
+      throw new Error('CookieReader not available (browser environment)');
     }
+    return await CookieReaderNative.openLoginWebView();
   },
 };
 

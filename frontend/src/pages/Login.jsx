@@ -37,55 +37,28 @@ export default function Login({ onBack }) {
     setWebviewPhase('opening');
     setWebviewTip('正在打开 QQ 音乐登录页面…');
 
-    // 监听 WebView 关闭事件
-    const onClose = async (e) => {
-      const detail = e?.detail || {};
-      window.removeEventListener('qq-login-webview-closed', onClose);
-      if (pollTimerRef.current) { clearInterval(pollTimerRef.current); pollTimerRef.current = null; }
-
-      if (detail.loggedIn) {
-        // WebView 返回了登录成功标志，读取 Cookie
-        await extractCookieAndLogin();
-      } else {
-        // 用户关闭了 WebView，可能还没登录
-        setWebviewPhase('idle');
-        setWebviewTip('');
-      }
-    };
-    window.addEventListener('qq-login-webview-closed', onClose);
-
-    // 尝试打开 WebView
     try {
       // 先检查当前是否已经有有效 Cookie（可能之前登录过）
       const currentCookies = await CookieReader.getCookiesForUrl('https://y.qq.com');
       if (currentCookies.loggedIn) {
-        // 已登录！直接提取
         await handleCookieLogin(currentCookies);
         return;
       }
 
-      // 通过 MainActivity 的 AndroidBridge 打开登录 WebView
-      const opened = await CookieReader.openLoginWebView();
-      if (!opened) {
-        // AndroidBridge 不可用，降级到手动轮询
-        setWebviewPhase('polling');
-        setWebviewTip('请在系统浏览器中登录 QQ 音乐，完成后点"检查登录状态"');
-        return;
-      }
-
-      // WebView 打开成功，开始定时轮询 Cookie
+      // 打开 WebView 登录窗口，Promise 在用户完成登录后 resolve
       setWebviewPhase('polling');
       setWebviewTip('请在弹出的窗口中登录 QQ 音乐…');
-      pollTimerRef.current = setInterval(async () => {
-        const cookies = await CookieReader.getCookiesForUrl('https://y.qq.com');
-        if (cookies.loggedIn) {
-          if (pollTimerRef.current) { clearInterval(pollTimerRef.current); pollTimerRef.current = null; }
-          await handleCookieLogin(cookies);
-        }
-      }, 1500);
+
+      const result = await CookieReader.openLoginWebView();
+      // 用户登录成功，WebView 已关闭
+      setWebviewTip('登录成功，正在同步账号…');
+      // 读取最终 Cookie
+      const cookies = await CookieReader.getCookiesForUrl('https://y.qq.com');
+      await handleCookieLogin(cookies);
     } catch (e) {
+      // 用户取消或失败
       setWebviewPhase('error');
-      setWebviewTip('打开登录页面失败：' + (e.message || ''));
+      setWebviewTip('登录已取消：' + (e.message || ''));
     }
   }, []);
 
@@ -259,7 +232,7 @@ export default function Login({ onBack }) {
     <div style={{
       position: 'fixed', inset: 0,
       display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-start',
-      background: 'radial-gradient(ellipse at center, #1a1a2e 0%, #0a0a0f 100%)',
+      background: 'radial-gradient(ellipse at 50% 30%, color-mix(in srgb, var(--accent-dynamic) 12%, transparent) 0%, rgba(0,0,0,0.4) 60%, rgba(0,0,0,0.7) 100%)',
       padding: 20, overflow: 'auto',
     }}>
       {/* 浮动光斑 */}

@@ -26,7 +26,7 @@ export default function App() {
   }
 
   return (
-    <div style={{ height: '100%', position: 'relative', background: 'var(--bg-primary)' }}>
+    <div style={{ height: '100%', position: 'relative', background: 'transparent' }}>
       {view === 'profile' && isLoggedIn
         ? <Profile onBack={() => setView('player')} />
         : <Player onProfile={() => setView(isLoggedIn ? 'profile' : 'login')} />}
