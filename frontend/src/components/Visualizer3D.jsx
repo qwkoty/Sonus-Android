@@ -30,7 +30,7 @@ export default function Visualizer3D({ accent = '#4FC3F7', cover = '', onReady }
   useEffect(() => { accentRef.current = accent; }, [accent]);
   useEffect(() => { coverRef.current = cover; }, [cover]);
 
-  // 手势状态（双指缩放 + 旋转）
+  // 手势状态（双指缩放 + 旋转；单指划动旋转）
   const gestureRef = useRef({
     zoom: 1.0,
     rotation: 0,
@@ -41,6 +41,8 @@ export default function Visualizer3D({ accent = '#4FC3F7', cover = '', onReady }
     startAngle: 0,
     startZoom: 1.0,
     startRot: 0,
+    dragging: false,
+    startX: 0,
   });
 
   // 加载封面并采样为 ImageData
@@ -234,9 +236,9 @@ export default function Visualizer3D({ accent = '#4FC3F7', cover = '', onReady }
 
       // 每帧更新 Z；无封面时同时更新 color
       const needColorUpdate = !hasCover;
-      // 风吹参数：进一步增强，风从左上吹向右下，强度随时间起伏
+      // 风吹参数：风从右侧两角吹向左侧，强度随时间起伏
       const windSpeed = 2.4;
-      const windFreqX = 3.6;   // X 方向波纹频率
+      const windFreqX = 3.6;   // X 方向波纹频率（从右向左）
       const windFreqY = 2.4;   // Y 方向波纹频率
       const windGust = 1.0 + Math.sin(time * 0.75) * 0.45 + bassSmooth * 1.1; // 阵风强度
 
@@ -257,12 +259,16 @@ export default function Visualizer3D({ accent = '#4FC3F7', cover = '', onReady }
         const tFreq = Math.max(0, 1 - Math.abs(dc - 0.85) * 3);
         let localEnergy = bassSmooth * bFreq + midSmooth * mFreq * 0.8 + trebleSmooth * tFreq * 0.6;
 
-        // 风吹效果：粒子 Z 方向像旗帜被风吹起那样起伏
-        const wave1 = Math.sin(u * windFreqX * Math.PI + time * windSpeed) * 0.6;
-        const wave2 = Math.sin(v * windFreqY * Math.PI + time * windSpeed * 0.75) * 0.4;
-        const ripple = Math.sin((u + v) * 10 + time * 3.2) * 0.12;
-        const swirl = Math.sin(u * 6 + v * 4 + time * 1.5) * 0.15; // 旋转风涡
-        const windZ = (wave1 + wave2 + ripple + swirl) * windGust * falloff;
+        // 风吹效果：风从右侧两角吹向左侧，右侧上下角最强
+        const rightStrength = Math.pow(Math.max(0, u - 0.2) / 0.8, 1.1);
+        const cornerLift = 0.5 + Math.abs(v - 0.5); // 右上角 / 右下角更高
+        const localWind = rightStrength * cornerLift;
+
+        const wave1 = Math.sin((1 - u) * windFreqX * Math.PI + time * windSpeed) * 0.6;
+        const wave2 = Math.sin((1 - v) * windFreqY * Math.PI + time * windSpeed * 0.7) * 0.35;
+        const ripple = Math.sin(((1 - u) + v) * 10 + time * 3.0) * 0.12;
+        const swirl = Math.sin((1 - u) * 6 + v * 4 + time * 1.4) * 0.15;
+        const windZ = (wave1 + wave2 + ripple + swirl) * windGust * localWind;
 
         // 音频能量叠加到 Z（中心低频推高）
         const audioZ = localEnergy * 0.8 * falloff * breath;
@@ -312,14 +318,20 @@ export default function Visualizer3D({ accent = '#4FC3F7', cover = '', onReady }
     };
     animate();
 
-    // ===== 手势控制：双指缩放 + 旋转 =====
+    // ===== 手势控制：单指划动旋转 + 双指缩放/旋转 =====
     const dom = renderer.domElement;
     const dist = (t1, t2) => Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
     const angle = (t1, t2) => Math.atan2(t2.clientY - t1.clientY, t2.clientX - t1.clientX);
+    const ROTATE_SENSITIVITY = 0.006; // 单指水平滑动灵敏度
     const onTouchStart = (e) => {
-      if (e.touches.length === 2) {
-        const g = gestureRef.current;
+      const g = gestureRef.current;
+      if (e.touches.length === 1) {
+        g.dragging = true;
+        g.startX = e.touches[0].clientX;
+        g.startRot = g.targetRotation;
+      } else if (e.touches.length === 2) {
         g.pinching = true;
+        g.dragging = false;
         g.startDist = dist(e.touches[0], e.touches[1]);
         g.startAngle = angle(e.touches[0], e.touches[1]);
         g.startZoom = g.targetZoom;
@@ -328,18 +340,25 @@ export default function Visualizer3D({ accent = '#4FC3F7', cover = '', onReady }
     };
     const onTouchMove = (e) => {
       const g = gestureRef.current;
-      if (!g.pinching || e.touches.length !== 2) return;
-      e.preventDefault();
-      const d = dist(e.touches[0], e.touches[1]);
-      const a = angle(e.touches[0], e.touches[1]);
-      // 缩放 = 当前距离 / 起始距离
-      const scale = d / Math.max(1, g.startDist);
-      g.targetZoom = Math.max(0.4, Math.min(3.0, g.startZoom * scale));
-      // 旋转 = 当前角度 - 起始角度
-      g.targetRotation = g.startRot + (a - g.startAngle);
+      if (g.pinching && e.touches.length === 2) {
+        e.preventDefault();
+        const d = dist(e.touches[0], e.touches[1]);
+        const a = angle(e.touches[0], e.touches[1]);
+        // 缩放 = 当前距离 / 起始距离
+        const scale = d / Math.max(1, g.startDist);
+        g.targetZoom = Math.max(0.4, Math.min(3.0, g.startZoom * scale));
+        // 旋转 = 当前角度 - 起始角度
+        g.targetRotation = g.startRot + (a - g.startAngle);
+      } else if (g.dragging && e.touches.length === 1) {
+        e.preventDefault();
+        const dx = e.touches[0].clientX - g.startX;
+        g.targetRotation = g.startRot + dx * ROTATE_SENSITIVITY;
+      }
     };
     const onTouchEnd = (e) => {
-      if (e.touches.length < 2) gestureRef.current.pinching = false;
+      const g = gestureRef.current;
+      if (e.touches.length < 2) g.pinching = false;
+      if (e.touches.length < 1) g.dragging = false;
     };
     // 鼠标滚轮缩放（桌面端调试用）
     const onWheel = (e) => {
