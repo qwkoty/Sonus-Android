@@ -102,6 +102,7 @@ public class CookieReaderPlugin extends Plugin {
     public void httpGet(PluginCall call) {
         String urlStr = call.getString("url");
         String cookieDomain = call.getString("cookieDomain", "https://y.qq.com");
+        String explicitCookies = call.getString("cookies", "");
 
         if (urlStr == null || urlStr.isEmpty()) {
             call.reject("Must provide url");
@@ -119,12 +120,17 @@ public class CookieReaderPlugin extends Plugin {
             conn.setReadTimeout(15000);
             conn.setInstanceFollowRedirects(true);
 
-            // 从 CookieManager 读取 Cookie 并注入
-            CookieManager cm = CookieManager.getInstance();
-            cm.flush();
-            String cookies = cm.getCookie(cookieDomain);
-            if (cookies != null && !cookies.isEmpty()) {
-                conn.setRequestProperty("Cookie", cookies);
+            // 注入 Cookie：优先使用调用方传入的 cookies 字符串，否则从 CookieManager 读取
+            String cookiesToInject = null;
+            if (explicitCookies != null && !explicitCookies.isEmpty()) {
+                cookiesToInject = explicitCookies;
+            } else {
+                CookieManager cm = CookieManager.getInstance();
+                cm.flush();
+                cookiesToInject = cm.getCookie(cookieDomain);
+            }
+            if (cookiesToInject != null && !cookiesToInject.isEmpty()) {
+                conn.setRequestProperty("Cookie", cookiesToInject);
             }
 
             int status = conn.getResponseCode();

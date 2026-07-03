@@ -5,6 +5,16 @@ import { getSpectrumBars } from '../audio/engine';
 const GRID = 142;             // 142x142 = 20164 ≈ 2 万粒子
 const FOV = 55;
 
+function hexToRGB(hex) {
+  const c = hex.replace('#', '');
+  const bigint = parseInt(c.length === 3 ? c.split('').map(x => x + x).join('') : c, 16);
+  return {
+    r: ((bigint >> 16) & 255) / 255,
+    g: ((bigint >> 8) & 255) / 255,
+    b: (bigint & 255) / 255,
+  };
+}
+
 // 3D 封面粒子画：2 万粒子在 X-Y 平面排满封面图像（每粒子颜色 = 封面对应像素）
 // 电影镜头：用户双指捏合缩放 + 双指划拉旋转（手势驱动）
 // 风吹动画：粒子 Z 方向像旗帜被风吹起那样起伏，阵风强度随时间起伏
@@ -22,16 +32,17 @@ export default function Visualizer3D({ accent = '#4FC3F7', cover = '', onReady }
 
   // 手势状态（双指缩放 + 旋转）
   const gestureRef = useRef({
-    zoom: 1.0,           // 当前缩放倍率
-    rotation: 0,         // 当前旋转角度（弧度）
-    targetZoom: 1.0,     // 目标缩放（平滑过渡）
-    targetRotation: 0,   // 目标旋转
+    zoom: 1.0,
+    rotation: 0,
+    targetZoom: 1.0,
+    targetRotation: 0,
     pinching: false,
     startDist: 0,
     startAngle: 0,
     startZoom: 1.0,
     startRot: 0,
   });
+  const autoRotateRef = useRef(0);  // 自动旋转基准角
 
   // 加载封面并采样为 ImageData
   useEffect(() => {
@@ -224,19 +235,22 @@ export default function Visualizer3D({ accent = '#4FC3F7', cover = '', onReady }
 
       // 每帧更新 Z；无封面时同时更新 color
       const needColorUpdate = !hasCover;
-      // 风吹参数：风从左上吹向右下，强度随时间起伏
-      const windSpeed = 1.4;
-      const windFreqX = 2.2;   // X 方向波纹频率
-      const windFreqY = 1.6;   // Y 方向波纹频率
-      const windGust = 0.5 + Math.sin(time * 0.5) * 0.25 + bassSmooth * 0.6; // 阵风强度
+      // 风吹参数：增强，风从左上吹向右下，强度随时间起伏
+      const windSpeed = 2.0;
+      const windFreqX = 3.0;   // X 方向波纹频率
+      const windFreqY = 2.0;   // Y 方向波纹频率
+      const windGust = 0.8 + Math.sin(time * 0.7) * 0.35 + bassSmooth * 0.9; // 阵风强度
+
+      // 主题色解析
+      const accentRGB = hexToRGB(accentRef.current || '#4FC3F7');
 
       for (let i = 0; i < COUNT; i++) {
         const u = origUV[i * 2];
         const v = origUV[i * 2 + 1];
         const dc = distFromCenter[i]; // 0 中心 ~ 1 边角
 
-        // 边缘衰减：中心 1，边缘趋近 0 —— 保证边缘粒子不动，撑满不溢出
-        const falloff = Math.pow(1 - dc, 1.6);
+        // 边缘衰减：中心 1，边缘趋近 0
+        const falloff = Math.pow(1 - dc, 1.4);
 
         // 音频响应：中心 = bass（低频），向外依次 mid、treble（高频）
         const bFreq = Math.max(0, 1 - dc * 1.8);
@@ -245,46 +259,43 @@ export default function Visualizer3D({ accent = '#4FC3F7', cover = '', onReady }
         let localEnergy = bassSmooth * bFreq + midSmooth * mFreq * 0.8 + trebleSmooth * tFreq * 0.6;
 
         // 风吹效果：粒子 Z 方向像旗帜被风吹起那样起伏
-        // 主波：沿 X 方向传播的风波
-        const wave1 = Math.sin(u * windFreqX * Math.PI + time * windSpeed) * 0.5;
-        // 次波：沿 Y 方向，频率不同形成交叉波纹
-        const wave2 = Math.sin(v * windFreqY * Math.PI + time * windSpeed * 0.7) * 0.3;
-        // 细节涟漪：高频小波，增加自然感
-        const ripple = Math.sin((u + v) * 8 + time * 2.5) * 0.08;
-        // 组合风吹位移
-        const windZ = (wave1 + wave2 + ripple) * windGust * falloff;
+        const wave1 = Math.sin(u * windFreqX * Math.PI + time * windSpeed) * 0.6;
+        const wave2 = Math.sin(v * windFreqY * Math.PI + time * windSpeed * 0.75) * 0.4;
+        const ripple = Math.sin((u + v) * 10 + time * 3.2) * 0.12;
+        const swirl = Math.sin(u * 6 + v * 4 + time * 1.5) * 0.15; // 旋转风涡
+        const windZ = (wave1 + wave2 + ripple + swirl) * windGust * falloff;
 
         // 音频能量叠加到 Z（中心低频推高）
-        const audioZ = localEnergy * 0.5 * falloff * breath;
+        const audioZ = localEnergy * 0.8 * falloff * breath;
 
-        posAttr.array[i * 3 + 2] = windZ * zAmp + audioZ * zAmp;
+        posAttr.array[i * 3 + 2] = (windZ + audioZ) * zAmp;
 
         if (needColorUpdate) {
-          // 无封面时：中心冷蓝 → 外圈紫红，随风强度增亮
-          const intensity = 0.3 + localEnergy * 0.6 + Math.abs(windZ) * 0.4;
-          const r = (0.25 + dc * 0.55) * intensity;
-          const g = (0.45 + (1 - dc) * 0.25) * intensity;
-          const b = (0.85 - dc * 0.35) * intensity;
-          colorAttr.array[i * 3]     = r;
-          colorAttr.array[i * 3 + 1] = g;
-          colorAttr.array[i * 3 + 2] = b;
+          // 无封面时：以主题色为基础，中心亮、外圈暗，随风和音频增亮
+          const windGlow = Math.abs(windZ) * 0.5;
+          const intensity = 0.25 + localEnergy * 0.7 + windGlow;
+          const outFactor = 1 - dc * 0.6; // 中心亮，边缘暗
+          colorAttr.array[i * 3]     = Math.min(1, accentRGB.r * intensity * outFactor + localEnergy * 0.3);
+          colorAttr.array[i * 3 + 1] = Math.min(1, accentRGB.g * intensity * outFactor + localEnergy * 0.3);
+          colorAttr.array[i * 3 + 2] = Math.min(1, accentRGB.b * intensity * outFactor + localEnergy * 0.3 + windGlow * 0.3);
         }
       }
       posAttr.needsUpdate = true;
       if (needColorUpdate) colorAttr.needsUpdate = true;
 
-      // ===== 电影镜头：手势驱动（双指缩放 + 旋转）=====
+      // ===== 电影镜头：手势驱动 + 自动缓慢旋转 =====
       const g = gestureRef.current;
-      // 平滑过渡到目标值（弹性手感）
       g.zoom += (g.targetZoom - g.zoom) * 0.18;
       g.rotation += (g.targetRotation - g.rotation) * 0.18;
+      autoRotateRef.current += 0.002;  // 无手势时自动缓慢旋转
       // 缩放限制 0.4 ~ 3.0
       const clampedZoom = Math.max(0.4, Math.min(3.0, g.zoom));
       camera.position.z = cameraZ / clampedZoom;
-      // 用户旋转直接应用到粒子整体
-      points.rotation.y = g.rotation;
-      // 微俯仰保持 3D 感
-      points.rotation.x = -0.18;
+      // 粒子旋转 = 自动旋转 + 用户手势旋转
+      points.rotation.y = autoRotateRef.current + g.rotation;
+      // 微俯仰 + 随风轻微摇摆
+      points.rotation.x = -0.18 + Math.sin(time * 0.6) * 0.04;
+      points.rotation.z = Math.cos(time * 0.45) * 0.02;
       camera.position.x = 0;
       camera.position.y = 0;
       camera.lookAt(0, 0, 0);

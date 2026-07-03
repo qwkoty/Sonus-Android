@@ -7,10 +7,11 @@ function qqUrl(payload) {
   return `https://u.y.qq.com/cgi-bin/musicu.fcg?data=${encodeURIComponent(JSON.stringify(payload))}`;
 }
 
-async function nativeGet(url) {
-  // 强制从 y.qq.com 域读 Cookie（登录 Cookie 写在此域，子域请求也能用）
-  // QQ 音乐服务端只校验 Cookie 内容，不校验 domain
-  const r = await CookieReader.httpGet(url, 'https://y.qq.com');
+// 原生 HTTP GET：优先使用传入的 cookie 字符串，否则从 CookieManager 读取
+async function nativeGet(url, cookieString = '') {
+  const r = cookieString
+    ? await CookieReader.httpGet(url, 'https://y.qq.com', cookieString)
+    : await CookieReader.httpGet(url, 'https://y.qq.com');
   if (!r.ok || !r.body) throw new Error(`HTTP ${r.status}`);
   return JSON.parse(r.body);
 }
@@ -50,10 +51,12 @@ async function searchAPK(keyword, limit = 30) {
 
 // ==================== 播放链接 ====================
 // 多策略 fallback：先试 m4a 标准音质，空了试 mp3，再试 songtype=1（VIP）
+// cookie 字符串优先注入请求头，保证登录态有效
 async function urlAPK(id, cookie = '', uin = '0') {
   const rawId = String(id).replace(/^qq_/, '');
   const uinStr = String(uin || '0');
   const loginflag = cookie ? 1 : 0;
+  const cookieStr = cookie || '';
 
   // 策略列表：filename 格式 + songtype 组合
   const strategies = [
@@ -81,7 +84,7 @@ async function urlAPK(id, cookie = '', uin = '0') {
           },
         },
         comm: { uin: uinStr, format: 'json', ct: 24, cv: 0 },
-      }));
+      }), cookieStr);
       const item = d?.req_0?.data?.midurlinfo?.[0];
       const sip = d?.req_0?.data?.sip?.[0];
       if (item?.purl && sip) return sip + item.purl;
@@ -91,7 +94,8 @@ async function urlAPK(id, cookie = '', uin = '0') {
   // 最后 fallback：旧版 mobile express 接口
   try {
     const fb = await nativeGet(
-      `https://c.y.qq.com/base/fcgi-bin/fcg_music_express_mobile3.fcg?format=json205361747&songmid=${rawId}&filename=C400${rawId}.m4a&guid=10000&uin=${uinStr}&platform=yqq&cid=205361747`
+      `https://c.y.qq.com/base/fcgi-bin/fcg_music_express_mobile3.fcg?format=json205361747&songmid=${rawId}&filename=C400${rawId}.m4a&guid=10000&uin=${uinStr}&platform=yqq&cid=205361747`,
+      cookieStr
     );
     const fi = fb?.data?.items?.[0];
     if (fi?.url) return fi.url;
@@ -117,11 +121,11 @@ async function lyricAPK(id) {
 }
 
 // ==================== 用户信息 ====================
-async function userInfoAPK(uin) {
+async function userInfoAPK(uin, cookie = '') {
   const d = await nativeGet(qqUrl({
     comm: { uin: String(uin), format: 'json', ct: 24, cv: 0 },
     req_0: { module: 'music.UserInfo.userInfoServer', method: 'GetLoginUserInfo', param: {} },
-  }));
+  }), cookie);
   const i = d?.req_0?.data;
   return {
     nickname: i?.nick || 'QQ音乐用户',
@@ -134,7 +138,7 @@ async function userInfoAPK(uin) {
 }
 
 // ==================== 用户歌单列表 ====================
-async function playlistsAPK(uin) {
+async function playlistsAPK(uin, cookie = '') {
   const d = await nativeGet(qqUrl({
     comm: { uin: String(uin), format: 'json', ct: 24, cv: 0 },
     req_0: {
@@ -142,7 +146,7 @@ async function playlistsAPK(uin) {
       method: 'GetPlaylistByUin',
       param: { uin: String(uin), num: 100, order: 0 },
     },
-  }));
+  }), cookie);
   return (d?.req_0?.data?.v_playlist || []).map((p) => ({
     id: p.tid || p.dirId || '',
     name: p.diss_name || p.dirName || '歌单',
@@ -186,7 +190,8 @@ async function loginByCookieAPK(cookie) {
   const uin = m[1];
   const key = (cookie.match(/(?:^|;\s*)(qqmusic_key|qm_keyst|p_skey|skey)=([^;]+)/) || [])[2] || '';
   try {
-    const i = await userInfoAPK(uin);
+    // 用 cookie 调用 userInfo 接口验证登录态是否有效
+    const i = await userInfoAPK(uin, cookie);
     return { code: 0, msg: 'ok', cookie, uin, key, nickname: i.nickname };
   } catch {
     return { code: 800, msg: 'cookie 验证失败' };
@@ -200,8 +205,8 @@ export const music = {
   cover: (url) => url,
   lyric: lyricAPK,
   loginByCookie: loginByCookieAPK,
-  userInfo: (_cookie, uin) => userInfoAPK(uin),
-  userPlaylists: (_cookie, uin) => playlistsAPK(uin),
+  userInfo: (cookie, uin) => userInfoAPK(uin, cookie),
+  userPlaylists: (cookie, uin) => playlistsAPK(uin, cookie),
   playlist: (id, _cookie = '') => playlistAPK(id),
 };
 
