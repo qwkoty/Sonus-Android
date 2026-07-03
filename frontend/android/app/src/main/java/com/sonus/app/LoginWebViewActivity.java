@@ -4,6 +4,7 @@ import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.content.Intent;
 import android.graphics.Bitmap;
+import android.graphics.Color;
 import android.os.Bundle;
 import android.view.View;
 import android.view.KeyEvent;
@@ -48,6 +49,8 @@ public class LoginWebViewActivity extends Activity {
         );
 
         webView = new WebView(this);
+        // 登录 WebView 加载前显示黑色背景，避免原生白屏闪烁
+        webView.setBackgroundColor(Color.BLACK);
         setContentView(webView);
 
         WebSettings settings = webView.getSettings();

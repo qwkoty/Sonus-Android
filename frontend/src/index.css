@@ -46,6 +46,8 @@ body {
   color: var(--text-primary);
   -webkit-font-smoothing: antialiased;
   overflow: hidden;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
 }
 html, body, #root { height: 100%; width: 100%; }
 

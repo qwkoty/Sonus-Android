@@ -103,7 +103,7 @@ export default function Player({ onProfile }) {
 
       {/* 顶部栏：无框独立浮动小圆按钮 */}
       <div style={{ position: 'absolute', top: 'calc(8px + var(--safe-top))', left: 'calc(12px + var(--safe-left))', right: 'calc(12px + var(--safe-right))', zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'space-between', pointerEvents: 'none' }}>
-        <RoundBtn onClick={onProfile} title="个人中心" style={{ overflow: 'hidden', padding: 0 }}>
+        <RoundBtn onClick={onProfile} title="个人中心" style={{ overflow: 'hidden', padding: 0, pointerEvents: 'auto' }}>
           {isLoggedIn && av ? <img src={av} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <User size={15} />}
         </RoundBtn>
         <div style={{ display: 'flex', gap: 8, pointerEvents: 'auto' }}>

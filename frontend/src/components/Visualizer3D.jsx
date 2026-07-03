@@ -42,7 +42,6 @@ export default function Visualizer3D({ accent = '#4FC3F7', cover = '', onReady }
     startZoom: 1.0,
     startRot: 0,
   });
-  const autoRotateRef = useRef(0);  // 自动旋转基准角
 
   // 加载封面并采样为 ImageData
   useEffect(() => {
@@ -95,7 +94,7 @@ export default function Visualizer3D({ accent = '#4FC3F7', cover = '', onReady }
     container.appendChild(renderer.domElement);
 
     const FILL = 1.0;            // 平面占可见区比例，1.0 = 撑满短边
-    const MAX_Z_RATIO = 0.22;    // Z 起伏最大占可见半边比例（仅中心，边缘衰减为 0）
+    const MAX_Z_RATIO = 0.34;    // Z 起伏最大占可见半边比例（增强飘动）
 
     let planeSize, cameraZ;
 
@@ -210,11 +209,11 @@ export default function Visualizer3D({ accent = '#4FC3F7', cover = '', onReady }
         for (let i = 32; i < 64; i++) treble += data[i];
         treble /= 32;
       } else {
-        // 待机动画：缓慢呼吸的能量起伏
+        // 待机动画：明显律动的能量起伏，让风吹效果始终可见
         const t = Date.now() * 0.001;
-        bass = 0.10 + Math.sin(t * 0.7) * 0.05;
-        mid = 0.06 + Math.sin(t * 1.1 + 1) * 0.03;
-        treble = 0.04 + Math.sin(t * 1.5 + 2) * 0.02;
+        bass = 0.20 + Math.sin(t * 0.60) * 0.10 + Math.sin(t * 1.25) * 0.06;
+        mid = 0.14 + Math.sin(t * 0.90 + 1) * 0.07;
+        treble = 0.10 + Math.sin(t * 1.20 + 2) * 0.05;
       }
       bassSmooth += (bass - bassSmooth) * 0.18;
       midSmooth += (mid - midSmooth) * 0.18;
@@ -235,11 +234,11 @@ export default function Visualizer3D({ accent = '#4FC3F7', cover = '', onReady }
 
       // 每帧更新 Z；无封面时同时更新 color
       const needColorUpdate = !hasCover;
-      // 风吹参数：增强，风从左上吹向右下，强度随时间起伏
-      const windSpeed = 2.0;
-      const windFreqX = 3.0;   // X 方向波纹频率
-      const windFreqY = 2.0;   // Y 方向波纹频率
-      const windGust = 0.8 + Math.sin(time * 0.7) * 0.35 + bassSmooth * 0.9; // 阵风强度
+      // 风吹参数：进一步增强，风从左上吹向右下，强度随时间起伏
+      const windSpeed = 2.4;
+      const windFreqX = 3.6;   // X 方向波纹频率
+      const windFreqY = 2.4;   // Y 方向波纹频率
+      const windGust = 1.0 + Math.sin(time * 0.75) * 0.45 + bassSmooth * 1.1; // 阵风强度
 
       // 主题色解析
       const accentRGB = hexToRGB(accentRef.current || '#4FC3F7');
@@ -283,16 +282,15 @@ export default function Visualizer3D({ accent = '#4FC3F7', cover = '', onReady }
       posAttr.needsUpdate = true;
       if (needColorUpdate) colorAttr.needsUpdate = true;
 
-      // ===== 电影镜头：手势驱动 + 自动缓慢旋转 =====
+      // ===== 电影镜头：仅手势驱动（无自动旋转）=====
       const g = gestureRef.current;
       g.zoom += (g.targetZoom - g.zoom) * 0.18;
       g.rotation += (g.targetRotation - g.rotation) * 0.18;
-      autoRotateRef.current += 0.002;  // 无手势时自动缓慢旋转
       // 缩放限制 0.4 ~ 3.0
       const clampedZoom = Math.max(0.4, Math.min(3.0, g.zoom));
       camera.position.z = cameraZ / clampedZoom;
-      // 粒子旋转 = 自动旋转 + 用户手势旋转
-      points.rotation.y = autoRotateRef.current + g.rotation;
+      // 仅用户手势旋转
+      points.rotation.y = g.rotation;
       // 微俯仰 + 随风轻微摇摆
       points.rotation.x = -0.18 + Math.sin(time * 0.6) * 0.04;
       points.rotation.z = Math.cos(time * 0.45) * 0.02;

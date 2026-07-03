@@ -8,9 +8,71 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <title>Sonus</title>
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      #sonus-splash {
+        position: fixed; inset: 0; z-index: 999999;
+        display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 24px;
+        background: radial-gradient(ellipse at 30% 20%, rgba(79,195,247,0.12) 0%, #000 55%, #000 100%);
+        transition: opacity .7s ease, transform .7s ease;
+      }
+      #sonus-splash.fade-out { opacity: 0; transform: scale(1.05); pointer-events: none; }
+      .splash-logo {
+        width: 96px; height: 96px; border-radius: 26px;
+        background: rgba(255,255,255,0.08);
+        backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px);
+        border: 1px solid rgba(255,255,255,0.14);
+        box-shadow: 0 0 60px rgba(79,195,247,0.25), inset 0 0 30px rgba(255,255,255,0.05);
+        display: flex; align-items: center; justify-content: center;
+        animation: splashPulse 2.2s ease-in-out infinite;
+      }
+      .splash-logo svg { width: 52px; height: 52px; }
+      .splash-text {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        font-size: 28px; font-weight: 800; letter-spacing: 6px;
+        color: #fff; text-shadow: 0 0 30px rgba(79,195,247,0.6);
+        opacity: 0; animation: splashTextIn .8s ease .3s forwards;
+      }
+      .splash-sub {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        font-size: 11px; color: rgba(255,255,255,0.45); letter-spacing: 2px;
+        opacity: 0; animation: splashTextIn .8s ease .5s forwards;
+      }
+      @keyframes splashPulse {
+        0%, 100% { transform: scale(1); box-shadow: 0 0 60px rgba(79,195,247,0.25), inset 0 0 30px rgba(255,255,255,0.05); }
+        50% { transform: scale(1.04); box-shadow: 0 0 90px rgba(79,195,247,0.45), inset 0 0 40px rgba(255,255,255,0.08); }
+      }
+      @keyframes splashTextIn {
+        from { opacity: 0; transform: translateY(12px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+    </style>
   </head>
   <body>
+    <div id="sonus-splash">
+      <div class="splash-logo">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#4FC3F7" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10" opacity="0.3"/>
+          <path d="M9 9v6l6-3-6-3z"/>
+          <path d="M19 12a7 7 0 0 1-7 7" stroke="url(#g)"/>
+          <defs><linearGradient id="g" x1="12" y1="12" x2="19" y2="12" gradientUnits="userSpaceOnUse"><stop stop-color="#4FC3F7"/><stop offset="1" stop-color="#A78BFA"/></linearGradient></defs>
+        </svg>
+      </div>
+      <div class="splash-text">SONUS</div>
+      <div class="splash-sub">沉浸式音乐可视化</div>
+    </div>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
+    <script>
+      window.addEventListener('DOMContentLoaded', function() {
+        const splash = document.getElementById('sonus-splash');
+        // 最小展示 1.2 秒，之后由 React 控制淡出
+        window.__hideSonusSplash = function() {
+          if (!splash || splash.classList.contains('fade-out')) return;
+          splash.classList.add('fade-out');
+          setTimeout(function() { splash.remove(); }, 800);
+        };
+      });
+    </script>
   </body>
 </html>
