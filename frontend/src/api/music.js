@@ -52,7 +52,7 @@ async function searchAPK(keyword, limit = 30) {
 // ==================== 播放链接 ====================
 // 多策略 fallback：先试 m4a 标准音质，空了试 mp3，再试 songtype=1（VIP）
 // cookie 字符串优先注入请求头，保证登录态有效
-async function urlAPK(id, cookie = '', uin = '0') {
+async function urlAPK(id, cookie = '', uin = '0', key = '') {
   const rawId = String(id).replace(/^qq_/, '');
   const uinStr = String(uin || '0');
   const loginflag = cookie ? 1 : 0;
@@ -63,42 +63,55 @@ async function urlAPK(id, cookie = '', uin = '0') {
     try { await CookieReader.syncStreamCookies('https://y.qq.com'); } catch {}
   }
 
-  // 策略列表：filename 格式 + songtype 组合
+  // 策略列表：音质前缀/后缀 + songtype 组合
   const strategies = [
-    { filename: `C400${rawId}.m4a`, songtype: 0 },
-    { filename: `M500${rawId}.mp3`, songtype: 0 },
-    { filename: `C400${rawId}.m4a`, songtype: 1 },
-    { filename: `M500${rawId}.mp3`, songtype: 1 },
+    { prefix: 'C400', ext: '.m4a', songtype: 0 },
+    { prefix: 'M500', ext: '.mp3', songtype: 0 },
+    { prefix: 'M800', ext: '.mp3', songtype: 0 },
+    { prefix: 'C400', ext: '.m4a', songtype: 1 },
+    { prefix: 'M500', ext: '.mp3', songtype: 1 },
   ];
 
   for (const s of strategies) {
     try {
-      const d = await nativeGet(qqUrl({
+      // 标准 filename 格式：前缀 + songmid + mediaId(默认=songmid) + 后缀
+      const file = `${s.prefix}${rawId}${rawId}${s.ext}`;
+      const guid = '10000';
+      const payload = {
         req_0: {
-          module: 'music.vkey.GetVkeyServer',
+          module: 'vkey.GetVkeyServer',
           method: 'CgiGetVkey',
           param: {
-            guid: '10000',
+            filename: [file],
+            guid,
             songmid: [rawId],
             songtype: [s.songtype],
             uin: uinStr,
             loginflag,
             platform: '20',
-            filename: [s.filename],
           },
         },
-        comm: { uin: uinStr, format: 'json', ct: 24, cv: 0 },
-      }), cookieStr);
-      console.log('[vkey]', s.filename, s.songtype, JSON.stringify(d?.req_0?.data?.midurlinfo?.[0]));
+        comm: {
+          uin: uinStr,
+          format: 'json',
+          ct: 19,
+          cv: 0,
+          authst: key || '',
+        },
+      };
+      const url = `https://u.y.qq.com/cgi-bin/musicu.fcg?-=getplaysongvkey&g_tk=5381&loginUin=${uinStr}&hostUin=0&format=json&inCharset=utf8&outCharset=utf-8&notice=0&platform=yqq.json&needNewCode=0&data=${encodeURIComponent(JSON.stringify(payload))}`;
+      const d = await nativeGet(url, cookieStr);
+      console.log('[vkey]', file, s.songtype, JSON.stringify(d?.req_0?.data?.midurlinfo?.[0]));
       const item = d?.req_0?.data?.midurlinfo?.[0];
-      const sip = d?.req_0?.data?.sip?.[0];
-      if (item?.purl && sip) {
-        const url = sip + item.purl;
+      let domain = d?.req_0?.data?.sip?.find(i => !i.startsWith('http://ws'));
+      if (!domain) domain = d?.req_0?.data?.sip?.[0];
+      if (item?.purl && domain) {
+        const url = domain + item.purl;
         console.log('[stream url]', url);
         return url;
       }
     } catch (e) {
-      console.warn('[vkey failed]', s.filename, e.message);
+      console.warn('[vkey failed]', s.songtype, e.message);
     }
   }
 

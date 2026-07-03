@@ -208,7 +208,7 @@ export default function Player({ onProfile }) {
             <div style={{ display: 'flex', gap: 8 }}>
               {VIZ_MODES.map(m => <button key={m.key} onClick={() => { setVm(m.key); try { localStorage.setItem('sonus_viz_mode', m.key) } catch { } }} className={`glass-button${vm === m.key ? ' is-active' : ''}`} style={{ flex: 1, padding: '12px 4px', borderRadius: 12, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, fontSize: 11 }}><span style={{ fontSize: 18 }}>{m.icon}</span>{m.label}</button>)}
             </div>
-            {vm === '3d' && <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 6, textAlign: 'center', lineHeight: 1.5 }}>3D 模式：双指捏合缩放，双指划拉旋转</div>}
+            {vm === '3d' && <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 6, textAlign: 'center', lineHeight: 1.5 }}>3D 模式：单指滑动旋转，双指捏合缩放，双指划拉旋转</div>}
           </div>
           <div>
             <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginBottom: 8 }}>主题色</div>

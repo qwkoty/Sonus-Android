@@ -33,8 +33,8 @@ function getCurrentLyric(lyrics, time) {
 }
 
 function authCreds() {
-  const { cookie, uin } = useAuthStore.getState();
-  return { cookie: cookie || '', uin: uin || '0' };
+  const { cookie, uin, key } = useAuthStore.getState();
+  return { cookie: cookie || '', uin: uin || '0', key: key || '' };
 }
 
 export const usePlayerStore = create((set, get) => {
@@ -132,12 +132,12 @@ export const usePlayerStore = create((set, get) => {
         set({ playlist: [...playlist, track] });
       }
 
-      const { cookie, uin } = authCreds();
+      const { cookie, uin, key } = authCreds();
 
       let url = track.url || '';
       if (!url && track.rawId) {
         try {
-          url = await music.stream(track.rawId, cookie, uin);
+          url = await music.stream(track.rawId, cookie, uin, key);
         } catch (e) {
           console.error('获取播放链接失败', e);
         }

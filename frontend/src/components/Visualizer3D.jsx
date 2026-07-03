@@ -259,16 +259,18 @@ export default function Visualizer3D({ accent = '#4FC3F7', cover = '', onReady }
         const tFreq = Math.max(0, 1 - Math.abs(dc - 0.85) * 3);
         let localEnergy = bassSmooth * bFreq + midSmooth * mFreq * 0.8 + trebleSmooth * tFreq * 0.6;
 
-        // 风吹效果：风从右侧两角吹向左侧，右侧上下角最强
-        const rightStrength = Math.pow(Math.max(0, u - 0.2) / 0.8, 1.1);
-        const cornerLift = 0.5 + Math.abs(v - 0.5); // 右上角 / 右下角更高
-        const localWind = rightStrength * cornerLift;
-
-        const wave1 = Math.sin((1 - u) * windFreqX * Math.PI + time * windSpeed) * 0.6;
-        const wave2 = Math.sin((1 - v) * windFreqY * Math.PI + time * windSpeed * 0.7) * 0.35;
-        const ripple = Math.sin(((1 - u) + v) * 10 + time * 3.0) * 0.12;
-        const swirl = Math.sin((1 - u) * 6 + v * 4 + time * 1.4) * 0.15;
-        const windZ = (wave1 + wave2 + ripple + swirl) * windGust * localWind;
+        // 风吹效果：四个角都会飘动，每个角有独立的波动相位
+        const corner = (cu, cv, phase) => {
+          const dx = u - cu, dy = v - cv;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          const strength = Math.max(0, 1 - dist * 1.6);
+          return Math.sin(dist * windFreqX * Math.PI * 2 - time * windSpeed + phase) * strength;
+        };
+        const windTR = corner(1, 0, 0);      // 右上
+        const windBR = corner(1, 1, 1.6);    // 右下
+        const windTL = corner(0, 0, 3.2);    // 左上
+        const windBL = corner(0, 1, 4.8);    // 左下
+        const windZ = (windTR + windBR + windTL + windBL) * windGust;
 
         // 音频能量叠加到 Z（中心低频推高）
         const audioZ = localEnergy * 0.8 * falloff * breath;
