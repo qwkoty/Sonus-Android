@@ -199,8 +199,17 @@ async function qqQrCheck(qrsig) {
     });
 
     const text = typeof resp.data === 'string' ? resp.data : '';
-    const match = text.match(/ptuiCB\('(\d+)','0','([^']*)','0','([^']*)','([^']*)'\)/);
-    if (!match) return { code: 66, msg: '等待扫码' };
+    // 宽松正则：不硬编码第 2/4 参数为 '0'，兼容 QQ 格式变动
+    let match = text.match(/ptuiCB\('(\d+)','[^']*','([^']*)','[^']*','([^']*)','([^']*)'\)/);
+    // fallback：严格正则（老格式）
+    if (!match) {
+      match = text.match(/ptuiCB\('(\d+)','0','([^']*)','0','([^']*)','([^']*)'\)/);
+    }
+    if (!match) {
+      // 正则都没匹配，返回诊断信息帮助定位
+      const preview = text.slice(0, 200).replace(/[\r\n]+/g, ' ');
+      return { code: 66, msg: '等待扫码', _diag: `status=${resp.status} body="${preview}"` };
+    }
 
     const [, code, redirectUrl, msg, nickname] = match;
 
