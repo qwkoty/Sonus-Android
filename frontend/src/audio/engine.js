@@ -10,10 +10,9 @@ export function getAudio() {
   if (!audio) {
     audio = new Audio();
     audio.preload = 'auto';
-    // Sonus 只作为 Android App 运行，QQ 音乐音源没有 CORS 头，
-    // 设置 crossOrigin 会导致 Audio 加载失败。这里不设置 crossOrigin，
-    // 让 Audio 元素直接请求播放；Web Audio 的 MediaElementSource 会连接失败，
-    // 可视化自动退化为待机动画。
+    // 代理服务器返回 Access-Control-Allow-Origin: *，设 crossOrigin 后
+    // Web Audio 的 createMediaElementSource 能正常读取音频数据（否则跨域静音）
+    audio.crossOrigin = 'anonymous';
   }
   return audio;
 }

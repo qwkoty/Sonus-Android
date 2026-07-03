@@ -25,6 +25,16 @@ public class AudioProxyServer extends NanoHTTPD {
 
     @Override
     public Response serve(IHTTPSession session) {
+        // 处理 CORS preflight（crossOrigin='anonymous' + Range 可能触发 OPTIONS）
+        if (Method.OPTIONS.equals(session.getMethod())) {
+            Response res = newFixedLengthResponse(Response.Status.OK, "text/plain", "");
+            res.addHeader("Access-Control-Allow-Origin", "*");
+            res.addHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
+            res.addHeader("Access-Control-Allow-Headers", "Range");
+            res.addHeader("Access-Control-Max-Age", "86400");
+            return res;
+        }
+
         String uri = session.getUri();
         // 解析目标 URL
         String targetUrl = getParam(session, "url");

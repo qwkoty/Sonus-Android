@@ -92,14 +92,18 @@ async function searchAPK(keyword, limit = 30) {
 
 // ==================== 播放链接 ====================
 // 安卓端 QQ 音乐播放链接获取
-// 最简策略：用最基本的参数请求 vkey，免费歌曲匿名即可获取 purl
+// 免费歌曲匿名即可获取 purl；VIP 歌曲需要登录态 + songtype=1
 async function urlAPK(id, cookie = '', uin = '0', _key = '', mediaMid = '') {
   const songmid = String(id).replace(/^qq_/, '');
   const cookieStr = cookie || '';
 
   // 从 cookie 中提取播放授权票据
   const musicKey = extractMusicKey(cookieStr);
-  console.log('[urlAPK] songmid:', songmid, 'mediaMid:', mediaMid || '(none)', 'hasCookie:', !!cookieStr, 'hasMusicKey:', !!musicKey);
+  console.log('[urlAPK] songmid:', songmid,
+    'mediaMid:', mediaMid || '(none)',
+    'hasCookie:', !!cookieStr,
+    'hasMusicKey:', !!musicKey,
+    'musicKeyHead:', musicKey ? musicKey.substring(0, 10) + '...' : '(none)');
 
   // 把登录 Cookie 同步到音频流域名，让 WebView Audio 播放时带登录态
   if (cookieStr) {
@@ -126,12 +130,16 @@ async function urlAPK(id, cookie = '', uin = '0', _key = '', mediaMid = '') {
   );
   const filenames = fileCandidates.map(item => item.filename);
 
-  // 两轮尝试：先匿名，再登录态
+  // 三轮尝试：
+  // 1. 匿名 + songtype=0 → 免费歌曲能拿到 purl
+  // 2. 登录态 + songtype=0 → 部分歌曲需要登录态
+  // 3. 登录态 + songtype=1 → VIP 歌曲需要标记为付费歌曲
   const attempts = [
-    { uin: '0', loginflag: 0, ct: 24, authst: null, label: '匿名', useCookie: false },
+    { uin: '0', loginflag: 0, ct: 24, authst: null, songtype: 0, label: '匿名', useCookie: false },
   ];
   if (musicKey) {
-    attempts.push({ uin: String(uin || '0'), loginflag: 1, ct: 19, authst: musicKey, label: '登录态', useCookie: true });
+    attempts.push({ uin: String(uin || '0'), loginflag: 1, ct: 19, authst: musicKey, songtype: 0, label: '登录态', useCookie: true });
+    attempts.push({ uin: String(uin || '0'), loginflag: 1, ct: 19, authst: musicKey, songtype: 1, label: 'VIP', useCookie: true });
   }
 
   for (const attempt of attempts) {
@@ -139,7 +147,7 @@ async function urlAPK(id, cookie = '', uin = '0', _key = '', mediaMid = '') {
       const param = {
         guid,
         songmid: filenames.map(() => songmid),
-        songtype: filenames.map(() => 0),
+        songtype: filenames.map(() => attempt.songtype),
         uin: attempt.uin,
         loginflag: attempt.loginflag,
         platform: '20',
@@ -164,7 +172,8 @@ async function urlAPK(id, cookie = '', uin = '0', _key = '', mediaMid = '') {
       const info = infos.find(item => item && item.purl) || infos[0];
       const purl = info?.purl;
 
-      console.log(`[vkey:${attempt.label}]`, 'purl:', purl ? 'YES' : 'NO',
+      console.log(`[vkey:${attempt.label}]`, 'songtype:', attempt.songtype,
+        'purl:', purl ? 'YES' : 'NO',
         'code:', info?.result || info?.code || '-',
         'sip:', data?.sip?.[0] || '(none)',
         'filename:', info?.filename || '(none)');
@@ -257,6 +266,7 @@ async function playlistAPK(id, cookie = '') {
     tracks: songlist.map((s) => ({
       id: `qq_${s.mid}`,
       rawId: s.mid,
+      mediaMid: s.file?.media_mid || '',
       platform: 'qq',
       title: s.name || s.title || '',
       artist: (s.singer || []).map((a) => a.name).join(' / '),
