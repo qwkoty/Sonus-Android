@@ -526,30 +526,6 @@ router.get('/login/qq/qrcode', async (req, res) => {
   }
 });
 
-// 登录：检查状态
-router.get('/login/qq/check', async (req, res) => {
-  try {
-    const { qrsig } = req.query;
-    if (!qrsig) return res.status(400).json({ error: 'qrsig required' });
-    const result = await qqQrCheck(qrsig);
-    res.json({ code: 200, data: result });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// Cookie 导入登录（绕过 ptqrlogin IP 风控的可靠方案）
-router.post('/login/qq/cookie', async (req, res) => {
-  try {
-    const { cookie } = req.body || {};
-    if (!cookie) return res.status(400).json({ error: 'cookie required' });
-    const result = await qqCookieLogin(cookie);
-    res.json({ code: 200, data: result });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
 // 前端 JSONP 拿到 redirectUrl 后，后端跟随重定向收集 cookie
 router.post('/login/qq/redirect', async (req, res) => {
   try {

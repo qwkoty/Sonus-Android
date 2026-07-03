@@ -9,7 +9,6 @@ import { useAuthStore } from '../store/useAuthStore';
 import { music } from '../api/music';
 import Visualizer from '../components/Visualizer';
 import FloatingLyrics from '../components/FloatingLyrics';
-import InlineLogin from '../components/InlineLogin';
 
 const Visualizer3D = lazy(() => import('../components/Visualizer3D'));
 const Visualizer3DPulse = lazy(() => import('../components/Visualizer3DPulse'));
@@ -209,8 +208,10 @@ export default function Player() {
   const openUserPanel = async () => {
     setUserOpen(true);
     setPlaylistDetail(null);
+    // 只有已登录才加载歌单
+    const { isLoggedIn, cookie, uin } = useAuthStore.getState();
+    if (!isLoggedIn || !cookie || !uin) return;
     if (playlists.length === 0) {
-      const { cookie, uin } = useAuthStore.getState();
       setLoadingPlaylists(true);
       try {
         const list = await music.userPlaylists(cookie, uin);
@@ -625,7 +626,7 @@ export default function Player() {
               </>
             )}
           </>
-        ) : isLoggedIn ? (
+        ) : (
           <>
             {/* 用户信息卡 */}
             <div style={{
@@ -718,9 +719,6 @@ export default function Player() {
               <LogOut size={15} /> 退出登录
             </button>
           </>
-        ) : (
-          /* 未登录：内联二维码登录 */
-          <InlineLogin />
         )}
       </Sheet>
 

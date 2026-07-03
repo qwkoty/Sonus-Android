@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { useAuthStore } from './store/useAuthStore';
 import Player from './pages/Player';
+import Login from './pages/Login';
 
 export default function App() {
   const isLoggedIn = useAuthStore((s) => s.isLoggedIn);
@@ -12,7 +13,7 @@ export default function App() {
 
   return (
     <div style={{ height: '100%', position: 'relative', background: 'var(--bg-primary)' }}>
-      <Player />
+      {isLoggedIn ? <Player /> : <Login />}
     </div>
   );
 }

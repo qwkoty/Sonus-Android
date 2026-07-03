@@ -60,10 +60,6 @@ export const music = {
   // ===== 登录 =====
   loginQrCode: () =>
     get(`/api/music/login/qq/qrcode`),
-  loginCheck: (qrsig) =>
-    get(`/api/music/login/qq/check?qrsig=${encodeURIComponent(qrsig)}`),
-  loginByCookie: (cookie) =>
-    post(`/api/music/login/qq/cookie`, { cookie }),
   loginByRedirect: (redirectUrl, qrsig) =>
     post(`/api/music/login/qq/redirect`, { redirectUrl, qrsig }),
 
