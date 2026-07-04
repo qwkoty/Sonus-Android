@@ -200,15 +200,12 @@ export default function Player({ onProfile }) {
 
       {/* 底部控制（可收起/展开） */}
       {!ctrlExpanded ? (
-        <div className="glass-panel" style={{position:'absolute',bottom:0,left:0,right:0,zIndex:50,padding:'6px 12px calc(6px + var(--safe-bottom))',borderRadius:'12px 12px 0 0',borderBottom:'none',background:'rgba(0,0,0,0.82)',display:'flex',alignItems:'center',gap:10}}>
-          <button onClick={togglePlay} className="glass-button-accent" style={{width:32,height:32,borderRadius:'50%',display:'flex',alignItems:'center',justifyContent:'center',background:ac,flexShrink:0}}>
-            {isPlaying?<Pause size={16} fill="#000"/>:<Play size={16} fill="#000" style={{marginLeft:1}}/>}
+        <div style={{position:'absolute',left:'calc(12px + var(--safe-left,0px))',bottom:'calc(12px + var(--safe-bottom))',zIndex:50,display:'flex',gap:8,alignItems:'center'}}>
+          <button onClick={togglePlay} title="播放/暂停" style={{width:40,height:40,borderRadius:'50%',border:'none',background:ac,display:'flex',alignItems:'center',justifyContent:'center',boxShadow:`0 4px 16px ${ac}55`,flexShrink:0,cursor:'pointer'}}>
+            {isPlaying?<Pause size={18} fill="#000"/>:<Play size={18} fill="#000" style={{marginLeft:1}}/>}
           </button>
-          <div style={{flex:1,minWidth:0,fontSize:11,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',color:'var(--text-secondary)'}}>
-            {currentLyric || currentTrack?.title || 'Sonus'}
-          </div>
-          <button onClick={()=>{setCtrlExpanded(true);try{localStorage.setItem('sonus_ctrl_expanded','true')}catch{}}} className="glass-button" style={{width:28,height:28,borderRadius:8,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
-            <span style={{fontSize:12,color:'var(--text-secondary)'}}>▲</span>
+          <button onClick={()=>{setCtrlExpanded(true);try{localStorage.setItem('sonus_ctrl_expanded','true')}catch{}}} title="展开控制栏" style={{width:36,height:36,borderRadius:'50%',border:'none',background:'rgba(0,0,0,0.55)',backdropFilter:'blur(10px)',WebkitBackdropFilter:'blur(10px)',display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer'}}>
+            <span style={{fontSize:14,color:'rgba(255,255,255,0.85)'}}>▲</span>
           </button>
         </div>
       ) : (

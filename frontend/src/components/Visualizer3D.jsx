@@ -125,7 +125,7 @@ export default function Visualizer3D({ accent = '#4FC3F7', cover = '', onReady }
     container.appendChild(renderer.domElement);
 
     const FILL = 1.0;            // 平面占可见区比例，1.0 = 撑满短边
-    const MAX_Z_RATIO = 0.14;    // Z 起伏最大占可见半边比例（风吹幅度收敛）
+    const MAX_Z_RATIO = 0.09;    // Z 起伏最大占可见半边比例（降低整体高度，留给冲击感）
 
     let planeSize, cameraZ;
 
@@ -223,7 +223,10 @@ export default function Visualizer3D({ accent = '#4FC3F7', cover = '', onReady }
     };
 
     let firstFrame = true;
-    let bassSmooth = 0;
+    // bass 采用 attack/release 分离：攻击快（捕捉鼓点瞬间）+ 衰减稍慢（保留余韵）
+    // bassPulse = attack 超过 release 的部分 = 短促的鼓点冲击
+    let bassAttack = 0;
+    let bassRelease = 0;
     let midSmooth = 0;
     let trebleSmooth = 0;
 
@@ -246,13 +249,20 @@ export default function Visualizer3D({ accent = '#4FC3F7', cover = '', onReady }
         mid = 0.14 + Math.sin(t * 0.90 + 1) * 0.07;
         treble = 0.10 + Math.sin(t * 1.20 + 2) * 0.05;
       }
-      bassSmooth += (bass - bassSmooth) * 0.18;
-      midSmooth += (mid - midSmooth) * 0.18;
-      trebleSmooth += (treble - trebleSmooth) * 0.18;
+      // bass：攻击快（0.55 立刻跟上鼓点）、回落稍快（0.28 不拖泥），release 慢（0.12 留余韵）
+      // 这样鼓点来时中心瞬间弹起又快速落下，形成"砰"的冲击而非缓慢起伏
+      if (bass > bassAttack) bassAttack += (bass - bassAttack) * 0.55;
+      else bassAttack += (bass - bassAttack) * 0.28;
+      bassRelease += (bass - bassRelease) * 0.12;
+      midSmooth += (mid - midSmooth) * 0.22;
+      trebleSmooth += (treble - trebleSmooth) * 0.28;
 
-      // 整体呼吸缩放：基础呼吸 + bass 增强
+      // 鼓点脉冲：攻击超过残影的部分 = 短促爆发，让震感"砸"下来
+      const bassPulse = Math.max(0, bassAttack - bassRelease);
+
+      // 整体呼吸缩放：基础呼吸 + 鼓点冲击（pulse 让画面随鼓点轻微"砸"一下，增强震感）
       const time = Date.now() * 0.001;
-      const breath = 1 + Math.sin(time * 0.6) * 0.025 + bassSmooth * 0.10;
+      const breath = 1 + Math.sin(time * 0.6) * 0.020 + bassAttack * 0.04 + bassPulse * 0.10;
       const zAmp = planeSize * MAX_Z_RATIO;
       const hasCover = hasCoverRef.current;
 
@@ -269,7 +279,7 @@ export default function Visualizer3D({ accent = '#4FC3F7', cover = '', onReady }
       const windSpeed = 2.0;
       const windFreqX = 3.0;   // X 方向波纹频率
       const windFreqY = 2.0;   // Y 方向波纹频率
-      const windGust = 1.0 + Math.sin(time * 0.7) * 0.2 + bassSmooth * 0.5; // 阵风强度（收敛）
+      const windGust = 1.0 + Math.sin(time * 0.7) * 0.15 + bassAttack * 0.25; // 阵风强度（收敛，bass 影响减小避免盖过音频冲击）
 
       // 主题色解析
       const accentRGB = hexToRGB(accentRef.current || '#4FC3F7');
@@ -284,7 +294,11 @@ export default function Visualizer3D({ accent = '#4FC3F7', cover = '', onReady }
         const bFreq = Math.max(0, 1 - dc * 3.5);                 // 中心低频：dc<0.28 有响应
         const mFreq = Math.max(0, 1 - Math.abs(dc - 0.50) * 3.6); // 中环 mid：峰值在 0.50
         const tFreq = Math.max(0, 1 - Math.abs(dc - 0.85) * 5.0); // 外环 treble：峰值在 0.85
-        let localEnergy = bassSmooth * bFreq * 1.6 + midSmooth * mFreq * 1.15 + trebleSmooth * tFreq * 0.95;
+        // bass 锐化：低电平压制、高电平突出，制造"砰"的冲击；bassPulse 叠加短促爆发
+        const bassSharp = Math.pow(bassAttack, 1.4);
+        let localEnergy = (bassSharp + bassPulse * 1.6) * bFreq * 1.1
+                        + midSmooth * mFreq * 0.85
+                        + trebleSmooth * tFreq * 0.70;
 
         // 风吹效果：作为底层微弱动画，不盖过音频
         const wave1 = Math.sin(u * windFreqX * Math.PI + time * windSpeed) * 0.18;
@@ -293,16 +307,17 @@ export default function Visualizer3D({ accent = '#4FC3F7', cover = '', onReady }
         const swirl = Math.sin(u * 6 + v * 4 + time * 1.4) * 0.05;
         const windZ = (wave1 + wave2 + ripple + swirl) * windGust;
 
-        // 音频能量叠加到 Z：中心低频鼓起，中圈 mid，外圈 treble
+        // 音频能量叠加到 Z：中心低频鼓点冲击，中圈 mid，外圈 treble
+        // 高度降低（2.4→1.15），冲击感由 bassPulse 的短促爆发承担
         const falloff = Math.pow(1 - dc, 0.75); // 边缘衰减减弱，让外圈高频也可见
-        const audioZ = localEnergy * 2.4 * falloff * breath;
+        const audioZ = localEnergy * 1.15 * falloff * breath;
 
         posAttr.array[i * 3 + 2] = (windZ + audioZ) * zAmp;
 
         if (needColorUpdate) {
           // 无封面时：按频段染色 + 中心亮外圈暗
           const windGlow = Math.abs(windZ) * 0.4;
-          const bassGlow = bFreq * bassSmooth * 1.6;
+          const bassGlow = bFreq * (bassAttack + bassPulse * 1.5) * 1.4;
           const midGlow = mFreq * midSmooth * 0.9;
           const trebleGlow = tFreq * trebleSmooth * 1.1;
           const intensity = 0.22 + localEnergy * 1.1 + windGlow;
