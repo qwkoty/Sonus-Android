@@ -251,36 +251,37 @@ export default function Visualizer3D({ accent = '#4FC3F7', cover = '', onReady }
         const dc = distFromCenter[i]; // 0 中心 ~ 1 边角
 
         // 音频响应：中心 = bass（低频），向外依次 mid、treble（高频）
-        // 三个频段按距中心距离分层，分界线更清晰
-        const bFreq = Math.max(0, 1 - dc * 2.6);                 // 中心低频：dc<0.38 有响应
-        const mFreq = Math.max(0, 1 - Math.abs(dc - 0.52) * 3.0); // 中环 mid：峰值在 0.52
-        const tFreq = Math.max(0, 1 - Math.abs(dc - 0.92) * 4.0); // 外环 treble：峰值在 0.92
-        let localEnergy = bassSmooth * bFreq * 1.3 + midSmooth * mFreq * 0.95 + trebleSmooth * tFreq * 0.75;
+        // 三个频段按距中心距离分层，分界线更锐利
+        const bFreq = Math.max(0, 1 - dc * 3.5);                 // 中心低频：dc<0.28 有响应
+        const mFreq = Math.max(0, 1 - Math.abs(dc - 0.50) * 3.6); // 中环 mid：峰值在 0.50
+        const tFreq = Math.max(0, 1 - Math.abs(dc - 0.85) * 5.0); // 外环 treble：峰值在 0.85
+        let localEnergy = bassSmooth * bFreq * 1.6 + midSmooth * mFreq * 1.15 + trebleSmooth * tFreq * 0.95;
 
-        // 风吹效果：整个面一起轻柔飘动，像旗帜被微风吹起
-        const wave1 = Math.sin(u * windFreqX * Math.PI + time * windSpeed) * 0.22;
-        const wave2 = Math.sin(v * windFreqY * Math.PI + time * windSpeed * 0.7) * 0.15;
-        const ripple = Math.sin((u + v) * 10 + time * 3.0) * 0.05;
-        const swirl = Math.sin(u * 6 + v * 4 + time * 1.4) * 0.06;
+        // 风吹效果：作为底层微弱动画，不盖过音频
+        const wave1 = Math.sin(u * windFreqX * Math.PI + time * windSpeed) * 0.18;
+        const wave2 = Math.sin(v * windFreqY * Math.PI + time * windSpeed * 0.7) * 0.12;
+        const ripple = Math.sin((u + v) * 10 + time * 3.0) * 0.04;
+        const swirl = Math.sin(u * 6 + v * 4 + time * 1.4) * 0.05;
         const windZ = (wave1 + wave2 + ripple + swirl) * windGust;
 
         // 音频能量叠加到 Z：中心低频鼓起，中圈 mid，外圈 treble
-        const falloff = Math.pow(1 - dc, 0.9); // 边缘衰减减弱，让外圈高频也可见
-        const audioZ = localEnergy * 1.5 * falloff * breath;
+        const falloff = Math.pow(1 - dc, 0.75); // 边缘衰减减弱，让外圈高频也可见
+        const audioZ = localEnergy * 2.4 * falloff * breath;
 
         posAttr.array[i * 3 + 2] = (windZ + audioZ) * zAmp;
 
         if (needColorUpdate) {
           // 无封面时：按频段染色 + 中心亮外圈暗
-          const windGlow = Math.abs(windZ) * 0.5;
-          const bassGlow = bFreq * bassSmooth * 1.2;
-          const trebleGlow = tFreq * trebleSmooth * 0.8;
-          const intensity = 0.22 + localEnergy * 0.9 + windGlow;
-          const outFactor = 1 - dc * 0.55;
-          // 中心偏白（低频亮），中间主题色，外圈偏深
-          colorAttr.array[i * 3]     = Math.min(1, accentRGB.r * intensity * outFactor + bassGlow * 0.35 + trebleGlow * 0.15);
-          colorAttr.array[i * 3 + 1] = Math.min(1, accentRGB.g * intensity * outFactor + bassGlow * 0.35 + trebleGlow * 0.15);
-          colorAttr.array[i * 3 + 2] = Math.min(1, accentRGB.b * intensity * outFactor + bassGlow * 0.35 + trebleGlow * 0.35 + windGlow * 0.3);
+          const windGlow = Math.abs(windZ) * 0.4;
+          const bassGlow = bFreq * bassSmooth * 1.6;
+          const midGlow = mFreq * midSmooth * 0.9;
+          const trebleGlow = tFreq * trebleSmooth * 1.1;
+          const intensity = 0.22 + localEnergy * 1.1 + windGlow;
+          const outFactor = 1 - dc * 0.5;
+          // 中心偏白（低频亮），中间主题色，外圈偏冷/深
+          colorAttr.array[i * 3]     = Math.min(1, accentRGB.r * intensity * outFactor + bassGlow * 0.45 + midGlow * 0.2 + trebleGlow * 0.15);
+          colorAttr.array[i * 3 + 1] = Math.min(1, accentRGB.g * intensity * outFactor + bassGlow * 0.45 + midGlow * 0.25 + trebleGlow * 0.15);
+          colorAttr.array[i * 3 + 2] = Math.min(1, accentRGB.b * intensity * outFactor + bassGlow * 0.45 + midGlow * 0.25 + trebleGlow * 0.45 + windGlow * 0.3);
         }
       }
       posAttr.needsUpdate = true;
