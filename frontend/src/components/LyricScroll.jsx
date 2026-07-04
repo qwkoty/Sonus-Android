@@ -1,22 +1,21 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 
-// 中央歌词：只显示当前正在唱的一句，切换时有上下滑动 + 淡入淡出动画
-export default function LyricScroll({ currentLyric = '', accent = '#4FC3F7' }) {
+// 中央歌词：只显示当前正在唱的一句，切换时淡入淡出
+export default function LyricScroll({ currentLyric = '', accent = '#00F5D4' }) {
   const [display, setDisplay] = useState(currentLyric);
-  const [phase, setPhase] = useState('in'); // 'in' | 'out'
-  const prevRef = useRef('');
+  const [phase, setPhase] = useState('in');
 
   useEffect(() => {
     if (currentLyric === display) return;
-    // 先淡出旧歌词，再换新歌词淡入
     setPhase('out');
     const t = setTimeout(() => {
       setDisplay(currentLyric);
       setPhase('in');
-    }, 200);
+    }, 180);
     return () => clearTimeout(t);
   }, [currentLyric, display]);
 
+  const show = display || ' ';
   return (
     <div style={{
       position: 'absolute',
@@ -27,23 +26,26 @@ export default function LyricScroll({ currentLyric = '', accent = '#4FC3F7' }) {
       display: 'flex',
       justifyContent: 'center',
       alignItems: 'center',
-      padding: '0 32px',
+      padding: '0 44px',
       zIndex: 5,
       pointerEvents: 'none',
     }}>
       <p style={{
-        fontSize: 18,
-        fontWeight: 700,
-        color: '#fff',
+        fontSize: 22,
+        fontWeight: 800,
+        lineHeight: 1.45,
         textAlign: 'center',
-        lineHeight: 1.5,
-        maxWidth: '88vw',
+        maxWidth: 'min(720px, 88vw)',
         opacity: phase === 'in' ? 1 : 0,
-        transform: phase === 'in' ? 'translateY(0)' : 'translateY(12px)',
-        transition: 'opacity .3s ease, transform .3s ease',
-        textShadow: '0 2px 12px rgba(0,0,0,0.9)',
+        transform: phase === 'in' ? 'translateY(0) scale(1)' : 'translateY(14px) scale(0.985)',
+        transition: 'opacity .32s cubic-bezier(.16,1,.3,1), transform .32s cubic-bezier(.16,1,.3,1)',
+        textShadow: `0 2px 18px rgba(0,0,0,0.95), 0 0 34px ${accent}22`,
+        background: 'linear-gradient(180deg, #fff 0%, rgba(255,255,255,0.88) 100%)',
+        WebkitBackgroundClip: 'text',
+        WebkitTextFillColor: 'transparent',
+        backgroundClip: 'text',
       }}>
-        {display || ' '}
+        {show}
       </p>
     </div>
   );

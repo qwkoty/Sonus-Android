@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 
-// 漂浮歌词粒子：一句句歌词从底部缓慢上浮，字号小、透明度低，不抢焦点
+// 漂浮歌词粒子：一句句歌词从底部缓慢上浮，营造氛围
 export default function FloatingLyrics({ lyrics, isPlaying }) {
   const canvasRef = useRef(null);
   const rafRef = useRef(null);
@@ -28,10 +28,10 @@ export default function FloatingLyrics({ lyrics, isPlaying }) {
         text: line.text,
         x: Math.random() * w,
         y: h + 20,
-        speed: 0.12 + Math.random() * 0.22,
-        opacity: 0.025 + Math.random() * 0.04,
-        size: 7 + Math.random() * 7,
-        drift: (Math.random() - 0.5) * 0.08,
+        speed: 0.10 + Math.random() * 0.18,
+        opacity: 0.018 + Math.random() * 0.032,
+        size: 6 + Math.random() * 5,
+        drift: (Math.random() - 0.5) * 0.06,
       });
     };
 
@@ -39,7 +39,7 @@ export default function FloatingLyrics({ lyrics, isPlaying }) {
     const draw = () => {
       ctx.clearRect(0, 0, w, h);
 
-      if (isPlaying && frameCount % 80 === 0) {
+      if (isPlaying && frameCount % 100 === 0) {
         spawnParticle();
       }
       frameCount++;
@@ -51,7 +51,7 @@ export default function FloatingLyrics({ lyrics, isPlaying }) {
         p.x += p.drift;
 
         const dpr = Math.min(window.devicePixelRatio || 1, 2);
-        ctx.font = `${p.size * dpr}px Inter, sans-serif`;
+        ctx.font = `${p.size * dpr}px Inter, "Noto Sans SC", sans-serif`;
         ctx.fillStyle = `rgba(255,255,255,${p.opacity})`;
         ctx.textAlign = 'center';
         ctx.fillText(p.text, p.x, p.y);
