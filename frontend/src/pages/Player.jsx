@@ -4,7 +4,7 @@ import { usePlayerStore } from '../store/usePlayerStore';
 import { useAuthStore } from '../store/useAuthStore';
 import { music } from '../api/music';
 import Visualizer from '../components/Visualizer';
-import FloatingLyrics from '../components/FloatingLyrics';
+import LyricBackground from '../components/LyricBackground';
 
 const Visualizer3D = lazy(() => import('../components/Visualizer3D'));
 
@@ -36,6 +36,26 @@ function ColorPicker({ value, onChange }) {
         <Slider label="饱和度" value={s} min={0} max={100} gradient={`linear-gradient(90deg, hsl(${h},0%,${l}%), hsl(${h},100%,${l}%))`} onChange={v => update(h, v, l)} />
         <Slider label="亮度" value={l} min={5} max={95} gradient={`linear-gradient(90deg, hsl(${h},${s}%,5%), hsl(${h},${s}%,50%), hsl(${h},${s}%,95%))`} onChange={v => update(h, s, v)} />
       </div>
+    </div>
+  );
+}
+
+function Toggle({ label, value, onChange }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+      <span style={{ fontSize: 11, color: 'var(--text-secondary)' }}>{label}</span>
+      <button
+        onClick={() => onChange(!value)}
+        style={{
+          width: 44, height: 24, borderRadius: 12, border: 'none', padding: 2,
+          background: value ? 'var(--accent-dynamic)' : 'rgba(255,255,255,0.15)',
+          display: 'flex', alignItems: 'center', justifyContent: value ? 'flex-end' : 'flex-start',
+          transition: 'background .2s ease',
+          cursor: 'pointer',
+        }}
+      >
+        <span style={{ width: 20, height: 20, borderRadius: '50%', background: '#fff', boxShadow: '0 1px 3px rgba(0,0,0,0.3)' }} />
+      </button>
     </div>
   );
 }
@@ -105,6 +125,7 @@ export default function Player({ onProfile }) {
   const [query, setQuery] = useState(''); const [results, setResults] = useState([]); const [searching, setSearching] = useState(false); const st = useRef(null);
   const [vm, setVm] = useState(()=>{try{return localStorage.getItem('sonus_viz_mode')||'ring'}catch{return'ring'}});
   const [ac, setAc] = useState(()=>{try{return localStorage.getItem('sonus_accent')||'#4FC3F7'}catch{return'#4FC3F7'}});
+  const [lyricBg, setLyricBg] = useState(()=>{try{return localStorage.getItem('sonus_lyric_bg')!=='false'}catch{return true}});
   const [v3r, setV3r] = useState(false);
   const pr = useRef(null); const [sk, setSk] = useState(false);
 
@@ -125,7 +146,7 @@ export default function Player({ onProfile }) {
     <div style={{height:'100%',position:'relative',overflow:'hidden',background:'#000'}}>
       {/* 背景歌词 + 可视化 */}
       <div style={{position:'absolute',inset:0}}>
-        <FloatingLyrics lyrics={lyrics} isPlaying={isPlaying}/>
+        {lyricBg && <LyricBackground lyric={currentLyric || ''} />}
         {vm==='3d'?<Suspense><Visualizer3D accent={ac} cover={currentTrack?.cover||''} onReady={()=>setV3r(true)}/></Suspense>:<Visualizer isPlaying={isPlaying} mode={vm} accent={ac}/>}
       </div>
 
@@ -148,11 +169,6 @@ export default function Player({ onProfile }) {
             <span style={{position:'absolute',bottom:4,right:4,width:7,height:7,borderRadius:'50%',background:ac,boxShadow:`0 0 4px ${ac}`}}/>
           </button>
         </div>
-      </div>
-
-      {/* 当前歌词 */}
-      <div style={{position:'absolute',bottom:156,left:0,right:0,display:'flex',justifyContent:'center',padding:'0 24px',zIndex:10,pointerEvents:'none'}}>
-        <p style={{fontSize:14,fontWeight:600,color:'#fff',textAlign:'center',opacity:currentLyric?1:0,transition:'opacity .3s',textShadow:'0 2px 8px rgba(0,0,0,0.9)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',maxWidth:'85vw'}}>{currentLyric||' '}</p>
       </div>
 
       {/* 底部控制 */}
@@ -219,6 +235,7 @@ export default function Player({ onProfile }) {
             </div>
           </div>
           <ColorPicker value={ac} onChange={setAc}/>
+          <Toggle label="歌词背景" value={lyricBg} onChange={v=>{setLyricBg(v);try{localStorage.setItem('sonus_lyric_bg',String(v))}catch{}}}/>
         </div>
       </Sheet>
     </div>

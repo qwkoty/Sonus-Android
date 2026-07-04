@@ -250,14 +250,12 @@ export default function Visualizer3D({ accent = '#4FC3F7', cover = '', onReady }
         const v = origUV[i * 2 + 1];
         const dc = distFromCenter[i]; // 0 中心 ~ 1 边角
 
-        // 边缘衰减：中心 1，边缘趋近 0
-        const falloff = Math.pow(1 - dc, 1.4);
-
         // 音频响应：中心 = bass（低频），向外依次 mid、treble（高频）
-        const bFreq = Math.max(0, 1 - dc * 1.8);
-        const mFreq = Math.max(0, 1 - Math.abs(dc - 0.45) * 2.5);
-        const tFreq = Math.max(0, 1 - Math.abs(dc - 0.85) * 3);
-        let localEnergy = bassSmooth * bFreq + midSmooth * mFreq * 0.8 + trebleSmooth * tFreq * 0.6;
+        // 三个频段按距中心距离分层，分界线更清晰
+        const bFreq = Math.max(0, 1 - dc * 2.6);                 // 中心低频：dc<0.38 有响应
+        const mFreq = Math.max(0, 1 - Math.abs(dc - 0.52) * 3.0); // 中环 mid：峰值在 0.52
+        const tFreq = Math.max(0, 1 - Math.abs(dc - 0.92) * 4.0); // 外环 treble：峰值在 0.92
+        let localEnergy = bassSmooth * bFreq * 1.3 + midSmooth * mFreq * 0.95 + trebleSmooth * tFreq * 0.75;
 
         // 风吹效果：整个面一起轻柔飘动，像旗帜被微风吹起
         const wave1 = Math.sin(u * windFreqX * Math.PI + time * windSpeed) * 0.22;
@@ -266,19 +264,23 @@ export default function Visualizer3D({ accent = '#4FC3F7', cover = '', onReady }
         const swirl = Math.sin(u * 6 + v * 4 + time * 1.4) * 0.06;
         const windZ = (wave1 + wave2 + ripple + swirl) * windGust;
 
-        // 音频能量叠加到 Z（中心低频推高）
-        const audioZ = localEnergy * 0.8 * falloff * breath;
+        // 音频能量叠加到 Z：中心低频鼓起，中圈 mid，外圈 treble
+        const falloff = Math.pow(1 - dc, 0.9); // 边缘衰减减弱，让外圈高频也可见
+        const audioZ = localEnergy * 1.5 * falloff * breath;
 
         posAttr.array[i * 3 + 2] = (windZ + audioZ) * zAmp;
 
         if (needColorUpdate) {
-          // 无封面时：以主题色为基础，中心亮、外圈暗，随风和音频增亮
+          // 无封面时：按频段染色 + 中心亮外圈暗
           const windGlow = Math.abs(windZ) * 0.5;
-          const intensity = 0.25 + localEnergy * 0.7 + windGlow;
-          const outFactor = 1 - dc * 0.6; // 中心亮，边缘暗
-          colorAttr.array[i * 3]     = Math.min(1, accentRGB.r * intensity * outFactor + localEnergy * 0.3);
-          colorAttr.array[i * 3 + 1] = Math.min(1, accentRGB.g * intensity * outFactor + localEnergy * 0.3);
-          colorAttr.array[i * 3 + 2] = Math.min(1, accentRGB.b * intensity * outFactor + localEnergy * 0.3 + windGlow * 0.3);
+          const bassGlow = bFreq * bassSmooth * 1.2;
+          const trebleGlow = tFreq * trebleSmooth * 0.8;
+          const intensity = 0.22 + localEnergy * 0.9 + windGlow;
+          const outFactor = 1 - dc * 0.55;
+          // 中心偏白（低频亮），中间主题色，外圈偏深
+          colorAttr.array[i * 3]     = Math.min(1, accentRGB.r * intensity * outFactor + bassGlow * 0.35 + trebleGlow * 0.15);
+          colorAttr.array[i * 3 + 1] = Math.min(1, accentRGB.g * intensity * outFactor + bassGlow * 0.35 + trebleGlow * 0.15);
+          colorAttr.array[i * 3 + 2] = Math.min(1, accentRGB.b * intensity * outFactor + bassGlow * 0.35 + trebleGlow * 0.35 + windGlow * 0.3);
         }
       }
       posAttr.needsUpdate = true;
