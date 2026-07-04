@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import { getSpectrumBars } from '../audio/engine';
+import { getProxyUrl } from '../api/music';
 
 const GRID = 142;             // 142x142 = 20164 ≈ 2 万粒子
 const FOV = 55;
@@ -46,33 +47,61 @@ export default function Visualizer3D({ accent = '#4FC3F7', cover = '', onReady }
   });
 
   // 加载封面并采样为 ImageData
+  // 通过本地代理加载，代理返回 CORS 头，img 设 crossOrigin 后 canvas 不会被污染
   useEffect(() => {
     if (!cover) { imageDataRef.current = null; hasCoverRef.current = false; return; }
     let cancelled = false;
-    const img = new Image();
-    // 不设 crossOrigin：QQ 音乐封面 CDN 无 CORS 头，设了反而加载失败
-    img.onload = () => {
-      if (cancelled) return;
+    (async () => {
       try {
-        const SIZE = GRID;
-        const c = document.createElement('canvas');
-        c.width = SIZE; c.height = SIZE;
-        const cx = c.getContext('2d');
-        // 居中裁剪为正方形后绘制
-        const iw = img.width, ih = img.height;
-        const s = Math.min(iw, ih);
-        const sx = (iw - s) / 2, sy = (ih - s) / 2;
-        cx.drawImage(img, sx, sy, s, s, 0, 0, SIZE, SIZE);
-        imageDataRef.current = cx.getImageData(0, 0, SIZE, SIZE).data;
-        hasCoverRef.current = true;
-      } catch (e) {
-        // canvas 被跨域图片污染，无法读取像素 → 退化为渐变色模式
-        imageDataRef.current = null;
-        hasCoverRef.current = false;
+        const proxyUrl = await getProxyUrl(cover);
+        if (cancelled) return;
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        img.onload = () => {
+          if (cancelled) return;
+          try {
+            const SIZE = GRID;
+            const c = document.createElement('canvas');
+            c.width = SIZE; c.height = SIZE;
+            const cx = c.getContext('2d');
+            const iw = img.width, ih = img.height;
+            const s = Math.min(iw, ih);
+            const sx = (iw - s) / 2, sy = (ih - s) / 2;
+            cx.drawImage(img, sx, sy, s, s, 0, 0, SIZE, SIZE);
+            imageDataRef.current = cx.getImageData(0, 0, SIZE, SIZE).data;
+            hasCoverRef.current = true;
+          } catch (e) {
+            imageDataRef.current = null;
+            hasCoverRef.current = false;
+          }
+        };
+        img.onerror = () => { imageDataRef.current = null; hasCoverRef.current = false; };
+        img.src = proxyUrl;
+      } catch {
+        // 代理不可用时直接加载（canvas 会被污染，退化为渐变色）
+        const img = new Image();
+        img.onload = () => {
+          if (cancelled) return;
+          try {
+            const SIZE = GRID;
+            const c = document.createElement('canvas');
+            c.width = SIZE; c.height = SIZE;
+            const cx = c.getContext('2d');
+            const iw = img.width, ih = img.height;
+            const s = Math.min(iw, ih);
+            const sx = (iw - s) / 2, sy = (ih - s) / 2;
+            cx.drawImage(img, sx, sy, s, s, 0, 0, SIZE, SIZE);
+            imageDataRef.current = cx.getImageData(0, 0, SIZE, SIZE).data;
+            hasCoverRef.current = true;
+          } catch {
+            imageDataRef.current = null;
+            hasCoverRef.current = false;
+          }
+        };
+        img.onerror = () => { imageDataRef.current = null; hasCoverRef.current = false; };
+        img.src = cover;
       }
-    };
-    img.onerror = () => { imageDataRef.current = null; hasCoverRef.current = false; };
-    img.src = cover;
+    })();
     return () => { cancelled = true; };
   }, [cover]);
 

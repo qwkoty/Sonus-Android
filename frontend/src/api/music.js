@@ -35,6 +35,11 @@ async function wrapWithProxy(streamUrl) {
   return proxyUrl;
 }
 
+// 导出：供 Visualizer3D 等组件获取代理 URL（用于封面图片跨域加载）
+export async function getProxyUrl(url) {
+  return await wrapWithProxy(url);
+}
+
 // 原生 HTTP GET：优先使用传入的 cookie 字符串，否则从 CookieManager 读取
 async function nativeGet(url, cookieString = '') {
   const r = cookieString

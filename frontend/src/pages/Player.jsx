@@ -14,6 +14,30 @@ function fmt(s) { if (!s||isNaN(s)) return '0:00'; const m=Math.floor(s/60), sec
 const VIZ_MODES = [{ key:'ring',label:'环',icon:'◯'},{ key:'wave',label:'波',icon:'〜'},{ key:'3d',label:'3D',icon:'◆'}];
 const PRESETS = ['#4FC3F7','#A78BFA','#FF6B9D','#4ADE80','#FB923C','#FACC15','#C0C0C0','#FFFFFF','#EF4444','#22D3EE'];
 
+function hexToHsl(hex) {
+  const c = hex.replace('#','');
+  const r = parseInt(c.substring(0,2),16)/255;
+  const g = parseInt(c.substring(2,4),16)/255;
+  const b = parseInt(c.substring(4,6),16)/255;
+  const max=Math.max(r,g,b), min=Math.min(r,g,b);
+  let h=0,s=0,l=(max+min)/2;
+  if(max!==min){const d=max-min; s=l>0.5?d/(2-max-min):d/(max+min);
+    if(max===r) h=((g-b)/d+(g<b?6:0));
+    else if(max===g) h=((b-r)/d+2);
+    else h=((r-g)/d+4);
+    h/=6;}
+  return [Math.round(h*360),Math.round(s*100),Math.round(l*100)];
+}
+function hslToHex(h,s,l) {
+  s/=100; l/=100;
+  const c=(1-Math.abs(2*l-1))*s; const x=c*(1-Math.abs(((h/60)%2)-1)); const m=l-c/2;
+  let r,g,b;
+  if(h<60)[r,g,b]=[c,x,0]; else if(h<120)[r,g,b]=[x,c,0]; else if(h<180)[r,g,b]=[0,c,x];
+  else if(h<240)[r,g,b]=[0,x,c]; else if(h<300)[r,g,b]=[x,0,c]; else [r,g,b]=[c,0,x];
+  const toHex=v=>Math.round((v+m)*255).toString(16).padStart(2,'0');
+  return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+}
+
 // 完整 DIY 调色盘：预设 + 色相/饱和度/亮度三轴
 function ColorPicker({ value, onChange }) {
   const [h, s, l] = hexToHsl(value);
@@ -150,7 +174,7 @@ export default function Player({ onProfile }) {
       <div style={{position:'absolute',inset:0}}>
         <FloatingLyrics lyrics={lyrics} isPlaying={isPlaying}/>
         {vm==='3d'?<Suspense><Visualizer3D accent={ac} cover={currentTrack?.cover||''} onReady={()=>setV3r(true)}/></Suspense>:<Visualizer isPlaying={isPlaying} mode={vm} accent={ac}/>}
-        {lyricPanel && <LyricScroll lyrics={lyrics} currentTime={currentTime} accent={ac}/>}
+        {lyricPanel && <LyricScroll currentLyric={currentLyric || ''} accent={ac}/>}
       </div>
 
       {/* 加载 */}
@@ -175,56 +199,52 @@ export default function Player({ onProfile }) {
       </div>
 
       {/* 底部控制（可收起/展开） */}
-      <div className="glass-panel" style={{position:'absolute',bottom:0,left:0,right:0,zIndex:50,borderRadius:ctrlExpanded?'18px 18px 0 0':'12px 12px 0 0',borderBottom:'none',background:'rgba(0,0,0,0.82)',transition:'border-radius .25s ease'}}>
-        {/* 收起态：只留一条播放/歌曲信息条 */}
-        {!ctrlExpanded && (
-          <div style={{display:'flex',alignItems:'center',gap:10,padding:'10px 14px calc(10px + var(--safe-bottom))'}}>
-            <button onClick={togglePlay} className="glass-button-accent" style={{width:36,height:36,borderRadius:'50%',display:'flex',alignItems:'center',justifyContent:'center',background:ac,flexShrink:0}}>
-              {isPlaying?<Pause size={18} fill="#000"/>:<Play size={18} fill="#000" style={{marginLeft:1}}/>}
-            </button>
-            <div style={{flex:1,minWidth:0}} onClick={()=>{setCtrlExpanded(true);try{localStorage.setItem('sonus_ctrl_expanded','true')}catch{}}}>
-              <div style={{fontSize:12,fontWeight:600,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{currentTrack?.title||'Sonus'}</div>
-              <div style={{fontSize:10,color:'var(--text-secondary)',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{currentLyric || (currentTrack?.artist||'点击展开控制栏')}</div>
-            </div>
-            <button onClick={()=>{setCtrlExpanded(true);try{localStorage.setItem('sonus_ctrl_expanded','true')}catch{}}} className="glass-button" style={{width:34,height:34,borderRadius:9,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
-              <span style={{fontSize:16,color:'var(--text-secondary)'}}>▲</span>
-            </button>
+      {!ctrlExpanded ? (
+        <div className="glass-panel" style={{position:'absolute',bottom:0,left:0,right:0,zIndex:50,padding:'6px 12px calc(6px + var(--safe-bottom))',borderRadius:'12px 12px 0 0',borderBottom:'none',background:'rgba(0,0,0,0.82)',display:'flex',alignItems:'center',gap:10}}>
+          <button onClick={togglePlay} className="glass-button-accent" style={{width:32,height:32,borderRadius:'50%',display:'flex',alignItems:'center',justifyContent:'center',background:ac,flexShrink:0}}>
+            {isPlaying?<Pause size={16} fill="#000"/>:<Play size={16} fill="#000" style={{marginLeft:1}}/>}
+          </button>
+          <div style={{flex:1,minWidth:0,fontSize:11,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',color:'var(--text-secondary)'}}>
+            {currentLyric || currentTrack?.title || 'Sonus'}
           </div>
-        )}
-        {/* 展开态：完整控制栏 */}
-        {ctrlExpanded && (
-          <div style={{padding:'10px 14px calc(10px + var(--safe-bottom))'}}>
-            <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:8}}>
-              <span style={{fontSize:10,color:'var(--text-secondary)',minWidth:30,textAlign:'right'}}>{fmt(currentTime)}</span>
-              <div ref={pr} onMouseDown={hp} onTouchStart={hp} style={{flex:1,height:14,display:'flex',alignItems:'center',cursor:'pointer',touchAction:'none'}}>
-                <div style={{width:'100%',height:3,borderRadius:3,background:'rgba(255,255,255,0.1)',position:'relative',overflow:'visible'}}>
-                  <div style={{width:`${pct}%`,height:'100%',borderRadius:3,background:ac,boxShadow:`0 0 6px ${ac}`,transition:sk?'none':'width .15s linear'}}/>
-                  <div style={{position:'absolute',left:`calc(${pct}% - 4px)`,top:'50%',transform:'translateY(-50%)',width:9,height:9,borderRadius:'50%',background:'#fff',opacity:sk?1:0.4,transition:'opacity .2s'}}/>
-                </div>
+          <button onClick={()=>{setCtrlExpanded(true);try{localStorage.setItem('sonus_ctrl_expanded','true')}catch{}}} className="glass-button" style={{width:28,height:28,borderRadius:8,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
+            <span style={{fontSize:12,color:'var(--text-secondary)'}}>▲</span>
+          </button>
+        </div>
+      ) : (
+        <div className="glass-panel" style={{position:'absolute',bottom:0,left:0,right:0,zIndex:50,padding:'10px 14px calc(10px + var(--safe-bottom))',borderRadius:'18px 18px 0 0',borderBottom:'none',background:'rgba(0,0,0,0.82)'}}>
+          {/* 进度 */}
+          <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:8}}>
+            <span style={{fontSize:10,color:'var(--text-secondary)',minWidth:30,textAlign:'right'}}>{fmt(currentTime)}</span>
+            <div ref={pr} onMouseDown={hp} onTouchStart={hp} style={{flex:1,height:14,display:'flex',alignItems:'center',cursor:'pointer',touchAction:'none'}}>
+              <div style={{width:'100%',height:3,borderRadius:3,background:'rgba(255,255,255,0.1)',position:'relative',overflow:'visible'}}>
+                <div style={{width:`${pct}%`,height:'100%',borderRadius:3,background:ac,boxShadow:`0 0 6px ${ac}`,transition:sk?'none':'width .15s linear'}}/>
+                <div style={{position:'absolute',left:`calc(${pct}% - 4px)`,top:'50%',transform:'translateY(-50%)',width:9,height:9,borderRadius:'50%',background:'#fff',opacity:sk?1:0.4,transition:'opacity .2s'}}/>
               </div>
-              <span style={{fontSize:10,color:'var(--text-secondary)',minWidth:30}}>{fmt(duration)}</span>
             </div>
-            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:6}}>
-              <button onClick={toggleMode} className="glass-button" style={{width:34,height:34,borderRadius:9,display:'flex',alignItems:'center',justifyContent:'center',color:mc}}>{mi}</button>
-              <div style={{display:'flex',alignItems:'center',gap:8}}>
-                <button onClick={prev} className="glass-button" style={{width:38,height:38,borderRadius:10,display:'flex',alignItems:'center',justifyContent:'center'}}><SkipBack size={20} fill="currentColor"/></button>
-                <button onClick={togglePlay} className="glass-button-accent" style={{width:50,height:50,borderRadius:'50%',display:'flex',alignItems:'center',justifyContent:'center',background:ac,boxShadow:`0 0 20px ${ac}40`}}>
-                  {isPlaying?<Pause size={22} fill="#000"/>:<Play size={22} fill="#000" style={{marginLeft:2}}/>}
-                </button>
-                <button onClick={next} className="glass-button" style={{width:38,height:38,borderRadius:10,display:'flex',alignItems:'center',justifyContent:'center'}}><SkipForward size={20} fill="currentColor"/></button>
-              </div>
-              <div style={{display:'flex',alignItems:'center',gap:4,minWidth:80,justifyContent:'flex-end'}}>
-                <button onClick={()=>{setCtrlExpanded(false);try{localStorage.setItem('sonus_ctrl_expanded','false')}catch{}}} className="glass-button" style={{width:32,height:32,borderRadius:8,display:'flex',alignItems:'center',justifyContent:'center'}}>
-                  <span style={{fontSize:14,color:'var(--text-secondary)'}}>▼</span>
-                </button>
-                <Volume2 size={14} color="var(--text-secondary)"/>
-                <input type="range" min="0" max="1" step="0.01" value={volume} onChange={e=>setVolume(parseFloat(e.target.value))} style={{width:46,accentColor:ac}}/>
-                <button onClick={()=>setQo(true)} className="glass-button" style={{width:32,height:32,borderRadius:8,display:'flex',alignItems:'center',justifyContent:'center'}}><ListMusic size={16} color="var(--text-secondary)"/></button>
-              </div>
+            <span style={{fontSize:10,color:'var(--text-secondary)',minWidth:30}}>{fmt(duration)}</span>
+          </div>
+          {/* 按钮 */}
+          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:6}}>
+            <button onClick={toggleMode} className="glass-button" style={{width:34,height:34,borderRadius:9,display:'flex',alignItems:'center',justifyContent:'center',color:mc}}>{mi}</button>
+            <div style={{display:'flex',alignItems:'center',gap:8}}>
+              <button onClick={prev} className="glass-button" style={{width:38,height:38,borderRadius:10,display:'flex',alignItems:'center',justifyContent:'center'}}><SkipBack size={20} fill="currentColor"/></button>
+              <button onClick={togglePlay} className="glass-button-accent" style={{width:50,height:50,borderRadius:'50%',display:'flex',alignItems:'center',justifyContent:'center',background:ac,boxShadow:`0 0 20px ${ac}40`}}>
+                {isPlaying?<Pause size={22} fill="#000"/>:<Play size={22} fill="#000" style={{marginLeft:2}}/>}
+              </button>
+              <button onClick={next} className="glass-button" style={{width:38,height:38,borderRadius:10,display:'flex',alignItems:'center',justifyContent:'center'}}><SkipForward size={20} fill="currentColor"/></button>
+            </div>
+            <div style={{display:'flex',alignItems:'center',gap:4,minWidth:80,justifyContent:'flex-end'}}>
+              <Volume2 size={14} color="var(--text-secondary)"/>
+              <input type="range" min="0" max="1" step="0.01" value={volume} onChange={e=>setVolume(parseFloat(e.target.value))} style={{width:50,accentColor:ac}}/>
+              <button onClick={()=>setQo(true)} className="glass-button" style={{width:32,height:32,borderRadius:8,display:'flex',alignItems:'center',justifyContent:'center'}}><ListMusic size={16} color="var(--text-secondary)"/></button>
+              <button onClick={()=>{setCtrlExpanded(false);try{localStorage.setItem('sonus_ctrl_expanded','false')}catch{}}} className="glass-button" style={{width:28,height:28,borderRadius:8,display:'flex',alignItems:'center',justifyContent:'center'}}>
+                <span style={{fontSize:11,color:'var(--text-secondary)'}}>▼</span>
+              </button>
             </div>
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* 错误 */}
       {error && <div className="glass-panel" style={{position:'absolute',top:'calc(56px + var(--safe-top))',left:'50%',transform:'translateX(-50%)',zIndex:300,padding:'8px 16px',borderRadius:12,fontSize:12,color:'#FCA5A5',background:'rgba(180,40,40,0.2)',borderColor:'rgba(248,113,113,0.3)'}}>{error}</div>}
