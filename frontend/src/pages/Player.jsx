@@ -19,8 +19,8 @@ const VIZ_MODES = [
 
 const VIZ_3D_MODES = [
   { key: 'coverflow', label: '粒子封面' },
-  { key: 'soundhalo', label: '音波光环' },
-  { key: 'liquidmetal', label: '液态金属' }
+  { key: 'orb', label: '粒子球体' },
+  { key: 'helix', label: '螺旋' }
 ];
 
 const PRESETS = [
@@ -176,9 +176,10 @@ export default function Player({ onProfile }) {
   const [controlsExpanded, setControlsExpanded] = useState(true);
   const [query, setQuery] = useState(''); const [results, setResults] = useState([]); const [searching, setSearching] = useState(false); const st = useRef(null);
   const [vm, setVm] = useState(() => { try { return localStorage.getItem('sonus_viz_mode') || 'ring' } catch { return 'ring' } });
-  const [v3m, setV3m] = useState(() => { try { const v = localStorage.getItem('sonus_3d_mode'); return v === 'silk' || !v ? 'coverflow' : v; } catch { return 'coverflow' } });
+  const [v3m, setV3m] = useState(() => { try { const v = localStorage.getItem('sonus_3d_mode'); const valid = ['coverflow','orb','helix']; return valid.includes(v) ? v : 'coverflow'; } catch { return 'coverflow' } });
   const [ac, setAc] = useState(() => { try { return localStorage.getItem('sonus_accent') || '#00F5D4' } catch { return '#00F5D4' } });
   const [lyricPanel, setLyricPanel] = useState(() => { try { return localStorage.getItem('sonus_lyric_panel') !== 'false' } catch { return true } });
+  const [vizTab, setVizTab] = useState('调色');
   const pr = useRef(null); const [sk, setSk] = useState(false);
 
   const pct = duration ? (currentTime / duration) * 100 : 0;
@@ -242,6 +243,7 @@ export default function Player({ onProfile }) {
           <div style={{ fontSize: 10.5, color: 'var(--text-secondary)', marginTop: 2, letterSpacing: '.3px' }}>{currentTrack?.artist || '搜索开始播放'}</div>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
+          <button onClick={() => setQo(true)} className={`glass-button ${qo ? 'is-active' : ''}`} style={{ width: 40, height: 40, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><ListMusic size={18} /></button>
           <button onClick={openSearch} className={`glass-button ${sq ? 'is-active' : ''}`} style={{ width: 40, height: 40, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Search size={18} /></button>
           <button onClick={openViz} className={`glass-button ${viz ? 'is-active' : ''}`} style={{ width: 40, height: 40, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
             <SlidersHorizontal size={18} />
@@ -307,14 +309,13 @@ export default function Player({ onProfile }) {
             <button onClick={next} className="glass-button" style={{ width: 28, height: 28, borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.78)' }}><SkipForward size={17} fill="currentColor" /></button>
           </div>
 
-          {/* 模式 / 音量 / 队列 / 收起 */}
+          {/* 模式 / 音量 / 收起 */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexShrink: 0 }}>
             <button onClick={toggleMode} className={`glass-button ${playMode !== 'list' ? 'is-active' : ''}`} style={{ width: 26, height: 26, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{mi}</button>
             <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
               {volume > 0 ? <Volume2 size={11} color="var(--text-secondary)" /> : <VolumeX size={11} color="var(--text-secondary)" />}
               <input type="range" min="0" max="1" step="0.01" value={volume} onChange={e => setVolume(parseFloat(e.target.value))} style={{ width: 44, accentColor: ac }} />
             </div>
-            <button onClick={() => setQo(true)} className={`glass-button ${qo ? 'is-active' : ''}`} style={{ width: 26, height: 26, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><ListMusic size={14} /></button>
             <button onClick={() => setControlsExpanded(false)} className="glass-button" style={{ width: 26, height: 26, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><ChevronDown size={15} /></button>
           </div>
         </div>
@@ -341,33 +342,53 @@ export default function Player({ onProfile }) {
             : results.map(t => <Row key={t.id} track={t} active={currentTrack?.id === t.id} onPlay={tr => { playTrack(tr); setSq(false); }} />)}
       </FloatPanel>
 
-      {/* 队列 Sheet */}
-      <Sheet open={qo} onClose={() => setQo(false)} title={`队列 · ${playlist.length}`}>
+      {/* 队列浮窗 */}
+      <FloatPanel open={qo} onClose={() => setQo(false)} title={`队列 · ${playlist.length}`} width={380}>
         {playlist.length === 0 ? <div style={{ textAlign: 'center', padding: 28, color: 'var(--text-muted)', fontSize: 12 }}>搜索添加歌曲</div>
           : playlist.map(t => <Row key={t.id} track={t} active={currentTrack?.id === t.id} onPlay={tr => { playTrack(tr); setQo(false); }} />)}
-      </Sheet>
+      </FloatPanel>
 
       {/* 可视化设置浮窗 */}
       <FloatPanel open={viz} onClose={() => setViz(false)} title="视觉设置" width={340}>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 18, padding: '4px 2px' }}>
-          <div>
-            <div style={{ fontSize: 10, fontWeight: 760, letterSpacing: '.14em', color: 'var(--fc-muted)', textTransform: 'uppercase', marginBottom: 10 }}>可视化</div>
-            <div style={{ display: 'flex', gap: 8 }}>
-              {VIZ_MODES.map(m => <button key={m.key} onClick={() => { setVm(m.key); try { localStorage.setItem('sonus_viz_mode', m.key); } catch { } }} className={`glass-button${vm === m.key ? ' is-active' : ''}`} style={{ flex: 1, padding: '14px 4px', borderRadius: 14, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, fontSize: 11, transition: 'all .2s' }}><span style={{ fontSize: 20 }}>{m.icon}</span>{m.label}</button>)}
-            </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14, padding: '4px 2px' }}>
+          {/* 导航栏 */}
+          <div style={{ display: 'flex', gap: 6, padding: '2px', borderRadius: 12, background: 'rgba(255,255,255,0.05)' }}>
+            {['调色', '可视化', '额外'].map(tab => (
+              <button key={tab} onClick={() => setVizTab(tab)} style={{ flex: 1, padding: '8px 0', borderRadius: 10, border: 'none', background: vizTab === tab ? 'rgba(255,255,255,0.12)' : 'transparent', color: vizTab === tab ? '#fff' : 'var(--text-secondary)', fontSize: 12, fontWeight: vizTab === tab ? 700 : 500, cursor: 'pointer', transition: 'all .2s ease' }}>{tab}</button>
+            ))}
           </div>
-          {vm === '3d' && (
-            <div>
-              <div style={{ fontSize: 10, fontWeight: 760, letterSpacing: '.14em', color: 'var(--fc-muted)', textTransform: 'uppercase', marginBottom: 10 }}>3D 形态</div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
-                {VIZ_3D_MODES.map(m => (
-                  <button key={m.key} onClick={() => { setV3m(m.key); try { localStorage.setItem('sonus_3d_mode', m.key); } catch { } }} className={`glass-button${v3m === m.key ? ' is-active' : ''}`} style={{ padding: '10px 4px', borderRadius: 12, fontSize: 11 }}>{m.label}</button>
-                ))}
+
+          {/* 调色 */}
+          {vizTab === '调色' && (
+            <ColorPicker value={ac} onChange={setAc} />
+          )}
+
+          {/* 可视化 */}
+          {vizTab === '可视化' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <div>
+                <div style={{ fontSize: 10, fontWeight: 760, letterSpacing: '.14em', color: 'var(--fc-muted)', textTransform: 'uppercase', marginBottom: 10 }}>可视化</div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  {VIZ_MODES.map(m => <button key={m.key} onClick={() => { setVm(m.key); try { localStorage.setItem('sonus_viz_mode', m.key); } catch { } }} className={`glass-button${vm === m.key ? ' is-active' : ''}`} style={{ flex: 1, padding: '14px 4px', borderRadius: 14, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, fontSize: 11, transition: 'all .2s' }}><span style={{ fontSize: 20 }}>{m.icon}</span>{m.label}</button>)}
+                </div>
               </div>
+              {vm === '3d' && (
+                <div>
+                  <div style={{ fontSize: 10, fontWeight: 760, letterSpacing: '.14em', color: 'var(--fc-muted)', textTransform: 'uppercase', marginBottom: 10 }}>3D 形态</div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
+                    {VIZ_3D_MODES.map(m => (
+                      <button key={m.key} onClick={() => { setV3m(m.key); try { localStorage.setItem('sonus_3d_mode', m.key); } catch { } }} className={`glass-button${v3m === m.key ? ' is-active' : ''}`} style={{ padding: '10px 4px', borderRadius: 12, fontSize: 11 }}>{m.label}</button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
-          <ColorPicker value={ac} onChange={setAc} />
-          <Toggle label="歌词面板" value={lyricPanel} onChange={v => { setLyricPanel(v); try { localStorage.setItem('sonus_lyric_panel', String(v)); } catch { } }} />
+
+          {/* 额外设置 */}
+          {vizTab === '额外' && (
+            <Toggle label="歌词面板" value={lyricPanel} onChange={v => { setLyricPanel(v); try { localStorage.setItem('sonus_lyric_panel', String(v)); } catch { } }} />
+          )}
         </div>
       </FloatPanel>
     </div>

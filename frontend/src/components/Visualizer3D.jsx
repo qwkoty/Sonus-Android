@@ -36,7 +36,7 @@ function createParticleTexture() {
 
 // 3D 封面粒子画：2 万粒子构成可切换的动画形态
 // 电影镜头：用户双指捏合缩放 + 双指划拉旋转（手势驱动），同时自动 360° 旋转
-// 动画预设：coverflow（粒子封面） / sphere（星球轨道） / tunnel（音律隧道） / ripple（涟漪封面） / soundhalo（音波光环） / liquidmetal（液态金属）
+// 动画预设：coverflow（粒子封面） / orb（粒子球体） / helix（螺旋）
 export default function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', onReady }) {
   const containerRef = useRef(null);
   const accentRef = useRef(accent);
@@ -145,8 +145,8 @@ export default function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'c
     const FILL = 1.0;
     const MAX_Z_RATIO = 0.09;
     const DOME_DEPTH_RATIO = 0.22;       // 穹顶弯曲，比之前更圆润
-    const HALO_RADIUS_RATIO = 0.95;
-    const LIQUID_RADIUS_RATIO = 0.58;
+    const ORB_RADIUS_RATIO = 0.52;
+    const HELIX_RADIUS_RATIO = 0.42;
 
     let planeSize, cameraZ;
 
@@ -191,27 +191,28 @@ export default function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'c
           distFromCenter[idx] = dc;
 
           let bx = 0, by = 0, bz = 0, nx = 0, ny = 0, nz = 0;
-          if (shape === 'liquidmetal') {
+          if (shape === 'orb') {
+            // 粒子球体：均匀分布的球面
             const theta = u * Math.PI * 2;
             const phi = (v - 0.5) * Math.PI;
-            const r = planeSize * LIQUID_RADIUS_RATIO;
+            const r = planeSize * ORB_RADIUS_RATIO;
             bx = r * Math.cos(phi) * Math.cos(theta);
             by = r * Math.sin(phi);
             bz = r * Math.cos(phi) * Math.sin(theta);
             const len = Math.hypot(bx, by, bz) || 1;
             nx = bx / len; ny = by / len; nz = bz / len;
-          } else if (shape === 'soundhalo') {
-            // 音波光环：5 条同心窄环带，封面像素沿环展开
-            const bands = 5;
-            const band = Math.min(bands - 1, Math.floor(u * bands));
-            const bandU = u * bands - band;
-            const ringBase = 0.20 + band * 0.15;
-            const ringR = (ringBase + bandU * 0.035) * planeSize * HALO_RADIUS_RATIO;
-            const theta = v * Math.PI * 2;
-            bx = ringR * Math.cos(theta);
-            by = ringR * Math.sin(theta);
-            bz = 0;
-            nx = Math.cos(theta); ny = Math.sin(theta); nz = 0;
+          } else if (shape === 'helix') {
+            // 螺旋：两条螺旋带缠绕上升，封面像素沿带展开
+            const turns = 3.5;
+            const phase = Math.floor(v * 2) * Math.PI; // 0 或 π
+            const t = u * turns * Math.PI * 2 + phase;
+            const bandW = (v * 2 - Math.floor(v * 2) - 0.5) * planeSize * 0.12;
+            const r = planeSize * HELIX_RADIUS_RATIO + bandW;
+            bx = r * Math.cos(t);
+            by = r * Math.sin(t);
+            bz = (u - 0.5) * planeSize * 1.6;
+            const len = Math.hypot(bx, by) || 1;
+            nx = bx / len; ny = by / len; nz = 0;
           } else {
             // coverflow（粒子封面）默认形态：轻微穹顶平面
             bx = x; by = y;
@@ -239,7 +240,7 @@ export default function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'c
     geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
 
     const material = new THREE.PointsMaterial({
-      size: planeSize * 2 / GRID * (shape === 'soundhalo' ? 1.35 : 1.0),  // 光环模式粒子稍粗
+      size: planeSize * 2 / GRID * 1.0,    // 填充比 1，粒子紧密相连
       map: createParticleTexture(),
       vertexColors: true,
       transparent: true,
@@ -265,23 +266,22 @@ export default function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'c
       const i = (py * GRID + px) * 4;
       return [d[i] / 255, d[i + 1] / 255, d[i + 2] / 255];
     };
-    const sampleCoverLight = (u, v) => {
-      const s = sampleCover(u, v);
-      if (!s) return 0.5;
-      return (s[0] * 0.299 + s[1] * 0.587 + s[2] * 0.114);
-    };
-
     const applyCoverColors = () => {
       if (!hasCoverRef.current) return false;
+      const accentMix = shape === 'orb' ? 0.45 : shape === 'helix' ? 0.35 : 0.0;
+      const accentRGB = hexToRGB(accentRef.current || '#4FC3F7');
       for (let i = 0; i < COUNT; i++) {
         const u = origUV[i * 2];
         const v = origUV[i * 2 + 1];
         const s = sampleCover(u, v);
         const boost = 1.18;
         const minBright = 0.22;
-        colorAttr.array[i * 3]     = Math.min(1, Math.max(s[0] * boost, minBright * (0.8 + s[0])));
-        colorAttr.array[i * 3 + 1] = Math.min(1, Math.max(s[1] * boost, minBright * (0.8 + s[1])));
-        colorAttr.array[i * 3 + 2] = Math.min(1, Math.max(s[2] * boost, minBright * (0.8 + s[2])));
+        const r = Math.min(1, Math.max(s[0] * boost, minBright * (0.8 + s[0])));
+        const g = Math.min(1, Math.max(s[1] * boost, minBright * (0.8 + s[1])));
+        const b = Math.min(1, Math.max(s[2] * boost, minBright * (0.8 + s[2])));
+        colorAttr.array[i * 3]     = r * (1 - accentMix) + accentRGB.r * accentMix;
+        colorAttr.array[i * 3 + 1] = g * (1 - accentMix) + accentRGB.g * accentMix;
+        colorAttr.array[i * 3 + 2] = b * (1 - accentMix) + accentRGB.b * accentMix;
         coverLight[i] = s[0] * 0.299 + s[1] * 0.587 + s[2] * 0.114;
       }
       colorAttr.needsUpdate = true;
@@ -329,8 +329,7 @@ export default function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'c
         if (applyCoverColors()) appliedCoverVersionRef.current = coverVersionRef.current;
       }
 
-      const needColorUpdate = !hasCover;
-      const windSpeed = 1.6;
+      const needColorUpdate = !hasCover || shape === 'orb' || shape === 'helix';
       const accentRGB = hexToRGB(accentRef.current || '#4FC3F7');
 
       for (let i = 0; i < COUNT; i++) {
@@ -355,36 +354,28 @@ export default function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'c
           x = bx + waveX * amp;
           y = by + waveY * amp;
           z = bz + waveZ * amp;
-        } else if (shape === 'soundhalo') {
-          // 音波光环：5 条同心窄环带自转 + 低频外扩 + 高频波纹
-          const bands = 5;
-          const band = Math.min(bands - 1, Math.floor(u * bands));
-          const bandU = u * bands - band;
-          const ringBase = 0.20 + band * 0.15;
-          const ringR = (ringBase + bandU * 0.035) * planeSize * HALO_RADIUS_RATIO;
-          const theta = v * Math.PI * 2 + time * 0.25;
-          const expand = bassAttack * planeSize * 0.12;
-          const ripple = midSmooth * Math.sin(u * Math.PI * 8 + time * 2) * planeSize * 0.03;
-          const rNow = ringR + expand + ripple;
-          const waveZ = trebleSmooth * Math.sin(theta * 20 + time * 5) * planeSize * 0.04;
-          x = rNow * Math.cos(theta);
-          y = rNow * Math.sin(theta);
-          z = waveZ + bassPulse * Math.exp(-dc * dc * 2) * planeSize * 0.06;
-        } else if (shape === 'liquidmetal') {
-          // 液态金属：球面按封面亮度隆起 + 表面张力回归 + 低频脉动 + 鼓点热点
-          const baseR = planeSize * LIQUID_RADIUS_RATIO;
-          const light = coverLight[i] || 0.5;
-          const targetR = baseR * (0.82 + light * 0.36);
-          let r = targetR;
-          r *= (1 + bassAttack * 0.10);
-          r += midSmooth * Math.sin(u * 40 + time * 3) * planeSize * 0.03;
-          r += trebleSmooth * Math.sin(v * 50 - time * 4) * planeSize * 0.015;
-          const hot1 = Math.exp(-Math.pow((u - 0.3) * 6, 2) - Math.pow((v - 0.3) * 6, 2));
-          const hot2 = Math.exp(-Math.pow((u - 0.7) * 6, 2) - Math.pow((v - 0.6) * 6, 2));
-          r += bassPulse * (hot1 + hot2) * planeSize * 0.18;
+        } else if (shape === 'orb') {
+          // 粒子球体：每个粒子绑定独立频段，沿法线径向脉动
+          const bandIdx = i % 64;
+          const freq = hasData ? data[bandIdx] : 0.12 + Math.sin(time * 1.8 + i * 0.08) * 0.07;
+          const particleEnergy = Math.min(1, freq * 1.6);
+          const baseR = planeSize * ORB_RADIUS_RATIO;
+          const r = baseR * (1 + particleEnergy * 0.32 + midSmooth * 0.10) + bassPulse * planeSize * 0.14;
           x = nx * r;
           y = ny * r;
           z = nz * r;
+        } else if (shape === 'helix') {
+          // 螺旋：低频半径脉动 + 高频 z 向抖动 + 鼓点整体爆发
+          const turns = 3.5;
+          const phase = Math.floor(v * 2) * Math.PI;
+          const t = u * turns * Math.PI * 2 + phase + time * 0.35;
+          const bandW = (v * 2 - Math.floor(v * 2) - 0.5) * planeSize * 0.12;
+          const baseR = planeSize * HELIX_RADIUS_RATIO;
+          const r = baseR * (1 + bassAttack * 0.24 + midSmooth * 0.12) + bandW + trebleSmooth * Math.sin(u * 30 + time * 4) * planeSize * 0.03;
+          const zz = (u - 0.5) * planeSize * 1.6 + trebleSmooth * Math.sin(t * 3) * planeSize * 0.05 + bassPulse * planeSize * 0.10;
+          x = r * Math.cos(t);
+          y = r * Math.sin(t);
+          z = zz;
         }
 
         posAttr.array[i * 3] = x;
@@ -392,12 +383,24 @@ export default function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'c
         posAttr.array[i * 3 + 2] = z;
 
         if (needColorUpdate) {
-          const windGlow = Math.abs(z - bz) / (planeSize * 0.12 + 0.001) * 0.12;
-          const intensity = 0.35 + totalEnergy * 1.6 + windGlow;
+          let intensity = 0;
+          if (shape === 'orb') {
+            const bandIdx = i % 64;
+            const freq = hasData ? data[bandIdx] : 0.12 + Math.sin(time * 1.8 + i * 0.08) * 0.07;
+            const light = hasCover ? coverLight[i] : 0.5;
+            intensity = 0.45 + freq * 2.0 + bassPulse * 0.8 + light * 0.3;
+          } else if (shape === 'helix') {
+            const bandIdx = Math.floor(u * 32) % 32;
+            const freq = hasData ? data[bandIdx] : 0.10 + Math.sin(time * 2 + u * 10) * 0.05;
+            intensity = 0.42 + freq * 1.8 + bassPulse * 0.7;
+          } else {
+            const windGlow = Math.abs(z - bz) / (planeSize * 0.12 + 0.001) * 0.12;
+            intensity = 0.35 + totalEnergy * 1.6 + windGlow;
+          }
           const outFactor = 1 - dc * 0.25;
           colorAttr.array[i * 3]     = Math.min(1, accentRGB.r * intensity * outFactor + bassPulse * 0.65);
           colorAttr.array[i * 3 + 1] = Math.min(1, accentRGB.g * intensity * outFactor + bassPulse * 0.65);
-          colorAttr.array[i * 3 + 2] = Math.min(1, accentRGB.b * intensity * outFactor + bassPulse * 0.65 + windGlow * 0.35);
+          colorAttr.array[i * 3 + 2] = Math.min(1, accentRGB.b * intensity * outFactor + bassPulse * 0.65);
         }
       }
       posAttr.needsUpdate = true;
@@ -484,7 +487,7 @@ export default function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'c
       computeLayout();
       buildBase();
       posAttr.needsUpdate = true;
-      material.size = planeSize * 2 / GRID * (shape === 'soundhalo' ? 1.35 : 1.0);
+      material.size = planeSize * 2 / GRID * 1.0;
       renderer.setSize(W, H);
     };
     window.addEventListener('resize', handleResize);
