@@ -336,11 +336,11 @@ export default function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'c
         let x = bx, y = by, z = bz;
 
         if (shape === 'coverflow') {
-          // 粒子封面：整个面 3D 飘动，幅度更小、更柔和，无膨胀
+          // 粒子封面：整个面 3D 飘动，幅度固定、无膨胀
           const waveX = Math.sin(u * 5 * Math.PI + time * 0.8) * Math.cos(v * 3 * Math.PI + time * 0.5) * 0.22;
           const waveY = Math.cos(u * 4 * Math.PI + time * 0.6) * Math.sin(v * 5 * Math.PI + time * 0.7) * 0.22;
           const waveZ = Math.sin((u + v) * 6 * Math.PI + time * 0.9) * 0.28 + Math.sin(dc * 8 - time * 1.2) * 0.08;
-          const amp = zAmp * (1 + totalEnergy * 0.2);
+          const amp = zAmp; // 固定幅度，不随音频能量变化
           x = bx + waveX * amp;
           y = by + waveY * amp;
           z = bz + waveZ * amp;

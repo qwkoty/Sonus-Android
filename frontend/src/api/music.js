@@ -230,6 +230,7 @@ async function userInfoAPK(uin, cookie = '') {
     avatar: i?.headpic || '',
     uin: String(uin),
     vipLevel: i?.vipLevel || 0,
+    isVip: !!(i?.isVip || i?.vip || i?.vipStatus || i?.svipLevel || i?.payPackId),
     follow: i?.follow || 0,
     fans: i?.fans || 0,
   };
