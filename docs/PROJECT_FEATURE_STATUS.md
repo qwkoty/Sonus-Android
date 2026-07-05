@@ -36,7 +36,7 @@
 |---|---|---|---|---|---|---|---|
 | 启动屏 Splash | HTML 内嵌启动动画，React 挂载后淡出 | `frontend/index.html` | 无 | ✅ | 否 | - | 最少展示 1.2s |
 | 玻璃态设计语言 | 统一的背景、边框、阴影、模糊效果 | `frontend/src/index.css` | CSS 变量 | ✅ | 否 | - | `.glass-*` 系列类名 |
-| 主播放器页面布局 | 顶部栏、可视化背景、底部控制胶囊、进度条 | `frontend/src/pages/Player.jsx` | 多个组件 | ✅ | 否 | - | 横屏优先 |
+| 主播放器页面布局 | 顶部栏、可视化背景、浮窗搜索/调色、可收起底部控制栏、进度条 | `frontend/src/pages/Player.jsx` | 多个组件 | ✅ | 否 | - | 横屏优先 |
 | 搜索 Sheet | 底部弹出搜索面板，实时搜索并播放 | `frontend/src/pages/Player.jsx` | `music.search` | ✅ | 否 | - | 防抖 350ms |
 | 播放队列 Sheet | 展示当前播放队列，支持点击切歌 | `frontend/src/pages/Player.jsx` | `usePlayerStore` | ✅ | 否 | - | - |
 | 视觉设置 Sheet | 切换可视化模式、调色、开关歌词面板 | `frontend/src/pages/Player.jsx` | 本地状态 | ✅ | 否 | - | 持久化到 localStorage |
@@ -65,7 +65,7 @@
 |---|---|---|---|---|---|---|---|
 | 2D 环状频谱 | 径向频谱、中心波形、bass 冲击波 | `frontend/src/components/Visualizer.jsx` | Web Audio | ✅ | 否 | - | ring 模式 |
 | 2D 镜像波形 | 上下镜像频谱带 + 时间域波形 | `frontend/src/components/Visualizer.jsx` | Web Audio | ✅ | 否 | - | wave 模式 |
-| 3D 封面粒子画 | 2 万粒子呈现封面，随音频起伏 | `frontend/src/components/Visualizer3D.jsx` | Three.js | ✅ | 否 | - | 3d 模式 |
+| 3D 封面粒子画 | 1.2 万粒子呈现封面，随音频起伏并自动 360° 旋转 | `frontend/src/components/Visualizer3D.jsx` | Three.js | ✅ | 否 | - | 3d 模式，手势偏移叠加 |
 | 3D 手势控制 | 单指旋转、双指缩放/旋转 | `frontend/src/components/Visualizer3D.jsx` | 触摸事件 | ✅ | 否 | - | - |
 | 音频待机动画 | 无音频时的呼吸/涟漪动画 | `Visualizer.jsx` / `Visualizer3D.jsx` | 时间驱动 | ✅ | 否 | - | - |
 
@@ -195,3 +195,4 @@
 | 日期 | 版本 | 更新内容 | 更新人 |
 |---|---|---|---|
 | 2026-07-05 | v1.0 | 初始版本，基于 Sonus 项目现状建立 | AI Assistant |
+| 2026-07-05 | v1.1 | Player UI：搜索/调色改为浮窗；底部控制栏可收起/展开；禁用全局文本选择；3D 可视化开启 360° 自转并优化性能 | AI Assistant |

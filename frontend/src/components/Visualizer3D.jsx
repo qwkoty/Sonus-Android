@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { getSpectrumBars } from '../audio/engine';
 import { getProxyUrl } from '../api/music';
 
-const GRID = 142;             // 142x142 = 20164 ≈ 2 万粒子
+const GRID = 110;             // 110x110 = 12100，平衡效果与移动端性能
 const FOV = 55;
 
 function hexToRGB(hex) {
@@ -109,8 +109,8 @@ export default function Visualizer3D({ accent = '#4FC3F7', cover = '', onReady }
     const container = containerRef.current;
     if (!container) return;
 
-    // 安卓原生 GPU 性能充足，使用完整 dpr + 抗锯齿
-    const dpr = window.devicePixelRatio || 1;
+    // 限制 dpr 上限，降低高分辨率屏渲染压力
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
     let W = container.offsetWidth;
     let H = container.offsetHeight;
 
@@ -192,6 +192,7 @@ export default function Visualizer3D({ accent = '#4FC3F7', cover = '', onReady }
     scene.add(points);
 
     let raf;
+    let baseRotation = 0;
     const posAttr = geometry.attributes.position;
     const colorAttr = geometry.attributes.color;
 
@@ -331,15 +332,17 @@ export default function Visualizer3D({ accent = '#4FC3F7', cover = '', onReady }
       posAttr.needsUpdate = true;
       if (needColorUpdate) colorAttr.needsUpdate = true;
 
-      // ===== 电影镜头：仅手势驱动（无自动旋转）=====
+      // ===== 电影镜头：自动 360° 旋转 + 手势偏移 =====
       const g = gestureRef.current;
       g.zoom += (g.targetZoom - g.zoom) * 0.18;
       g.rotation += (g.targetRotation - g.rotation) * 0.18;
       // 缩放限制 0.4 ~ 3.0
       const clampedZoom = Math.max(0.4, Math.min(3.0, g.zoom));
       camera.position.z = cameraZ / clampedZoom;
-      // 仅用户手势旋转
-      points.rotation.y = g.rotation;
+
+      // 自动 360° 慢速旋转，并叠加用户手势偏移
+      baseRotation += 0.002;
+      points.rotation.y = baseRotation + g.rotation;
       // 微俯仰 + 随风轻微摇摆
       points.rotation.x = -0.18 + Math.sin(time * 0.6) * 0.04;
       points.rotation.z = Math.cos(time * 0.45) * 0.02;
