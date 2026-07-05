@@ -36,8 +36,8 @@ function createParticleTexture() {
 
 // 3D 封面粒子画：2 万粒子构成可切换的动画形态
 // 电影镜头：用户双指捏合缩放 + 双指划拉旋转（手势驱动），同时自动 360° 旋转
-// 动画预设：silk（丝绸穹顶） / sphere（星球轨道） / tunnel（音律隧道） / ripple（涟漪封面）
-export default function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'silk', onReady }) {
+// 动画预设：coverflow（粒子封面） / sphere（星球轨道） / tunnel（音律隧道） / ripple（涟漪封面） / soundhalo（音波光环） / liquidmetal（液态金属）
+export default function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', onReady }) {
   const containerRef = useRef(null);
   const accentRef = useRef(accent);
   const coverRef = useRef(cover);
@@ -126,7 +126,7 @@ export default function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 's
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
-    const shape = mode || 'silk';
+    const shape = mode || 'coverflow';
 
     const dpr = window.devicePixelRatio || 1;
     let W = container.offsetWidth;
@@ -147,6 +147,8 @@ export default function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 's
     const DOME_DEPTH_RATIO = 0.22;       // 穹顶弯曲，比之前更圆润
     const SPHERE_RADIUS_RATIO = 0.78;
     const TUNNEL_RADIUS_RATIO = 0.55;
+    const HALO_RADIUS_RATIO = 0.95;
+    const LIQUID_RADIUS_RATIO = 0.72;
 
     let planeSize, cameraZ;
 
@@ -172,6 +174,7 @@ export default function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 's
     const distFromCenter = new Float32Array(COUNT);
     const basePositions = new Float32Array(COUNT * 3);
     const baseNormals = new Float32Array(COUNT * 3);
+    const coverLight = new Float32Array(COUNT);
 
     const buildBase = () => {
       let idx = 0;
@@ -190,10 +193,10 @@ export default function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 's
           distFromCenter[idx] = dc;
 
           let bx = 0, by = 0, bz = 0, nx = 0, ny = 0, nz = 0;
-          if (shape === 'sphere') {
+          if (shape === 'sphere' || shape === 'liquidmetal') {
             const theta = u * Math.PI * 2;
             const phi = (v - 0.5) * Math.PI;
-            const r = planeSize * SPHERE_RADIUS_RATIO;
+            const r = planeSize * (shape === 'liquidmetal' ? LIQUID_RADIUS_RATIO : SPHERE_RADIUS_RATIO);
             bx = r * Math.cos(phi) * Math.cos(theta);
             by = r * Math.sin(phi);
             bz = r * Math.cos(phi) * Math.sin(theta);
@@ -210,8 +213,15 @@ export default function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 's
           } else if (shape === 'ripple') {
             bx = x; by = y; bz = 0;
             nx = 0; ny = 0; nz = 1;
+          } else if (shape === 'soundhalo') {
+            const ringR = (0.18 + u * 0.72) * planeSize * HALO_RADIUS_RATIO;
+            const theta = v * Math.PI * 2;
+            bx = ringR * Math.cos(theta);
+            by = ringR * Math.sin(theta);
+            bz = 0;
+            nx = Math.cos(theta); ny = Math.sin(theta); nz = 0;
           } else {
-            // silk（默认）
+            // coverflow（粒子封面）默认形态：轻微穹顶平面
             bx = x; by = y;
             bz = -planeSize * DOME_DEPTH_RATIO * (1 - Math.cos(dc * Math.PI / 2));
             nx = 0; ny = 0; nz = 1;
@@ -263,6 +273,11 @@ export default function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 's
       const i = (py * GRID + px) * 4;
       return [d[i] / 255, d[i + 1] / 255, d[i + 2] / 255];
     };
+    const sampleCoverLight = (u, v) => {
+      const s = sampleCover(u, v);
+      if (!s) return 0.5;
+      return (s[0] * 0.299 + s[1] * 0.587 + s[2] * 0.114);
+    };
 
     const applyCoverColors = () => {
       if (!hasCoverRef.current) return false;
@@ -275,6 +290,7 @@ export default function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 's
         colorAttr.array[i * 3]     = Math.max(s[0] * boost, minBright * (0.6 + s[0]));
         colorAttr.array[i * 3 + 1] = Math.max(s[1] * boost, minBright * (0.6 + s[1]));
         colorAttr.array[i * 3 + 2] = Math.max(s[2] * boost, minBright * (0.6 + s[2]));
+        coverLight[i] = s[0] * 0.299 + s[1] * 0.587 + s[2] * 0.114;
       }
       colorAttr.needsUpdate = true;
       return true;
@@ -338,7 +354,16 @@ export default function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 's
 
         let x = bx, y = by, z = bz;
 
-        if (shape === 'sphere') {
+        if (shape === 'coverflow') {
+          // 粒子封面：整个面 3D 飘动，无膨胀
+          const waveX = Math.sin(u * 6 * Math.PI + time * 0.9) * Math.cos(v * 4 * Math.PI + time * 0.6) * 0.5;
+          const waveY = Math.cos(u * 5 * Math.PI + time * 0.7) * Math.sin(v * 7 * Math.PI + time * 0.8) * 0.5;
+          const waveZ = Math.sin((u + v) * 8 * Math.PI + time * 1.1) * 0.6 + Math.sin(dc * 10 - time * 1.5) * 0.2;
+          const amp = zAmp * (1 + totalEnergy * 0.3);
+          x = bx + waveX * amp;
+          y = by + waveY * amp;
+          z = bz + waveZ * amp;
+        } else if (shape === 'sphere') {
           // 星球：径向呼吸 + 高频闪烁 + 鼓点冲击
           const flare = trebleSmooth * Math.sin(u * Math.PI * 6 + time * 2.8 + v * Math.PI * 4) * 0.55;
           const disp = (totalEnergy * 0.35 + bassPulse * 1.2 * Math.exp(-dc * dc * 2) + flare) * planeSize * 0.30;
@@ -357,16 +382,32 @@ export default function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 's
           const ring = Math.sin(dc * 14 - time * 2.8) * Math.exp(-dc * 1.6) * (0.45 + totalEnergy * 0.9);
           const impact = bassPulse * Math.exp(-dc * dc * 3.5) * 1.6;
           z = (ring + impact) * planeSize * 0.14;
-        } else {
-          // silk（丝绸穹顶）：液体绸缎波动 + 鼓皮膨胀
-          const wave1 = Math.sin(u * 4 * Math.PI + time * windSpeed) * 0.22;
-          const wave2 = Math.sin(v * 3 * Math.PI + time * windSpeed * 0.8 + 1.2) * 0.18;
-          const wave3 = Math.sin((u + v) * 5 * Math.PI + time * windSpeed * 1.3) * 0.10;
-          const swirl = Math.sin(dc * 8 - time * 1.2) * 0.08;
-          const windZ = (wave1 + wave2 + wave3 + swirl) * (1 + totalEnergy * 0.4);
-          const inflate = totalEnergy * Math.cos(dc * Math.PI / 2) * 0.7;
-          const pulse = bassPulse * Math.exp(-dc * dc * 4) * 1.3;
-          z = bz + (windZ + inflate + pulse) * zAmp;
+        } else if (shape === 'soundhalo') {
+          // 音波光环：多层同心环自转 + 低频外扩 + 高频波纹
+          const ringR = (0.18 + u * 0.72) * planeSize * HALO_RADIUS_RATIO;
+          const theta = v * Math.PI * 2 + time * 0.25;
+          const expand = bassAttack * planeSize * 0.12;
+          const ripple = midSmooth * Math.sin(u * Math.PI * 8 + time * 2) * planeSize * 0.03;
+          const rNow = ringR + expand + ripple;
+          const waveZ = trebleSmooth * Math.sin(theta * 20 + time * 5) * planeSize * 0.04;
+          x = rNow * Math.cos(theta);
+          y = rNow * Math.sin(theta);
+          z = waveZ + bassPulse * Math.exp(-dc * dc * 2) * planeSize * 0.06;
+        } else if (shape === 'liquidmetal') {
+          // 液态金属：球面按封面亮度隆起 + 表面张力回归 + 低频脉动 + 鼓点热点
+          const baseR = planeSize * LIQUID_RADIUS_RATIO;
+          const light = coverLight[i] || 0.5;
+          const targetR = baseR * (0.82 + light * 0.36);
+          let r = targetR;
+          r *= (1 + bassAttack * 0.10);
+          r += midSmooth * Math.sin(u * 40 + time * 3) * planeSize * 0.03;
+          r += trebleSmooth * Math.sin(v * 50 - time * 4) * planeSize * 0.015;
+          const hot1 = Math.exp(-Math.pow((u - 0.3) * 6, 2) - Math.pow((v - 0.3) * 6, 2));
+          const hot2 = Math.exp(-Math.pow((u - 0.7) * 6, 2) - Math.pow((v - 0.6) * 6, 2));
+          r += bassPulse * (hot1 + hot2) * planeSize * 0.18;
+          x = nx * r;
+          y = ny * r;
+          z = nz * r;
         }
 
         posAttr.array[i * 3] = x;

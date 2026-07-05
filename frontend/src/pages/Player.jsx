@@ -18,10 +18,12 @@ const VIZ_MODES = [
 ];
 
 const VIZ_3D_MODES = [
-  { key: 'silk', label: '丝绸' },
+  { key: 'coverflow', label: '粒子封面' },
   { key: 'sphere', label: '星球' },
   { key: 'tunnel', label: '隧道' },
-  { key: 'ripple', label: '涟漪' }
+  { key: 'ripple', label: '涟漪' },
+  { key: 'soundhalo', label: '音波光环' },
+  { key: 'liquidmetal', label: '液态金属' }
 ];
 
 const PRESETS = [
@@ -177,7 +179,7 @@ export default function Player({ onProfile }) {
   const [controlsExpanded, setControlsExpanded] = useState(true);
   const [query, setQuery] = useState(''); const [results, setResults] = useState([]); const [searching, setSearching] = useState(false); const st = useRef(null);
   const [vm, setVm] = useState(() => { try { return localStorage.getItem('sonus_viz_mode') || 'ring' } catch { return 'ring' } });
-  const [v3m, setV3m] = useState(() => { try { return localStorage.getItem('sonus_3d_mode') || 'silk' } catch { return 'silk' } });
+  const [v3m, setV3m] = useState(() => { try { const v = localStorage.getItem('sonus_3d_mode'); return v === 'silk' || !v ? 'coverflow' : v; } catch { return 'coverflow' } });
   const [ac, setAc] = useState(() => { try { return localStorage.getItem('sonus_accent') || '#00F5D4' } catch { return '#00F5D4' } });
   const [lyricPanel, setLyricPanel] = useState(() => { try { return localStorage.getItem('sonus_lyric_panel') !== 'false' } catch { return true } });
   const pr = useRef(null); const [sk, setSk] = useState(false);
