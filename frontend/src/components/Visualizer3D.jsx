@@ -43,6 +43,8 @@ export default function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 's
   const coverRef = useRef(cover);
   const imageDataRef = useRef(null);  // 封面像素 RGBA
   const hasCoverRef = useRef(false);
+  const coverVersionRef = useRef(0);
+  const appliedCoverVersionRef = useRef(-1);
   const onReadyRef = useRef(onReady);
   useEffect(() => { onReadyRef.current = onReady; }, [onReady]);
   useEffect(() => { accentRef.current = accent; }, [accent]);
@@ -65,6 +67,7 @@ export default function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 's
 
   // 加载封面并采样为 ImageData
   useEffect(() => {
+    coverVersionRef.current += 1;
     if (!cover) { imageDataRef.current = null; hasCoverRef.current = false; return; }
     let cancelled = false;
     (async () => {
@@ -234,7 +237,7 @@ export default function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 's
     geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
 
     const material = new THREE.PointsMaterial({
-      size: planeSize * 2 / GRID * 0.85,   // 0.8~0.9 填充比，粒子更饱满、不分散
+      size: planeSize * 2 / GRID * 1.0,    // 填充比 1，粒子紧密相连
       map: createParticleTexture(),
       vertexColors: true,
       transparent: true,
@@ -261,7 +264,6 @@ export default function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 's
       return [d[i] / 255, d[i + 1] / 255, d[i + 2] / 255];
     };
 
-    let coverColorApplied = false;
     const applyCoverColors = () => {
       if (!hasCoverRef.current) return false;
       for (let i = 0; i < COUNT; i++) {
@@ -315,10 +317,8 @@ export default function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 's
       const zAmp = planeSize * MAX_Z_RATIO;
       const hasCover = hasCoverRef.current;
 
-      if (hasCover && !coverColorApplied) {
-        coverColorApplied = applyCoverColors();
-      } else if (!hasCover) {
-        coverColorApplied = false;
+      if (hasCover && appliedCoverVersionRef.current !== coverVersionRef.current) {
+        if (applyCoverColors()) appliedCoverVersionRef.current = coverVersionRef.current;
       }
 
       const needColorUpdate = !hasCover;
@@ -466,8 +466,7 @@ export default function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 's
       computeLayout();
       buildBase();
       posAttr.needsUpdate = true;
-      material.size = planeSize * 2 / GRID * 0.85;
-      coverColorApplied = false;
+      material.size = planeSize * 2 / GRID * 1.0;
       renderer.setSize(W, H);
     };
     window.addEventListener('resize', handleResize);

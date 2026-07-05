@@ -6,7 +6,6 @@ import { music } from '../api/music';
 import Visualizer from '../components/Visualizer';
 import FloatingLyrics from '../components/FloatingLyrics';
 import LyricScroll from '../components/LyricScroll';
-import LyricStage from '../components/LyricStage';
 
 const Visualizer3D = lazy(() => import('../components/Visualizer3D'));
 
@@ -200,9 +199,13 @@ export default function Player({ onProfile }) {
   const hp = (e) => {
     if (!pr.current || !duration || !isFinite(duration)) return;
     setSk(true);
+    const startX = e.touches && e.touches.length ? e.touches[0].clientX : e.clientX;
     const up = cx => { const r = pr.current.getBoundingClientRect(); seek(Math.max(0, Math.min(1, (cx - r.left) / r.width)) * duration); };
-    up(e.clientX);
-    const mv = ev => up(ev.touches ? ev.touches[0].clientX : ev.clientX);
+    up(startX);
+    const mv = ev => {
+      const cx = ev.touches && ev.touches.length ? ev.touches[0].clientX : ev.clientX;
+      up(cx);
+    };
     const uu = () => { setSk(false); document.removeEventListener('mousemove', mv); document.removeEventListener('mouseup', uu); document.removeEventListener('touchmove', mv); document.removeEventListener('touchend', uu); };
     document.addEventListener('mousemove', mv); document.addEventListener('mouseup', uu); document.addEventListener('touchmove', mv); document.addEventListener('touchend', uu);
   };
@@ -216,7 +219,6 @@ export default function Player({ onProfile }) {
       <div style={{ position: 'absolute', inset: 0 }}>
         <FloatingLyrics lyrics={lyrics} isPlaying={isPlaying} />
         {vm === '3d' ? <Suspense><Visualizer3D accent={ac} cover={currentTrack?.cover || ''} mode={v3m} /></Suspense> : <Visualizer isPlaying={isPlaying} mode={vm} accent={ac} />}
-        {lyricPanel && <LyricStage accent={ac} isPlaying={isPlaying} />}
         {lyricPanel && <LyricScroll currentLyric={currentLyric || ''} accent={ac} />}
       </div>
 
@@ -250,12 +252,12 @@ export default function Player({ onProfile }) {
       </div>
 
       {/* 底部进度条（独立） */}
-      <div style={{ position: 'absolute', left: '50%', bottom: 'calc(74px + var(--safe-bottom))', transform: 'translateX(-50%)', width: 'min(720px, calc(100% - 48px))', zIndex: 50, display: 'flex', alignItems: 'center', gap: 10 }}>
+      <div style={{ position: 'absolute', left: controlsExpanded ? '50%' : 188, bottom: 'calc(74px + var(--safe-bottom))', transform: controlsExpanded ? 'translateX(-50%)' : 'none', width: controlsExpanded ? 'min(720px, calc(100% - 48px))' : 'min(320px, calc(100% - 220px))', zIndex: 50, display: 'flex', alignItems: 'center', gap: 10, transition: 'left .3s ease, width .3s ease, transform .3s ease' }}>
         <span style={{ fontSize: 10.5, color: 'var(--text-muted)', minWidth: 34, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{fmt(currentTime)}</span>
         <div ref={pr} onMouseDown={hp} onTouchStart={hp} style={{ flex: 1, height: 18, display: 'flex', alignItems: 'center', cursor: 'pointer', touchAction: 'none' }}>
-          <div style={{ width: '100%', height: 4, borderRadius: 999, background: 'rgba(255,255,255,0.09)', position: 'relative', overflow: 'visible', boxShadow: 'inset 0 1px 1px rgba(255,255,255,0.12), inset 0 -1px 1px rgba(0,0,0,0.25)', transition: 'height .2s, background .2s' }}>
+          <div style={{ width: '100%', height: controlsExpanded ? 4 : 3, borderRadius: 999, background: 'rgba(255,255,255,0.09)', position: 'relative', overflow: 'visible', boxShadow: 'inset 0 1px 1px rgba(255,255,255,0.12), inset 0 -1px 1px rgba(0,0,0,0.25)', transition: 'height .2s, background .2s' }}>
             <div style={{ width: `${pct}%`, height: '100%', borderRadius: 999, background: `linear-gradient(90deg, rgba(255,255,255,0.92), ${ac})`, boxShadow: `0 0 14px ${ac}44`, transition: sk ? 'none' : 'width .12s linear' }} />
-            <div style={{ position: 'absolute', left: `${pct}%`, top: '50%', transform: 'translate(-50%,-50%)', width: 12, height: 12, borderRadius: '50%', background: 'radial-gradient(circle at 34% 28%, #fff 0, #fff 28%, rgba(194,235,255,0.86) 74%)', boxShadow: '0 0 0 1px rgba(255,255,255,0.34), 0 0 18px rgba(178,229,255,0.28)', opacity: sk ? 1 : 0, transition: 'opacity .16s, transform .16s', pointerEvents: 'none' }} />
+            <div style={{ position: 'absolute', left: `${pct}%`, top: '50%', transform: 'translate(-50%,-50%)', width: controlsExpanded ? 12 : 9, height: controlsExpanded ? 12 : 9, borderRadius: '50%', background: 'radial-gradient(circle at 34% 28%, #fff 0, #fff 28%, rgba(194,235,255,0.86) 74%)', boxShadow: '0 0 0 1px rgba(255,255,255,0.34), 0 0 18px rgba(178,229,255,0.28)', opacity: sk ? 1 : 0, transition: 'opacity .16s, transform .16s, width .2s, height .2s', pointerEvents: 'none' }} />
           </div>
         </div>
         <span style={{ fontSize: 10.5, color: 'var(--text-muted)', minWidth: 34, fontVariantNumeric: 'tabular-nums' }}>{fmt(duration)}</span>
