@@ -20,18 +20,8 @@ export default function App() {
     }
   }, [isLoggedIn, fetchUserInfo]);
 
-  // React 挂载且首帧渲染后淡出 HTML 启动动画
-  useEffect(() => {
-    const hide = () => {
-      if (typeof window !== 'undefined' && window.__hideSonusSplash) {
-        window.__hideSonusSplash();
-      }
-    };
-    // 保证至少展示 1.2 秒
-    const t = setTimeout(hide, 1200);
-    requestAnimationFrame(() => requestAnimationFrame(hide));
-    return () => clearTimeout(t);
-  }, []);
+  // 启动页由 HTML 内嵌脚本独立控制，需用户点击品牌名/任意处进入，
+  // React 不再主动隐藏 splash，避免打断完整的品牌动画。
 
   // 未登录且主动打开登录页时，全屏显示 Login（可返回）
   if (view === 'login' && !isLoggedIn) {

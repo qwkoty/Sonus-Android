@@ -34,11 +34,10 @@ function createParticleTexture() {
   return tex;
 }
 
-// 3D 封面粒子画：2 万粒子构成一个轻微弯曲的“封面穹顶”
-// 电影镜头：用户双指捏合缩放 + 双指划拉旋转（手势驱动）
-// 布幔动画：多层正弦波像液体绸缎一样在封面上流动，音频能量让整体穹顶像鼓皮一样膨胀
-// 视觉优化：粒子使用圆形纹理、间距加大；不再做中心低频/外圈高频的分层，整体随音乐呼吸起伏
-export default function Visualizer3D({ accent = '#4FC3F7', cover = '', onReady }) {
+// 3D 封面粒子画：2 万粒子构成可切换的动画形态
+// 电影镜头：用户双指捏合缩放 + 双指划拉旋转（手势驱动），同时自动 360° 旋转
+// 动画预设：silk（丝绸穹顶） / sphere（星球轨道） / tunnel（音律隧道） / ripple（涟漪封面）
+export default function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'silk', onReady }) {
   const containerRef = useRef(null);
   const accentRef = useRef(accent);
   const coverRef = useRef(cover);
@@ -65,7 +64,6 @@ export default function Visualizer3D({ accent = '#4FC3F7', cover = '', onReady }
   });
 
   // 加载封面并采样为 ImageData
-  // 通过本地代理加载，代理返回 CORS 头，img 设 crossOrigin 后 canvas 不会被污染
   useEffect(() => {
     if (!cover) { imageDataRef.current = null; hasCoverRef.current = false; return; }
     let cancelled = false;
@@ -96,7 +94,6 @@ export default function Visualizer3D({ accent = '#4FC3F7', cover = '', onReady }
         img.onerror = () => { imageDataRef.current = null; hasCoverRef.current = false; };
         img.src = proxyUrl;
       } catch {
-        // 代理不可用时直接加载（canvas 会被污染，退化为渐变色）
         const img = new Image();
         img.onload = () => {
           if (cancelled) return;
@@ -126,8 +123,8 @@ export default function Visualizer3D({ accent = '#4FC3F7', cover = '', onReady }
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
+    const shape = mode || 'silk';
 
-    // 安卓原生 GPU 性能充足，使用完整 dpr + 抗锯齿
     const dpr = window.devicePixelRatio || 1;
     let W = container.offsetWidth;
     let H = container.offsetHeight;
@@ -142,9 +139,11 @@ export default function Visualizer3D({ accent = '#4FC3F7', cover = '', onReady }
     renderer.domElement.style.height = '100%';
     container.appendChild(renderer.domElement);
 
-    const FILL = 1.0;            // 平面占可见区比例，1.0 = 撑满短边
-    const MAX_Z_RATIO = 0.09;    // Z 起伏最大占可见半边比例
-    const DOME_DEPTH_RATIO = 0.18; // 封面穹顶边缘向后的弯曲深度
+    const FILL = 1.0;
+    const MAX_Z_RATIO = 0.09;
+    const DOME_DEPTH_RATIO = 0.22;       // 穹顶弯曲，比之前更圆润
+    const SPHERE_RADIUS_RATIO = 0.78;
+    const TUNNEL_RADIUS_RATIO = 0.55;
 
     let planeSize, cameraZ;
 
@@ -156,53 +155,86 @@ export default function Visualizer3D({ accent = '#4FC3F7', cover = '', onReady }
       cameraZ = minDim * 2.4;
       const halfFovRad = (FOV / 2) * Math.PI / 180;
       const visibleHalf = cameraZ * Math.tan(halfFovRad);
-      planeSize = visibleHalf * FILL;   // 撑满短边方向
+      planeSize = visibleHalf * FILL;
       camera.aspect = aspect;
       camera.position.z = cameraZ;
       camera.updateProjectionMatrix();
     };
     computeLayout();
 
-    // ---- 粒子网格：X-Y 平面排满 planeSize x planeSize 正方形 ----
     const COUNT = GRID * GRID;
     const positions = new Float32Array(COUNT * 3);
     const colors = new Float32Array(COUNT * 3);
-    const origUV = new Float32Array(COUNT * 2);       // 原始归一化 uv (0..1)
-    const distFromCenter = new Float32Array(COUNT);   // 距中心归一化距离
-    const baseZ = new Float32Array(COUNT);            // 穹顶基础曲面
+    const origUV = new Float32Array(COUNT * 2);
+    const distFromCenter = new Float32Array(COUNT);
+    const basePositions = new Float32Array(COUNT * 3);
+    const baseNormals = new Float32Array(COUNT * 3);
 
-    const buildGrid = () => {
+    const buildBase = () => {
       let idx = 0;
       const half = planeSize;
       const step = (planeSize * 2) / (GRID - 1);
       for (let gy = 0; gy < GRID; gy++) {
         for (let gx = 0; gx < GRID; gx++) {
           const x = -half + gx * step;
-          const y = half - gy * step; // y 翻转匹配图像坐标
+          const y = half - gy * step;
           const u = gx / (GRID - 1);
           const v = gy / (GRID - 1);
           const dx = u - 0.5, dy = v - 0.5;
           const dc = Math.min(1, Math.sqrt(dx * dx + dy * dy) * 2);
-          distFromCenter[idx] = dc;
-          // 穹顶：中心平、边缘向后弯曲，让方形封面看起来更圆、更有立体感
-          baseZ[idx] = -planeSize * DOME_DEPTH_RATIO * (1 - Math.cos(dc * Math.PI / 2));
-          positions[idx * 3] = x;
-          positions[idx * 3 + 1] = y;
-          positions[idx * 3 + 2] = baseZ[idx];
           origUV[idx * 2] = u;
           origUV[idx * 2 + 1] = v;
+          distFromCenter[idx] = dc;
+
+          let bx = 0, by = 0, bz = 0, nx = 0, ny = 0, nz = 0;
+          if (shape === 'sphere') {
+            const theta = u * Math.PI * 2;
+            const phi = (v - 0.5) * Math.PI;
+            const r = planeSize * SPHERE_RADIUS_RATIO;
+            bx = r * Math.cos(phi) * Math.cos(theta);
+            by = r * Math.sin(phi);
+            bz = r * Math.cos(phi) * Math.sin(theta);
+            const len = Math.hypot(bx, by, bz) || 1;
+            nx = bx / len; ny = by / len; nz = bz / len;
+          } else if (shape === 'tunnel') {
+            const theta = u * Math.PI * 2;
+            const r = planeSize * TUNNEL_RADIUS_RATIO;
+            bx = r * Math.cos(theta);
+            by = r * Math.sin(theta);
+            bz = (v - 0.5) * planeSize * 2.2;
+            const len = Math.hypot(bx, by) || 1;
+            nx = bx / len; ny = by / len; nz = 0;
+          } else if (shape === 'ripple') {
+            bx = x; by = y; bz = 0;
+            nx = 0; ny = 0; nz = 1;
+          } else {
+            // silk（默认）
+            bx = x; by = y;
+            bz = -planeSize * DOME_DEPTH_RATIO * (1 - Math.cos(dc * Math.PI / 2));
+            nx = 0; ny = 0; nz = 1;
+          }
+          basePositions[idx * 3] = bx;
+          basePositions[idx * 3 + 1] = by;
+          basePositions[idx * 3 + 2] = bz;
+          baseNormals[idx * 3] = nx;
+          baseNormals[idx * 3 + 1] = ny;
+          baseNormals[idx * 3 + 2] = nz;
+
+          positions[idx * 3] = bx;
+          positions[idx * 3 + 1] = by;
+          positions[idx * 3 + 2] = bz;
           idx++;
         }
       }
     };
-    buildGrid();
+    buildBase();
 
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
     geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
 
     const material = new THREE.PointsMaterial({
-      size: planeSize * 2 / GRID * 0.55,   // 粒子变小、间距拉开，呈现细腻圆点阵
+      size: planeSize * 2 / GRID * 0.85,   // 0.8~0.9 填充比，粒子更饱满、不分散
       map: createParticleTexture(),
       vertexColors: true,
       transparent: true,
@@ -229,7 +261,6 @@ export default function Visualizer3D({ accent = '#4FC3F7', cover = '', onReady }
       return [d[i] / 255, d[i + 1] / 255, d[i + 2] / 255];
     };
 
-    // 封面颜色只设置一次（封面固定时大幅省性能）；无封面时每帧用渐变 + 能量
     let coverColorApplied = false;
     const applyCoverColors = () => {
       if (!hasCoverRef.current) return false;
@@ -238,7 +269,7 @@ export default function Visualizer3D({ accent = '#4FC3F7', cover = '', onReady }
         const v = origUV[i * 2 + 1];
         const s = sampleCover(u, v);
         const boost = 0.95;
-        const minBright = 0.12;   // 暗部保底，避免深色背景里消失
+        const minBright = 0.12;
         colorAttr.array[i * 3]     = Math.max(s[0] * boost, minBright * (0.6 + s[0]));
         colorAttr.array[i * 3 + 1] = Math.max(s[1] * boost, minBright * (0.6 + s[1]));
         colorAttr.array[i * 3 + 2] = Math.max(s[2] * boost, minBright * (0.6 + s[2]));
@@ -248,7 +279,6 @@ export default function Visualizer3D({ accent = '#4FC3F7', cover = '', onReady }
     };
 
     let firstFrame = true;
-    // 整体能量平滑
     let bassAttack = 0;
     let bassRelease = 0;
     let midSmooth = 0;
@@ -266,13 +296,11 @@ export default function Visualizer3D({ accent = '#4FC3F7', cover = '', onReady }
         for (let i = 32; i < 64; i++) treble += data[i];
         treble /= 32;
       } else {
-        // 待机动画：明显律动的能量起伏，让布幔效果始终可见
         const t = Date.now() * 0.001;
         bass = 0.20 + Math.sin(t * 0.60) * 0.10 + Math.sin(t * 1.25) * 0.06;
         mid = 0.14 + Math.sin(t * 0.90 + 1) * 0.07;
         treble = 0.10 + Math.sin(t * 1.20 + 2) * 0.05;
       }
-      // bass attack/release 保留鼓点冲击感
       if (bass > bassAttack) bassAttack += (bass - bassAttack) * 0.55;
       else bassAttack += (bass - bassAttack) * 0.28;
       bassRelease += (bass - bassRelease) * 0.12;
@@ -287,67 +315,90 @@ export default function Visualizer3D({ accent = '#4FC3F7', cover = '', onReady }
       const zAmp = planeSize * MAX_Z_RATIO;
       const hasCover = hasCoverRef.current;
 
-      // 封面就绪后应用一次颜色
       if (hasCover && !coverColorApplied) {
         coverColorApplied = applyCoverColors();
       } else if (!hasCover) {
         coverColorApplied = false;
       }
 
-      // 每帧更新 Z；无封面时同时更新 color
       const needColorUpdate = !hasCover;
-      // 布幔波动参数：多层正弦波叠加，像液体绸缎
       const windSpeed = 1.6;
       const accentRGB = hexToRGB(accentRef.current || '#4FC3F7');
 
       for (let i = 0; i < COUNT; i++) {
         const u = origUV[i * 2];
         const v = origUV[i * 2 + 1];
-        const dc = distFromCenter[i]; // 0 中心 ~ 1 边角
+        const dc = distFromCenter[i];
+        const bx = basePositions[i * 3];
+        const by = basePositions[i * 3 + 1];
+        const bz = basePositions[i * 3 + 2];
+        const nx = baseNormals[i * 3];
+        const ny = baseNormals[i * 3 + 1];
+        const nz = baseNormals[i * 3 + 2];
 
-        // 液体绸缎式波动：X、Y、对角线三层波叠加
-        const wave1 = Math.sin(u * 4 * Math.PI + time * windSpeed) * 0.22;
-        const wave2 = Math.sin(v * 3 * Math.PI + time * windSpeed * 0.8 + 1.2) * 0.18;
-        const wave3 = Math.sin((u + v) * 5 * Math.PI + time * windSpeed * 1.3) * 0.10;
-        const swirl = Math.sin(dc * 8 - time * 1.2) * 0.08;
-        const windZ = (wave1 + wave2 + wave3 + swirl) * (1 + totalEnergy * 0.4);
+        let x = bx, y = by, z = bz;
 
-        // 整体能量让穹顶像鼓皮一样整体膨胀（中心更明显）
-        const inflate = totalEnergy * Math.cos(dc * Math.PI / 2) * 0.7;
-        // bass 鼓点：中心短促冲击，向外快速衰减
-        const pulse = bassPulse * Math.exp(-dc * dc * 4) * 1.3;
+        if (shape === 'sphere') {
+          // 星球：径向呼吸 + 高频闪烁 + 鼓点冲击
+          const flare = trebleSmooth * Math.sin(u * Math.PI * 6 + time * 2.8 + v * Math.PI * 4) * 0.55;
+          const disp = (totalEnergy * 0.35 + bassPulse * 1.2 * Math.exp(-dc * dc * 2) + flare) * planeSize * 0.30;
+          x += nx * disp;
+          y += ny * disp;
+          z += nz * disp;
+        } else if (shape === 'tunnel') {
+          // 隧道：半径随节奏脉动，整体像音波管一样旋转
+          const wave = Math.sin(u * Math.PI * 8 + time * 1.8) * Math.cos(v * Math.PI * 4 + time * 0.7) * (midSmooth * 0.35);
+          const radiusMod = 1 + bassPulse * 0.30 + midSmooth * 0.18 + wave;
+          x = bx * radiusMod;
+          y = by * radiusMod;
+          z = bz + (wave + trebleSmooth * Math.sin(u * Math.PI * 12 + time * 3) * 0.2) * planeSize * 0.05;
+        } else if (shape === 'ripple') {
+          // 涟漪：由中心向外扩散的环形波，鼓点像水滴落下
+          const ring = Math.sin(dc * 14 - time * 2.8) * Math.exp(-dc * 1.6) * (0.45 + totalEnergy * 0.9);
+          const impact = bassPulse * Math.exp(-dc * dc * 3.5) * 1.6;
+          z = (ring + impact) * planeSize * 0.14;
+        } else {
+          // silk（丝绸穹顶）：液体绸缎波动 + 鼓皮膨胀
+          const wave1 = Math.sin(u * 4 * Math.PI + time * windSpeed) * 0.22;
+          const wave2 = Math.sin(v * 3 * Math.PI + time * windSpeed * 0.8 + 1.2) * 0.18;
+          const wave3 = Math.sin((u + v) * 5 * Math.PI + time * windSpeed * 1.3) * 0.10;
+          const swirl = Math.sin(dc * 8 - time * 1.2) * 0.08;
+          const windZ = (wave1 + wave2 + wave3 + swirl) * (1 + totalEnergy * 0.4);
+          const inflate = totalEnergy * Math.cos(dc * Math.PI / 2) * 0.7;
+          const pulse = bassPulse * Math.exp(-dc * dc * 4) * 1.3;
+          z = bz + (windZ + inflate + pulse) * zAmp;
+        }
 
-        posAttr.array[i * 3 + 2] = baseZ[i] + (windZ + inflate + pulse) * zAmp;
+        posAttr.array[i * 3] = x;
+        posAttr.array[i * 3 + 1] = y;
+        posAttr.array[i * 3 + 2] = z;
 
         if (needColorUpdate) {
-          const windGlow = Math.abs(windZ) * 0.35;
+          const windGlow = Math.abs(z - bz) / (planeSize * 0.12 + 0.001) * 0.12;
           const intensity = 0.18 + totalEnergy * 1.4 + windGlow;
           const outFactor = 1 - dc * 0.35;
-          colorAttr.array[i * 3]     = Math.min(1, accentRGB.r * intensity * outFactor + pulse * 0.5);
-          colorAttr.array[i * 3 + 1] = Math.min(1, accentRGB.g * intensity * outFactor + pulse * 0.5);
-          colorAttr.array[i * 3 + 2] = Math.min(1, accentRGB.b * intensity * outFactor + pulse * 0.5 + windGlow * 0.3);
+          colorAttr.array[i * 3]     = Math.min(1, accentRGB.r * intensity * outFactor + bassPulse * 0.5);
+          colorAttr.array[i * 3 + 1] = Math.min(1, accentRGB.g * intensity * outFactor + bassPulse * 0.5);
+          colorAttr.array[i * 3 + 2] = Math.min(1, accentRGB.b * intensity * outFactor + bassPulse * 0.5 + windGlow * 0.3);
         }
       }
       posAttr.needsUpdate = true;
       if (needColorUpdate) colorAttr.needsUpdate = true;
 
-      // ===== 电影镜头：手势驱动 =====
+      // 电影镜头：手势驱动 + 自动 360° 旋转
       const g = gestureRef.current;
       g.zoom += (g.targetZoom - g.zoom) * 0.18;
       g.rotation += (g.targetRotation - g.rotation) * 0.18;
-      // 缩放限制 0.4 ~ 3.0
       const clampedZoom = Math.max(0.4, Math.min(3.0, g.zoom));
       camera.position.z = cameraZ / clampedZoom;
-      // 用户手势旋转
-      points.rotation.y = g.rotation;
-      // 微俯仰 + 随风轻微摇摆
+      // 自动持续旋转（每秒约 0.08rad ≈ 360°/78s，优雅不晕）
+      points.rotation.y = g.rotation + time * 0.08;
       points.rotation.x = -0.12 + Math.sin(time * 0.5) * 0.03;
       points.rotation.z = Math.cos(time * 0.4) * 0.015;
       camera.position.x = 0;
       camera.position.y = 0;
       camera.lookAt(0, 0, 0);
 
-      // 整体呼吸缩放（基础呼吸 + 能量增强）
       const sc = breath;
       points.scale.set(sc, sc, 1);
 
@@ -361,11 +412,11 @@ export default function Visualizer3D({ accent = '#4FC3F7', cover = '', onReady }
     };
     animate();
 
-    // ===== 手势控制：单指划动旋转 + 双指缩放/旋转 =====
+    // 手势控制
     const dom = renderer.domElement;
     const dist = (t1, t2) => Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
     const angle = (t1, t2) => Math.atan2(t2.clientY - t1.clientY, t2.clientX - t1.clientX);
-    const ROTATE_SENSITIVITY = 0.006; // 单指水平滑动灵敏度
+    const ROTATE_SENSITIVITY = 0.006;
     const onTouchStart = (e) => {
       const g = gestureRef.current;
       if (e.touches.length === 1) {
@@ -387,10 +438,8 @@ export default function Visualizer3D({ accent = '#4FC3F7', cover = '', onReady }
         e.preventDefault();
         const d = dist(e.touches[0], e.touches[1]);
         const a = angle(e.touches[0], e.touches[1]);
-        // 缩放 = 当前距离 / 起始距离
         const scale = d / Math.max(1, g.startDist);
         g.targetZoom = Math.max(0.4, Math.min(3.0, g.startZoom * scale));
-        // 旋转 = 当前角度 - 起始角度
         g.targetRotation = g.startRot + (a - g.startAngle);
       } else if (g.dragging && e.touches.length === 1) {
         e.preventDefault();
@@ -403,7 +452,6 @@ export default function Visualizer3D({ accent = '#4FC3F7', cover = '', onReady }
       if (e.touches.length < 2) g.pinching = false;
       if (e.touches.length < 1) g.dragging = false;
     };
-    // 鼠标滚轮缩放（桌面端调试用）
     const onWheel = (e) => {
       const g = gestureRef.current;
       g.targetZoom = Math.max(0.4, Math.min(3.0, g.targetZoom * (e.deltaY > 0 ? 0.92 : 1.08)));
@@ -416,10 +464,10 @@ export default function Visualizer3D({ accent = '#4FC3F7', cover = '', onReady }
 
     const handleResize = () => {
       computeLayout();
-      buildGrid();
+      buildBase();
       posAttr.needsUpdate = true;
-      material.size = planeSize * 2 / GRID * 0.55;
-      coverColorApplied = false;   // 网格重建后需重新应用封面颜色
+      material.size = planeSize * 2 / GRID * 0.85;
+      coverColorApplied = false;
       renderer.setSize(W, H);
     };
     window.addEventListener('resize', handleResize);
@@ -439,7 +487,7 @@ export default function Visualizer3D({ accent = '#4FC3F7', cover = '', onReady }
         renderer.domElement.parentNode.removeChild(renderer.domElement);
       }
     };
-  }, []);
+  }, [mode]);
 
   return (
     <div
