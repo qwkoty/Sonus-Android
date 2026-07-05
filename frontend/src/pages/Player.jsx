@@ -235,7 +235,7 @@ export default function Player({ onProfile }) {
 
       {/* 顶部栏 */}
       <div style={{ position: 'absolute', top: 0, left: 0, right: 0, padding: 'calc(12px + var(--safe-top)) 14px 10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', zIndex: 50, gap: 10 }}>
-        <button onClick={onProfile} className="glass-button" style={{ width: 40, height: 40, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+        <button onClick={onProfile} className="glass-button" style={{ width: 40, height: 40, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', padding: 0, background: 'rgba(255,255,255,0.08)', border: '2px solid rgba(255,255,255,0.12)' }}>
           {isLoggedIn && av ? <img src={av} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <span style={{ fontSize: 12, fontWeight: 760, color: 'var(--text-secondary)' }}>{isLoggedIn ? '我' : '登'}</span>}
         </button>
         <div style={{ flex: 1, textAlign: 'center', minWidth: 0 }}>

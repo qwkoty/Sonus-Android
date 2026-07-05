@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { ArrowLeft, ChevronRight, Loader2, Music2, LogOut, Play, User as UserIcon, RefreshCw } from 'lucide-react';
+import { ChevronRight, Loader2, Music2, LogOut, Play, User as UserIcon, RefreshCw } from 'lucide-react';
 import { useAuthStore } from '../store/useAuthStore';
 import { usePlayerStore } from '../store/usePlayerStore';
 import { music } from '../api/music';
@@ -81,8 +81,8 @@ export default function Profile({ onBack }) {
     <div style={{ position: 'fixed', inset: 0, background: 'radial-gradient(ellipse at 30% 18%, rgba(0, 245, 212, .08) 0%, rgba(0,0,0,0.48) 55%, rgba(0,0,0,0.85) 100%)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
       {/* 顶部导航 */}
       <div className="glass-panel" style={{ padding: 'calc(10px + env(safe-area-inset-top)) 16px 10px', display: 'flex', alignItems: 'center', gap: 12, borderRadius: 0, borderLeft: 'none', borderRight: 'none', borderTop: 'none', flexShrink: 0 }}>
-        <button onClick={onBack} className="glass-button" style={{ width: 38, height: 38, borderRadius: 11, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-primary)' }}>
-          <ArrowLeft size={18} />
+        <button onClick={onBack} className="glass-button" style={{ width: 38, height: 38, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', padding: 0, background: 'rgba(255,255,255,0.08)', border: '2px solid rgba(255,255,255,0.12)' }}>
+          {avatar ? <img src={music.cover(avatar)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <UserIcon size={18} color="var(--text-muted)" />}
         </button>
         <span style={{ fontSize: 16, fontWeight: 760, flex: 1, letterSpacing: '.04em' }}>{playlistDetail ? playlistDetail.name : '我的音乐'}</span>
         <button onClick={() => { fetchUserInfo(); loadPlaylists(); }} className="glass-button" style={{ width: 38, height: 38, borderRadius: 11, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-secondary)' }} title="刷新">
@@ -100,11 +100,7 @@ export default function Profile({ onBack }) {
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
               <span style={{ fontSize: 17, fontWeight: 760, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block' }}>{loadingInfo && !nickname ? '加载中…' : nickname}</span>
-              {(userInfo?.vipLevel > 0 || userInfo?.isVip) ? (
-                <span style={{ fontSize: 10, fontWeight: 800, padding: '2px 8px', borderRadius: 6, marginTop: 4, background: 'linear-gradient(135deg, #fff3c2, var(--champagne), #c9963d)', color: '#201303', display: 'inline-flex', alignItems: 'center', gap: 4, boxShadow: '0 0 12px rgba(244,210,138,.24)' }}><Music2 size={10} /> 可播放 VIP 歌曲</span>
-              ) : (
-                <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 6, marginTop: 4, background: 'rgba(255,255,255,0.08)', color: 'var(--text-muted)', display: 'inline-flex', alignItems: 'center', gap: 4 }}><Music2 size={10} /> 不可播放 VIP 歌曲</span>
-              )}
+              <span style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2, display: 'block' }}>{userInfo?.uin ? `QQ: ${userInfo.uin}` : 'QQ 音乐账号'}</span>
             </div>
           </div>
 

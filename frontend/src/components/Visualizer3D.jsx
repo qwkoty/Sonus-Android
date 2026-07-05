@@ -233,7 +233,7 @@ export default function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'c
     geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
 
     const material = new THREE.PointsMaterial({
-      size: planeSize * 2 / GRID * 1.0,    // 填充比 1，粒子紧密相连
+      size: planeSize * 2 / GRID * 1.35,   // 粒子稍大，封面更清晰可见
       map: createParticleTexture(),
       vertexColors: true,
       transparent: true,
@@ -266,8 +266,8 @@ export default function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'c
         const u = origUV[i * 2];
         const v = origUV[i * 2 + 1];
         const s = sampleCover(u, v);
-        const boost = 1.18;
-        const minBright = 0.22;
+        const boost = 1.45;
+        const minBright = 0.35;
         colorAttr.array[i * 3]     = Math.min(1, Math.max(s[0] * boost, minBright * (0.8 + s[0])));
         colorAttr.array[i * 3 + 1] = Math.min(1, Math.max(s[1] * boost, minBright * (0.8 + s[1])));
         colorAttr.array[i * 3 + 2] = Math.min(1, Math.max(s[2] * boost, minBright * (0.8 + s[2])));
@@ -345,15 +345,17 @@ export default function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'c
           y = by + waveY * amp;
           z = bz + waveZ * amp;
         } else if (shape === 'liquidmetal') {
-          // 液态金属：球面按封面亮度隆起 + 高频表面波纹，去除整体膨胀
+          // 液态金属：震感更强、频率更高的表面波纹 + 鼓点热点
           const baseR = planeSize * LIQUID_RADIUS_RATIO;
           const light = coverLight[i] || 0.5;
           let r = baseR * (0.82 + light * 0.36);
-          r += midSmooth * Math.sin(u * 40 + time * 3) * planeSize * 0.03;
-          r += trebleSmooth * Math.sin(v * 50 - time * 4) * planeSize * 0.015;
+          r += midSmooth * Math.sin(u * 60 + time * 5) * planeSize * 0.05;
+          r += trebleSmooth * Math.sin(v * 70 - time * 7) * planeSize * 0.03;
+          r += midSmooth * Math.cos((u + v) * 90 + time * 6) * planeSize * 0.02;
           const hot1 = Math.exp(-Math.pow((u - 0.3) * 6, 2) - Math.pow((v - 0.3) * 6, 2));
           const hot2 = Math.exp(-Math.pow((u - 0.7) * 6, 2) - Math.pow((v - 0.6) * 6, 2));
-          r += bassPulse * (hot1 + hot2) * planeSize * 0.18;
+          const hot3 = Math.exp(-Math.pow((u - 0.5) * 8, 2) - Math.pow((v - 0.15) * 8, 2));
+          r += bassPulse * (hot1 + hot2 + hot3) * planeSize * 0.30;
           x = nx * r;
           y = ny * r;
           z = nz * r;
@@ -454,7 +456,7 @@ export default function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'c
       computeLayout();
       buildBase();
       posAttr.needsUpdate = true;
-      material.size = planeSize * 2 / GRID * 1.0;
+      material.size = planeSize * 2 / GRID * 1.35;
       renderer.setSize(W, H);
     };
     window.addEventListener('resize', handleResize);
