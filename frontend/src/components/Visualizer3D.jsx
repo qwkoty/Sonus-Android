@@ -146,7 +146,7 @@ export default function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'c
     const MAX_Z_RATIO = 0.09;
     const DOME_DEPTH_RATIO = 0.22;       // 穹顶弯曲，比之前更圆润
     const HALO_RADIUS_RATIO = 0.95;
-    const LIQUID_RADIUS_RATIO = 0.72;
+    const LIQUID_RADIUS_RATIO = 0.58;
 
     let planeSize, cameraZ;
 
@@ -201,7 +201,12 @@ export default function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'c
             const len = Math.hypot(bx, by, bz) || 1;
             nx = bx / len; ny = by / len; nz = bz / len;
           } else if (shape === 'soundhalo') {
-            const ringR = (0.18 + u * 0.72) * planeSize * HALO_RADIUS_RATIO;
+            // 音波光环：5 条同心窄环带，封面像素沿环展开
+            const bands = 5;
+            const band = Math.min(bands - 1, Math.floor(u * bands));
+            const bandU = u * bands - band;
+            const ringBase = 0.20 + band * 0.15;
+            const ringR = (ringBase + bandU * 0.035) * planeSize * HALO_RADIUS_RATIO;
             const theta = v * Math.PI * 2;
             bx = ringR * Math.cos(theta);
             by = ringR * Math.sin(theta);
@@ -234,15 +239,15 @@ export default function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'c
     geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
 
     const material = new THREE.PointsMaterial({
-      size: planeSize * 2 / GRID * 1.0,    // 填充比 1，粒子紧密相连
+      size: planeSize * 2 / GRID * (shape === 'soundhalo' ? 1.35 : 1.0),  // 光环模式粒子稍粗
       map: createParticleTexture(),
       vertexColors: true,
       transparent: true,
       opacity: 1.0,
       depthWrite: false,
       sizeAttenuation: true,
-      alphaTest: 0.05,
-      blending: THREE.NormalBlending,
+      alphaTest: 0.02,
+      blending: THREE.AdditiveBlending,
     });
 
     const points = new THREE.Points(geometry, material);
@@ -272,11 +277,11 @@ export default function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'c
         const u = origUV[i * 2];
         const v = origUV[i * 2 + 1];
         const s = sampleCover(u, v);
-        const boost = 0.95;
-        const minBright = 0.12;
-        colorAttr.array[i * 3]     = Math.max(s[0] * boost, minBright * (0.6 + s[0]));
-        colorAttr.array[i * 3 + 1] = Math.max(s[1] * boost, minBright * (0.6 + s[1]));
-        colorAttr.array[i * 3 + 2] = Math.max(s[2] * boost, minBright * (0.6 + s[2]));
+        const boost = 1.18;
+        const minBright = 0.22;
+        colorAttr.array[i * 3]     = Math.min(1, Math.max(s[0] * boost, minBright * (0.8 + s[0])));
+        colorAttr.array[i * 3 + 1] = Math.min(1, Math.max(s[1] * boost, minBright * (0.8 + s[1])));
+        colorAttr.array[i * 3 + 2] = Math.min(1, Math.max(s[2] * boost, minBright * (0.8 + s[2])));
         coverLight[i] = s[0] * 0.299 + s[1] * 0.587 + s[2] * 0.114;
       }
       colorAttr.needsUpdate = true;
@@ -342,17 +347,21 @@ export default function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'c
         let x = bx, y = by, z = bz;
 
         if (shape === 'coverflow') {
-          // 粒子封面：整个面 3D 飘动，无膨胀
-          const waveX = Math.sin(u * 6 * Math.PI + time * 0.9) * Math.cos(v * 4 * Math.PI + time * 0.6) * 0.5;
-          const waveY = Math.cos(u * 5 * Math.PI + time * 0.7) * Math.sin(v * 7 * Math.PI + time * 0.8) * 0.5;
-          const waveZ = Math.sin((u + v) * 8 * Math.PI + time * 1.1) * 0.6 + Math.sin(dc * 10 - time * 1.5) * 0.2;
-          const amp = zAmp * (1 + totalEnergy * 0.3);
+          // 粒子封面：整个面 3D 飘动，幅度更小、更柔和
+          const waveX = Math.sin(u * 5 * Math.PI + time * 0.8) * Math.cos(v * 3 * Math.PI + time * 0.5) * 0.22;
+          const waveY = Math.cos(u * 4 * Math.PI + time * 0.6) * Math.sin(v * 5 * Math.PI + time * 0.7) * 0.22;
+          const waveZ = Math.sin((u + v) * 6 * Math.PI + time * 0.9) * 0.28 + Math.sin(dc * 8 - time * 1.2) * 0.08;
+          const amp = zAmp * (1 + totalEnergy * 0.2);
           x = bx + waveX * amp;
           y = by + waveY * amp;
           z = bz + waveZ * amp;
         } else if (shape === 'soundhalo') {
-          // 音波光环：多层同心环自转 + 低频外扩 + 高频波纹
-          const ringR = (0.18 + u * 0.72) * planeSize * HALO_RADIUS_RATIO;
+          // 音波光环：5 条同心窄环带自转 + 低频外扩 + 高频波纹
+          const bands = 5;
+          const band = Math.min(bands - 1, Math.floor(u * bands));
+          const bandU = u * bands - band;
+          const ringBase = 0.20 + band * 0.15;
+          const ringR = (ringBase + bandU * 0.035) * planeSize * HALO_RADIUS_RATIO;
           const theta = v * Math.PI * 2 + time * 0.25;
           const expand = bassAttack * planeSize * 0.12;
           const ripple = midSmooth * Math.sin(u * Math.PI * 8 + time * 2) * planeSize * 0.03;
@@ -384,11 +393,11 @@ export default function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'c
 
         if (needColorUpdate) {
           const windGlow = Math.abs(z - bz) / (planeSize * 0.12 + 0.001) * 0.12;
-          const intensity = 0.18 + totalEnergy * 1.4 + windGlow;
-          const outFactor = 1 - dc * 0.35;
-          colorAttr.array[i * 3]     = Math.min(1, accentRGB.r * intensity * outFactor + bassPulse * 0.5);
-          colorAttr.array[i * 3 + 1] = Math.min(1, accentRGB.g * intensity * outFactor + bassPulse * 0.5);
-          colorAttr.array[i * 3 + 2] = Math.min(1, accentRGB.b * intensity * outFactor + bassPulse * 0.5 + windGlow * 0.3);
+          const intensity = 0.35 + totalEnergy * 1.6 + windGlow;
+          const outFactor = 1 - dc * 0.25;
+          colorAttr.array[i * 3]     = Math.min(1, accentRGB.r * intensity * outFactor + bassPulse * 0.65);
+          colorAttr.array[i * 3 + 1] = Math.min(1, accentRGB.g * intensity * outFactor + bassPulse * 0.65);
+          colorAttr.array[i * 3 + 2] = Math.min(1, accentRGB.b * intensity * outFactor + bassPulse * 0.65 + windGlow * 0.35);
         }
       }
       posAttr.needsUpdate = true;
@@ -475,7 +484,7 @@ export default function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'c
       computeLayout();
       buildBase();
       posAttr.needsUpdate = true;
-      material.size = planeSize * 2 / GRID * 1.0;
+      material.size = planeSize * 2 / GRID * (shape === 'soundhalo' ? 1.35 : 1.0);
       renderer.setSize(W, H);
     };
     window.addEventListener('resize', handleResize);

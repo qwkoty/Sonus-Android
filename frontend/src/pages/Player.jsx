@@ -217,7 +217,7 @@ export default function Player({ onProfile }) {
       {/* 可视化背景层 */}
       <div style={{ position: 'absolute', inset: 0 }}>
         <FloatingLyrics lyrics={lyrics} isPlaying={isPlaying} />
-        {vm === '3d' ? <Suspense><Visualizer3D accent={ac} cover={currentTrack?.cover || ''} mode={v3m} /></Suspense> : <Visualizer isPlaying={isPlaying} mode={vm} accent={ac} />}
+        {vm === '3d' ? <Suspense key={currentTrack?.cover || currentTrack?.id || 'none'}><Visualizer3D accent={ac} cover={currentTrack?.cover || ''} mode={v3m} /></Suspense> : <Visualizer isPlaying={isPlaying} mode={vm} accent={ac} />}
         {lyricPanel && <LyricScroll currentLyric={currentLyric || ''} accent={ac} />}
       </div>
 
@@ -359,7 +359,7 @@ export default function Player({ onProfile }) {
           {vm === '3d' && (
             <div>
               <div style={{ fontSize: 10, fontWeight: 760, letterSpacing: '.14em', color: 'var(--fc-muted)', textTransform: 'uppercase', marginBottom: 10 }}>3D 形态</div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
                 {VIZ_3D_MODES.map(m => (
                   <button key={m.key} onClick={() => { setV3m(m.key); try { localStorage.setItem('sonus_3d_mode', m.key); } catch { } }} className={`glass-button${v3m === m.key ? ' is-active' : ''}`} style={{ padding: '10px 4px', borderRadius: 12, fontSize: 11 }}>{m.label}</button>
                 ))}
