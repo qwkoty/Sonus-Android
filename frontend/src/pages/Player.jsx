@@ -6,6 +6,7 @@ import { music } from '../api/music';
 import Visualizer from '../components/Visualizer';
 import FloatingLyrics from '../components/FloatingLyrics';
 import LyricScroll from '../components/LyricScroll';
+import LyricStage from '../components/LyricStage';
 
 const Visualizer3D = lazy(() => import('../components/Visualizer3D'));
 
@@ -207,6 +208,7 @@ export default function Player({ onProfile }) {
       <div style={{ position: 'absolute', inset: 0 }}>
         <FloatingLyrics lyrics={lyrics} isPlaying={isPlaying} />
         {vm === '3d' ? <Suspense><Visualizer3D accent={ac} cover={currentTrack?.cover || ''} /></Suspense> : <Visualizer isPlaying={isPlaying} mode={vm} accent={ac} />}
+        {lyricPanel && <LyricStage accent={ac} isPlaying={isPlaying} />}
         {lyricPanel && <LyricScroll currentLyric={currentLyric || ''} accent={ac} />}
       </div>
 
