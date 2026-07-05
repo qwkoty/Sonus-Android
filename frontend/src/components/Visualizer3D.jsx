@@ -35,12 +35,13 @@ function createParticleTexture() {
 }
 
 // 3D 封面粒子画：2 万粒子构成可切换的动画形态
-// 电影镜头：用户双指捏合缩放 + 双指划拉旋转（手势驱动），同时自动 360° 旋转
-// 动画预设：coverflow（粒子封面） / orb（粒子球体） / helix（螺旋）
-export default function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', onReady }) {
+// 电影镜头：用户双指捏合缩放 + 双指划拉旋转（手势驱动），关闭自动旋转
+// 动画预设：coverflow（粒子封面） / liquidmetal（液态金属）
+export default function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPlaying = false, onReady }) {
   const containerRef = useRef(null);
   const accentRef = useRef(accent);
   const coverRef = useRef(cover);
+  const isPlayingRef = useRef(isPlaying);
   const imageDataRef = useRef(null);  // 封面像素 RGBA
   const hasCoverRef = useRef(false);
   const coverVersionRef = useRef(0);
@@ -49,6 +50,11 @@ export default function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'c
   useEffect(() => { onReadyRef.current = onReady; }, [onReady]);
   useEffect(() => { accentRef.current = accent; }, [accent]);
   useEffect(() => { coverRef.current = cover; }, [cover]);
+  useEffect(() => {
+    isPlayingRef.current = isPlaying;
+    // 恢复播放时重新应用封面色
+    if (isPlaying) appliedCoverVersionRef.current = -1;
+  }, [isPlaying]);
 
   // 手势状态（双指缩放 + 旋转；单指划动旋转）
   const gestureRef = useRef({
@@ -145,8 +151,7 @@ export default function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'c
     const FILL = 1.0;
     const MAX_Z_RATIO = 0.09;
     const DOME_DEPTH_RATIO = 0.22;       // 穹顶弯曲，比之前更圆润
-    const ORB_RADIUS_RATIO = 0.52;
-    const HELIX_RADIUS_RATIO = 0.42;
+    const LIQUID_RADIUS_RATIO = 0.56;
 
     let planeSize, cameraZ;
 
@@ -191,28 +196,16 @@ export default function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'c
           distFromCenter[idx] = dc;
 
           let bx = 0, by = 0, bz = 0, nx = 0, ny = 0, nz = 0;
-          if (shape === 'orb') {
-            // 粒子球体：均匀分布的球面
+          if (shape === 'liquidmetal') {
+            // 液态金属：球面按封面亮度隆起
             const theta = u * Math.PI * 2;
             const phi = (v - 0.5) * Math.PI;
-            const r = planeSize * ORB_RADIUS_RATIO;
+            const r = planeSize * LIQUID_RADIUS_RATIO;
             bx = r * Math.cos(phi) * Math.cos(theta);
             by = r * Math.sin(phi);
             bz = r * Math.cos(phi) * Math.sin(theta);
             const len = Math.hypot(bx, by, bz) || 1;
             nx = bx / len; ny = by / len; nz = bz / len;
-          } else if (shape === 'helix') {
-            // 螺旋：两条螺旋带缠绕上升，封面像素沿带展开
-            const turns = 3.5;
-            const phase = Math.floor(v * 2) * Math.PI; // 0 或 π
-            const t = u * turns * Math.PI * 2 + phase;
-            const bandW = (v * 2 - Math.floor(v * 2) - 0.5) * planeSize * 0.12;
-            const r = planeSize * HELIX_RADIUS_RATIO + bandW;
-            bx = r * Math.cos(t);
-            by = r * Math.sin(t);
-            bz = (u - 0.5) * planeSize * 1.6;
-            const len = Math.hypot(bx, by) || 1;
-            nx = bx / len; ny = by / len; nz = 0;
           } else {
             // coverflow（粒子封面）默认形态：轻微穹顶平面
             bx = x; by = y;
@@ -267,21 +260,17 @@ export default function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'c
       return [d[i] / 255, d[i + 1] / 255, d[i + 2] / 255];
     };
     const applyCoverColors = () => {
-      if (!hasCoverRef.current) return false;
-      const accentMix = shape === 'orb' ? 0.45 : shape === 'helix' ? 0.35 : 0.0;
-      const accentRGB = hexToRGB(accentRef.current || '#4FC3F7');
+      // 仅在播放中且已加载封面时应用封面颜色；暂停/未播放时使用主题色
+      if (!hasCoverRef.current || !isPlayingRef.current) return false;
       for (let i = 0; i < COUNT; i++) {
         const u = origUV[i * 2];
         const v = origUV[i * 2 + 1];
         const s = sampleCover(u, v);
         const boost = 1.18;
         const minBright = 0.22;
-        const r = Math.min(1, Math.max(s[0] * boost, minBright * (0.8 + s[0])));
-        const g = Math.min(1, Math.max(s[1] * boost, minBright * (0.8 + s[1])));
-        const b = Math.min(1, Math.max(s[2] * boost, minBright * (0.8 + s[2])));
-        colorAttr.array[i * 3]     = r * (1 - accentMix) + accentRGB.r * accentMix;
-        colorAttr.array[i * 3 + 1] = g * (1 - accentMix) + accentRGB.g * accentMix;
-        colorAttr.array[i * 3 + 2] = b * (1 - accentMix) + accentRGB.b * accentMix;
+        colorAttr.array[i * 3]     = Math.min(1, Math.max(s[0] * boost, minBright * (0.8 + s[0])));
+        colorAttr.array[i * 3 + 1] = Math.min(1, Math.max(s[1] * boost, minBright * (0.8 + s[1])));
+        colorAttr.array[i * 3 + 2] = Math.min(1, Math.max(s[2] * boost, minBright * (0.8 + s[2])));
         coverLight[i] = s[0] * 0.299 + s[1] * 0.587 + s[2] * 0.114;
       }
       colorAttr.needsUpdate = true;
@@ -321,15 +310,16 @@ export default function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'c
       const totalEnergy = (bassAttack + midSmooth * 0.7 + trebleSmooth * 0.4) / 2.1;
 
       const time = Date.now() * 0.001;
-      const breath = 1 + Math.sin(time * 0.6) * 0.020 + totalEnergy * 0.06 + bassPulse * 0.10;
       const zAmp = planeSize * MAX_Z_RATIO;
-      const hasCover = hasCoverRef.current;
+      const isPlaying = isPlayingRef.current;
+      const useCover = isPlaying && hasCoverRef.current;
 
-      if (hasCover && appliedCoverVersionRef.current !== coverVersionRef.current) {
+      if (useCover && appliedCoverVersionRef.current !== coverVersionRef.current) {
         if (applyCoverColors()) appliedCoverVersionRef.current = coverVersionRef.current;
       }
 
-      const needColorUpdate = !hasCover || shape === 'orb' || shape === 'helix';
+      // 未播放/暂停时强制回到主题色
+      const needColorUpdate = !useCover;
       const accentRGB = hexToRGB(accentRef.current || '#4FC3F7');
 
       for (let i = 0; i < COUNT; i++) {
@@ -346,7 +336,7 @@ export default function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'c
         let x = bx, y = by, z = bz;
 
         if (shape === 'coverflow') {
-          // 粒子封面：整个面 3D 飘动，幅度更小、更柔和
+          // 粒子封面：整个面 3D 飘动，幅度更小、更柔和，无膨胀
           const waveX = Math.sin(u * 5 * Math.PI + time * 0.8) * Math.cos(v * 3 * Math.PI + time * 0.5) * 0.22;
           const waveY = Math.cos(u * 4 * Math.PI + time * 0.6) * Math.sin(v * 5 * Math.PI + time * 0.7) * 0.22;
           const waveZ = Math.sin((u + v) * 6 * Math.PI + time * 0.9) * 0.28 + Math.sin(dc * 8 - time * 1.2) * 0.08;
@@ -354,28 +344,19 @@ export default function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'c
           x = bx + waveX * amp;
           y = by + waveY * amp;
           z = bz + waveZ * amp;
-        } else if (shape === 'orb') {
-          // 粒子球体：每个粒子绑定独立频段，沿法线径向脉动
-          const bandIdx = i % 64;
-          const freq = hasData ? data[bandIdx] : 0.12 + Math.sin(time * 1.8 + i * 0.08) * 0.07;
-          const particleEnergy = Math.min(1, freq * 1.6);
-          const baseR = planeSize * ORB_RADIUS_RATIO;
-          const r = baseR * (1 + particleEnergy * 0.32 + midSmooth * 0.10) + bassPulse * planeSize * 0.14;
+        } else if (shape === 'liquidmetal') {
+          // 液态金属：球面按封面亮度隆起 + 高频表面波纹，去除整体膨胀
+          const baseR = planeSize * LIQUID_RADIUS_RATIO;
+          const light = coverLight[i] || 0.5;
+          let r = baseR * (0.82 + light * 0.36);
+          r += midSmooth * Math.sin(u * 40 + time * 3) * planeSize * 0.03;
+          r += trebleSmooth * Math.sin(v * 50 - time * 4) * planeSize * 0.015;
+          const hot1 = Math.exp(-Math.pow((u - 0.3) * 6, 2) - Math.pow((v - 0.3) * 6, 2));
+          const hot2 = Math.exp(-Math.pow((u - 0.7) * 6, 2) - Math.pow((v - 0.6) * 6, 2));
+          r += bassPulse * (hot1 + hot2) * planeSize * 0.18;
           x = nx * r;
           y = ny * r;
           z = nz * r;
-        } else if (shape === 'helix') {
-          // 螺旋：低频半径脉动 + 高频 z 向抖动 + 鼓点整体爆发
-          const turns = 3.5;
-          const phase = Math.floor(v * 2) * Math.PI;
-          const t = u * turns * Math.PI * 2 + phase + time * 0.35;
-          const bandW = (v * 2 - Math.floor(v * 2) - 0.5) * planeSize * 0.12;
-          const baseR = planeSize * HELIX_RADIUS_RATIO;
-          const r = baseR * (1 + bassAttack * 0.24 + midSmooth * 0.12) + bandW + trebleSmooth * Math.sin(u * 30 + time * 4) * planeSize * 0.03;
-          const zz = (u - 0.5) * planeSize * 1.6 + trebleSmooth * Math.sin(t * 3) * planeSize * 0.05 + bassPulse * planeSize * 0.10;
-          x = r * Math.cos(t);
-          y = r * Math.sin(t);
-          z = zz;
         }
 
         posAttr.array[i * 3] = x;
@@ -383,45 +364,31 @@ export default function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'c
         posAttr.array[i * 3 + 2] = z;
 
         if (needColorUpdate) {
-          let intensity = 0;
-          if (shape === 'orb') {
-            const bandIdx = i % 64;
-            const freq = hasData ? data[bandIdx] : 0.12 + Math.sin(time * 1.8 + i * 0.08) * 0.07;
-            const light = hasCover ? coverLight[i] : 0.5;
-            intensity = 0.45 + freq * 2.0 + bassPulse * 0.8 + light * 0.3;
-          } else if (shape === 'helix') {
-            const bandIdx = Math.floor(u * 32) % 32;
-            const freq = hasData ? data[bandIdx] : 0.10 + Math.sin(time * 2 + u * 10) * 0.05;
-            intensity = 0.42 + freq * 1.8 + bassPulse * 0.7;
-          } else {
-            const windGlow = Math.abs(z - bz) / (planeSize * 0.12 + 0.001) * 0.12;
-            intensity = 0.35 + totalEnergy * 1.6 + windGlow;
-          }
+          const windGlow = shape === 'coverflow' ? Math.abs(z - bz) / (planeSize * 0.12 + 0.001) * 0.12 : 0;
+          const intensity = 0.42 + totalEnergy * 1.6 + windGlow;
           const outFactor = 1 - dc * 0.25;
           colorAttr.array[i * 3]     = Math.min(1, accentRGB.r * intensity * outFactor + bassPulse * 0.65);
           colorAttr.array[i * 3 + 1] = Math.min(1, accentRGB.g * intensity * outFactor + bassPulse * 0.65);
-          colorAttr.array[i * 3 + 2] = Math.min(1, accentRGB.b * intensity * outFactor + bassPulse * 0.65);
+          colorAttr.array[i * 3 + 2] = Math.min(1, accentRGB.b * intensity * outFactor + bassPulse * 0.65 + windGlow * 0.35);
         }
       }
       posAttr.needsUpdate = true;
       if (needColorUpdate) colorAttr.needsUpdate = true;
 
-      // 电影镜头：手势驱动 + 自动 360° 旋转
+      // 电影镜头：仅手势驱动，关闭自动旋转
       const g = gestureRef.current;
       g.zoom += (g.targetZoom - g.zoom) * 0.18;
       g.rotation += (g.targetRotation - g.rotation) * 0.18;
       const clampedZoom = Math.max(0.4, Math.min(3.0, g.zoom));
       camera.position.z = cameraZ / clampedZoom;
-      // 自动持续旋转（每秒约 0.08rad ≈ 360°/78s，优雅不晕）
-      points.rotation.y = g.rotation + time * 0.08;
-      points.rotation.x = -0.12 + Math.sin(time * 0.5) * 0.03;
-      points.rotation.z = Math.cos(time * 0.4) * 0.015;
+      points.rotation.y = g.rotation;
+      points.rotation.x = -0.12;
+      points.rotation.z = 0;
       camera.position.x = 0;
       camera.position.y = 0;
       camera.lookAt(0, 0, 0);
 
-      const sc = breath;
-      points.scale.set(sc, sc, 1);
+      points.scale.set(1, 1, 1);
 
       renderer.render(scene, camera);
 

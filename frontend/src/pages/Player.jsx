@@ -19,8 +19,7 @@ const VIZ_MODES = [
 
 const VIZ_3D_MODES = [
   { key: 'coverflow', label: '粒子封面' },
-  { key: 'orb', label: '粒子球体' },
-  { key: 'helix', label: '螺旋' }
+  { key: 'liquidmetal', label: '液态金属' }
 ];
 
 const PRESETS = [
@@ -173,10 +172,10 @@ export default function Player({ onProfile }) {
   const { currentTrack, isPlaying, currentTime, duration, volume, playMode, playlist, togglePlay, next, prev, seek, setVolume, toggleMode, playTrack, lyrics, currentLyric, isLoadingUrl, error, clearError, setError } = usePlayerStore();
   const { userInfo, isLoggedIn } = useAuthStore();
   const [sq, setSq] = useState(false); const [qo, setQo] = useState(false); const [viz, setViz] = useState(false);
-  const [controlsExpanded, setControlsExpanded] = useState(true);
+  const [controlsExpanded, setControlsExpanded] = useState(() => { try { return localStorage.getItem('sonus_controls_expanded') !== 'false'; } catch { return true } });
   const [query, setQuery] = useState(''); const [results, setResults] = useState([]); const [searching, setSearching] = useState(false); const st = useRef(null);
   const [vm, setVm] = useState(() => { try { return localStorage.getItem('sonus_viz_mode') || 'ring' } catch { return 'ring' } });
-  const [v3m, setV3m] = useState(() => { try { const v = localStorage.getItem('sonus_3d_mode'); const valid = ['coverflow','orb','helix']; return valid.includes(v) ? v : 'coverflow'; } catch { return 'coverflow' } });
+  const [v3m, setV3m] = useState(() => { try { const v = localStorage.getItem('sonus_3d_mode'); const valid = ['coverflow','liquidmetal']; return valid.includes(v) ? v : 'liquidmetal'; } catch { return 'liquidmetal' } });
   const [ac, setAc] = useState(() => { try { return localStorage.getItem('sonus_accent') || '#00F5D4' } catch { return '#00F5D4' } });
   const [lyricPanel, setLyricPanel] = useState(() => { try { return localStorage.getItem('sonus_lyric_panel') !== 'false' } catch { return true } });
   const [vizTab, setVizTab] = useState('调色');
@@ -187,6 +186,7 @@ export default function Player({ onProfile }) {
   const av = userInfo?.avatar;
 
   useEffect(() => { document.documentElement.style.setProperty('--accent-dynamic', ac); }, [ac]);
+  useEffect(() => { try { localStorage.setItem('sonus_controls_expanded', String(controlsExpanded)); } catch { } }, [controlsExpanded]);
   useEffect(() => { if (error) { const t = setTimeout(clearError, 5000); return () => clearTimeout(t); } }, [error, clearError]);
 
   const doSearch = async kw => {
@@ -218,7 +218,7 @@ export default function Player({ onProfile }) {
       {/* 可视化背景层 */}
       <div style={{ position: 'absolute', inset: 0 }}>
         <FloatingLyrics lyrics={lyrics} isPlaying={isPlaying} />
-        {vm === '3d' ? <Suspense key={currentTrack?.cover || currentTrack?.id || 'none'}><Visualizer3D accent={ac} cover={currentTrack?.cover || ''} mode={v3m} /></Suspense> : <Visualizer isPlaying={isPlaying} mode={vm} accent={ac} />}
+        {vm === '3d' ? <Suspense key={`${currentTrack?.cover || currentTrack?.id || 'none'}-${v3m}`}><Visualizer3D accent={ac} cover={currentTrack?.cover || ''} mode={v3m} isPlaying={isPlaying} /></Suspense> : <Visualizer isPlaying={isPlaying} mode={vm} accent={ac} />}
         {lyricPanel && <LyricScroll currentLyric={currentLyric || ''} accent={ac} />}
       </div>
 
@@ -375,7 +375,7 @@ export default function Player({ onProfile }) {
               {vm === '3d' && (
                 <div>
                   <div style={{ fontSize: 10, fontWeight: 760, letterSpacing: '.14em', color: 'var(--fc-muted)', textTransform: 'uppercase', marginBottom: 10 }}>3D 形态</div>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
                     {VIZ_3D_MODES.map(m => (
                       <button key={m.key} onClick={() => { setV3m(m.key); try { localStorage.setItem('sonus_3d_mode', m.key); } catch { } }} className={`glass-button${v3m === m.key ? ' is-active' : ''}`} style={{ padding: '10px 4px', borderRadius: 12, fontSize: 11 }}>{m.label}</button>
                     ))}

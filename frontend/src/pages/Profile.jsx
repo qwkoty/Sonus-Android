@@ -100,8 +100,10 @@ export default function Profile({ onBack }) {
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
               <span style={{ fontSize: 17, fontWeight: 760, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block' }}>{loadingInfo && !nickname ? '加载中…' : nickname}</span>
-              {userInfo?.vipLevel > 0 && (
-                <span style={{ fontSize: 10, fontWeight: 800, padding: '2px 8px', borderRadius: 6, marginTop: 4, background: 'linear-gradient(135deg, #fff3c2, var(--champagne), #c9963d)', color: '#201303', display: 'inline-block', boxShadow: '0 0 12px rgba(244,210,138,.24)' }}>VIP{userInfo.vipLevel}</span>
+              {userInfo?.vipLevel > 0 ? (
+                <span style={{ fontSize: 10, fontWeight: 800, padding: '2px 8px', borderRadius: 6, marginTop: 4, background: 'linear-gradient(135deg, #fff3c2, var(--champagne), #c9963d)', color: '#201303', display: 'inline-flex', alignItems: 'center', gap: 4, boxShadow: '0 0 12px rgba(244,210,138,.24)' }}><Music2 size={10} /> 可播放 VIP 歌曲</span>
+              ) : (
+                <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 6, marginTop: 4, background: 'rgba(255,255,255,0.08)', color: 'var(--text-muted)', display: 'inline-flex', alignItems: 'center', gap: 4 }}><Music2 size={10} /> 不可播放 VIP 歌曲</span>
               )}
             </div>
           </div>
