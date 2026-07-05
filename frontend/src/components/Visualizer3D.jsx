@@ -145,8 +145,6 @@ export default function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'c
     const FILL = 1.0;
     const MAX_Z_RATIO = 0.09;
     const DOME_DEPTH_RATIO = 0.22;       // 穹顶弯曲，比之前更圆润
-    const SPHERE_RADIUS_RATIO = 0.78;
-    const TUNNEL_RADIUS_RATIO = 0.55;
     const HALO_RADIUS_RATIO = 0.95;
     const LIQUID_RADIUS_RATIO = 0.72;
 
@@ -193,26 +191,15 @@ export default function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'c
           distFromCenter[idx] = dc;
 
           let bx = 0, by = 0, bz = 0, nx = 0, ny = 0, nz = 0;
-          if (shape === 'sphere' || shape === 'liquidmetal') {
+          if (shape === 'liquidmetal') {
             const theta = u * Math.PI * 2;
             const phi = (v - 0.5) * Math.PI;
-            const r = planeSize * (shape === 'liquidmetal' ? LIQUID_RADIUS_RATIO : SPHERE_RADIUS_RATIO);
+            const r = planeSize * LIQUID_RADIUS_RATIO;
             bx = r * Math.cos(phi) * Math.cos(theta);
             by = r * Math.sin(phi);
             bz = r * Math.cos(phi) * Math.sin(theta);
             const len = Math.hypot(bx, by, bz) || 1;
             nx = bx / len; ny = by / len; nz = bz / len;
-          } else if (shape === 'tunnel') {
-            const theta = u * Math.PI * 2;
-            const r = planeSize * TUNNEL_RADIUS_RATIO;
-            bx = r * Math.cos(theta);
-            by = r * Math.sin(theta);
-            bz = (v - 0.5) * planeSize * 2.2;
-            const len = Math.hypot(bx, by) || 1;
-            nx = bx / len; ny = by / len; nz = 0;
-          } else if (shape === 'ripple') {
-            bx = x; by = y; bz = 0;
-            nx = 0; ny = 0; nz = 1;
           } else if (shape === 'soundhalo') {
             const ringR = (0.18 + u * 0.72) * planeSize * HALO_RADIUS_RATIO;
             const theta = v * Math.PI * 2;
@@ -363,25 +350,6 @@ export default function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'c
           x = bx + waveX * amp;
           y = by + waveY * amp;
           z = bz + waveZ * amp;
-        } else if (shape === 'sphere') {
-          // 星球：径向呼吸 + 高频闪烁 + 鼓点冲击
-          const flare = trebleSmooth * Math.sin(u * Math.PI * 6 + time * 2.8 + v * Math.PI * 4) * 0.55;
-          const disp = (totalEnergy * 0.35 + bassPulse * 1.2 * Math.exp(-dc * dc * 2) + flare) * planeSize * 0.30;
-          x += nx * disp;
-          y += ny * disp;
-          z += nz * disp;
-        } else if (shape === 'tunnel') {
-          // 隧道：半径随节奏脉动，整体像音波管一样旋转
-          const wave = Math.sin(u * Math.PI * 8 + time * 1.8) * Math.cos(v * Math.PI * 4 + time * 0.7) * (midSmooth * 0.35);
-          const radiusMod = 1 + bassPulse * 0.30 + midSmooth * 0.18 + wave;
-          x = bx * radiusMod;
-          y = by * radiusMod;
-          z = bz + (wave + trebleSmooth * Math.sin(u * Math.PI * 12 + time * 3) * 0.2) * planeSize * 0.05;
-        } else if (shape === 'ripple') {
-          // 涟漪：由中心向外扩散的环形波，鼓点像水滴落下
-          const ring = Math.sin(dc * 14 - time * 2.8) * Math.exp(-dc * 1.6) * (0.45 + totalEnergy * 0.9);
-          const impact = bassPulse * Math.exp(-dc * dc * 3.5) * 1.6;
-          z = (ring + impact) * planeSize * 0.14;
         } else if (shape === 'soundhalo') {
           // 音波光环：多层同心环自转 + 低频外扩 + 高频波纹
           const ringR = (0.18 + u * 0.72) * planeSize * HALO_RADIUS_RATIO;

@@ -19,9 +19,6 @@ const VIZ_MODES = [
 
 const VIZ_3D_MODES = [
   { key: 'coverflow', label: '粒子封面' },
-  { key: 'sphere', label: '星球' },
-  { key: 'tunnel', label: '隧道' },
-  { key: 'ripple', label: '涟漪' },
   { key: 'soundhalo', label: '音波光环' },
   { key: 'liquidmetal', label: '液态金属' }
 ];
@@ -254,7 +251,7 @@ export default function Player({ onProfile }) {
       </div>
 
       {/* 底部进度条（独立） */}
-      <div style={{ position: 'absolute', left: controlsExpanded ? '50%' : 188, bottom: 'calc(74px + var(--safe-bottom))', transform: controlsExpanded ? 'translateX(-50%)' : 'none', width: controlsExpanded ? 'min(720px, calc(100% - 48px))' : 'min(320px, calc(100% - 220px))', zIndex: 50, display: 'flex', alignItems: 'center', gap: 10, transition: 'left .3s ease, width .3s ease, transform .3s ease' }}>
+      <div style={{ position: 'absolute', left: controlsExpanded ? '50%' : 14, bottom: controlsExpanded ? 'calc(74px + var(--safe-bottom))' : 'calc(72px + var(--safe-bottom))', transform: controlsExpanded ? 'translateX(-50%)' : 'none', width: controlsExpanded ? 'min(720px, calc(100% - 48px))' : 156, zIndex: 50, display: 'flex', alignItems: 'center', gap: 8, transition: 'left .3s ease, width .3s ease, transform .3s ease, bottom .3s ease' }}>
         <span style={{ fontSize: 10.5, color: 'var(--text-muted)', minWidth: 34, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{fmt(currentTime)}</span>
         <div ref={pr} onMouseDown={hp} onTouchStart={hp} style={{ flex: 1, height: 18, display: 'flex', alignItems: 'center', cursor: 'pointer', touchAction: 'none' }}>
           <div style={{ width: '100%', height: controlsExpanded ? 4 : 3, borderRadius: 999, background: 'rgba(255,255,255,0.09)', position: 'relative', overflow: 'visible', boxShadow: 'inset 0 1px 1px rgba(255,255,255,0.12), inset 0 -1px 1px rgba(0,0,0,0.25)', transition: 'height .2s, background .2s' }}>
@@ -275,9 +272,9 @@ export default function Player({ onProfile }) {
           }}
         >
           <button onClick={() => setControlsExpanded(true)} style={{ width: 40, height: 40, borderRadius: 11, overflow: 'hidden', flexShrink: 0, background: 'rgba(255,255,255,0.06)', border: 'none', padding: 0, cursor: 'pointer' }}>
-            {currentTrack?.cover ? <img src={currentTrack.cover} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <div style={{ width: '100%', height: '100%', background: 'linear-gradient(135deg, rgba(0,245,212,0.25), rgba(36,66,255,0.18))' }} />}
+            {currentTrack?.cover ? <img key={currentTrack.id} src={currentTrack.cover} alt="" className="cover-fade" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <div style={{ width: '100%', height: '100%', background: 'linear-gradient(135deg, rgba(0,245,212,0.25), rgba(36,66,255,0.18))' }} />}
           </button>
-          <button onClick={togglePlay} className="glass-button-accent" style={{ width: 36, height: 36, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: ac, boxShadow: `0 0 16px ${ac}44, inset 0 1px 0 rgba(255,255,255,0.25)` }}>
+          <button onClick={togglePlay} className={`glass-button-accent${isPlaying ? ' pulsing' : ''}`} style={{ width: 36, height: 36, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: ac, boxShadow: `0 0 16px ${ac}44, inset 0 1px 0 rgba(255,255,255,0.25)` }}>
             {isPlaying ? <Pause size={18} fill="#050608" /> : <Play size={18} fill="#050608" style={{ marginLeft: 2 }} />}
           </button>
           <button onClick={next} className="glass-button" style={{ width: 32, height: 32, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.78)' }}><SkipForward size={18} fill="currentColor" /></button>
@@ -294,7 +291,7 @@ export default function Player({ onProfile }) {
         >
           {/* 歌曲信息 */}
           <div style={{ width: 40, height: 40, borderRadius: 10, overflow: 'hidden', flexShrink: 0, background: 'rgba(255,255,255,0.06)' }}>
-            {currentTrack?.cover ? <img src={currentTrack.cover} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <div style={{ width: '100%', height: '100%', background: 'linear-gradient(135deg, rgba(0,245,212,0.25), rgba(36,66,255,0.18))' }} />}
+            {currentTrack?.cover ? <img key={currentTrack.id} src={currentTrack.cover} alt="" className="cover-fade" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <div style={{ width: '100%', height: '100%', background: 'linear-gradient(135deg, rgba(0,245,212,0.25), rgba(36,66,255,0.18))' }} />}
           </div>
           <div style={{ minWidth: 0, display: 'flex', flexDirection: 'column', gap: 1, flex: 1 }}>
             <div style={{ fontSize: 12, fontWeight: 700, color: 'rgba(255,255,255,0.92)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{currentTrack?.title || 'Sonus'}</div>
@@ -304,7 +301,7 @@ export default function Player({ onProfile }) {
           {/* 播放控制 */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
             <button onClick={prev} className="glass-button" style={{ width: 28, height: 28, borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.78)' }}><SkipBack size={17} fill="currentColor" /></button>
-            <button onClick={togglePlay} className="glass-button-accent" style={{ width: 38, height: 38, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: ac, boxShadow: `0 0 18px ${ac}44, 0 4px 12px rgba(0,0,0,0.28), inset 0 1px 0 rgba(255,255,255,0.25)` }}>
+            <button onClick={togglePlay} className={`glass-button-accent${isPlaying ? ' pulsing' : ''}`} style={{ width: 38, height: 38, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: ac, boxShadow: `0 0 18px ${ac}44, 0 4px 12px rgba(0,0,0,0.28), inset 0 1px 0 rgba(255,255,255,0.25)` }}>
               {isPlaying ? <Pause size={18} fill="#050608" /> : <Play size={18} fill="#050608" style={{ marginLeft: 2 }} />}
             </button>
             <button onClick={next} className="glass-button" style={{ width: 28, height: 28, borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.78)' }}><SkipForward size={17} fill="currentColor" /></button>
