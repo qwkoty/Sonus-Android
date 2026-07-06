@@ -172,6 +172,7 @@ public class CookieReaderPlugin extends Plugin {
             JSObject ret = new JSObject();
             ret.put("status", status);
             ret.put("setCookies", sbSetCookies.toString());
+            ret.put("finalUrl", conn.getURL().toString());
 
             if (status >= 200 && status < 300) {
                 BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream(), "UTF-8"));

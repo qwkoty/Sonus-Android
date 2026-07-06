@@ -13,6 +13,14 @@ export default function App() {
   // 任一平台已登录 → 头像进 Profile；都未登录 → 头像进 Login
   const [view, setView] = useState('player'); // 'player' | 'profile' | 'login'
 
+  // 冷启动：持久化登录态 isLoggedIn 初始即为 true 时不会触发上面的 effect
+  // 所以在 mount 时主动拉取一次用户信息
+  useEffect(() => {
+    if (isLoggedIn) {
+      fetchUserInfo();
+    }
+  }, []);
+
   useEffect(() => {
     if (isLoggedIn) {
       fetchUserInfo();

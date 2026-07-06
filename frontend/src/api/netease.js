@@ -136,9 +136,14 @@ async function playlist(id, cookie) {
 
 // ==================== 播放链接 ====================
 // 返回本地代理包装后的 URL；空 URL 返回 ''
-// 多档音质尝试：320k -> 128k -> 96k，提高免费歌曲播放成功率
+// 多接口尝试：
+//   1) /api/song/enhance/player/url (登录态高音质)
+//   2) /api/song/url?id=... (网页接口)
+//   3) /song/media/outer/url?id=... (免登录 302 跳转，最稳定)
 async function songUrl(id, cookie) {
   const rawId = String(id).replace(/^ncm_/, '');
+
+  // 尝试 1：登录态高音质接口
   const brCandidates = [320000, 128000, 96000];
   for (const br of brCandidates) {
     try {
@@ -148,12 +153,35 @@ async function songUrl(id, cookie) {
       const item = data.find((it) => it && it.url) || data[0];
       const rawUrl = item?.url || '';
       if (!rawUrl) continue;
-      // 网易云 CDN 直链同样需要本地代理转发，绕过 WebView Audio 跨域 403
       return await getProxyUrl(rawUrl);
     } catch (e) {
       // 继续尝试下一档音质
     }
   }
+
+  // 尝试 2：网页接口
+  try {
+    const d2 = await ncmGet(`/api/song/url?id=${encodeURIComponent(rawId)}&br=128000`, cookie);
+    const data2 = d2?.data || [];
+    const item2 = data2.find((it) => it && it.url) || data2[0];
+    const rawUrl2 = item2?.url || '';
+    if (rawUrl2) return await getProxyUrl(rawUrl2);
+  } catch (e) {}
+
+  // 尝试 3：免登录 outer URL，302 跳转到真实 CDN
+  try {
+    const outerUrl = `${NCM_BASE}/song/media/outer/url?id=${encodeURIComponent(rawId)}`;
+    const r3 = await CookieReader.httpGet(outerUrl, NCM_BASE);
+    // 跟随 302 后 finalUrl 就是真实 CDN 链接
+    const finalUrl = r3?.finalUrl || '';
+    if (finalUrl && !finalUrl.includes('/song/media/outer/url')) {
+      console.log('[ncm.songUrl] outer fallback finalUrl:', finalUrl);
+      return await getProxyUrl(finalUrl);
+    }
+  } catch (e) {
+    console.warn('[ncm.songUrl] outer fallback failed', e);
+  }
+
   return '';
 }
 

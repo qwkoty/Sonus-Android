@@ -4,6 +4,13 @@
 
 import { CookieReader } from '../plugins/CookieReader';
 
+// 从 Cookie 字符串中提取 uin（兼容 o0 前缀）
+function extractUinFromCookie(cookie) {
+  if (!cookie) return '';
+  const m = cookie.match(/(?:^|;\s*)(?:uin|wxuin)=o?(\d+)/);
+  return m ? m[1] : '';
+}
+
 function qqUrl(payload) {
   return `https://u.y.qq.com/cgi-bin/musicu.fcg?data=${encodeURIComponent(JSON.stringify(payload))}`;
 }
@@ -218,25 +225,107 @@ async function lyricAPK(id) {
   return decodeB64Utf8(b64);
 }
 
+// 计算 QQ 音乐 g_tk（从 cookie 中的 p_skey 或 skey）
+function getGtk(skey) {
+  if (!skey) return 5381;
+  let hash = 5381;
+  for (let i = 0; i < skey.length; i++) {
+    hash += (hash << 5) + skey.charCodeAt(i);
+  }
+  return hash & 0x7fffffff;
+}
+
 // ==================== 用户信息 ====================
 async function userInfoAPK(uin, cookie = '') {
-  const d = await nativeGet(qqUrl({
-    comm: { uin: String(uin), format: 'json', ct: 24, cv: 0 },
-    req_0: { module: 'music.UserInfo.userInfoServer', method: 'GetLoginUserInfo', param: {} },
-  }), cookie);
-  const i = d?.req_0?.data;
-  const avatar = i?.headpic || i?.headimg || i?.avatar || i?.face || i?.headPic || '';
-  // nickname 多字段尝试，避免接口字段变动导致拉不到名字
-  const nickname = i?.nick || i?.nickname || i?.name || i?.userName || '';
-  console.log('[userInfo] raw fields:', { nick: i?.nick, nickname: i?.nickname, name: i?.name, headpic: i?.headpic, headimg: i?.headimg });
+  const skeyMatch = (cookie || '').match(/(?:^|;\s*)skey=([^;]+)/);
+  const pskeyMatch = (cookie || '').match(/(?:^|;\s*)p_skey=([^;]+)/);
+  const gtk = getGtk(pskeyMatch ? pskeyMatch[1] : (skeyMatch ? skeyMatch[1] : ''));
+  const uinStr = String(uin || extractUinFromCookie(cookie) || '0');
+
+  // 尝试接口 1：music.UserInfo.userInfoServer.GetLoginUserInfo（登录态）
+  try {
+    const d = await nativeGet(qqUrl({
+      comm: {
+        uin: uinStr,
+        format: 'json',
+        ct: 24,
+        cv: 0,
+        g_tk: gtk,
+        t: Date.now(),
+      },
+      req_0: {
+        module: 'music.UserInfo.userInfoServer',
+        method: 'GetLoginUserInfo',
+        param: {},
+      },
+    }), cookie);
+    const i = d?.req_0?.data;
+    if (i && (i.nick || i.nickname || i.name || i.headpic)) {
+      const avatar = i?.headpic || i?.headimg || i?.avatar || i?.face || i?.headPic || '';
+      const nickname = i?.nick || i?.nickname || i?.name || i?.userName || '';
+      console.log('[userInfo] from GetLoginUserInfo:', { nickname, uin: uinStr });
+      return {
+        nickname: nickname || 'QQ音乐用户',
+        avatar,
+        uin: uinStr,
+        vipLevel: i?.vipLevel || 0,
+        isVip: !!(i?.isVip || i?.vip || i?.vipStatus || i?.svipLevel || i?.payPackId),
+        follow: i?.follow || 0,
+        fans: i?.fans || 0,
+      };
+    }
+  } catch (e) {
+    console.warn('[userInfo] GetLoginUserInfo failed:', e.message);
+  }
+
+  // 尝试接口 2：music.login.UserV3.GetUinEncryptMc（常用用户信息接口）
+  try {
+    const d2 = await nativeGet(qqUrl({
+      comm: {
+        uin: uinStr,
+        format: 'json',
+        ct: 24,
+        cv: 0,
+        g_tk: gtk,
+        t: Date.now(),
+      },
+      req_0: {
+        module: 'music.login.UserV3',
+        method: 'GetUinEncryptMc',
+        param: { uin: uinStr },
+      },
+    }), cookie);
+    const i2 = d2?.req_0?.data;
+    if (i2 && (i2.nick || i2.nickname || i2.name)) {
+      const avatar = i2?.headpic || i2?.headimg || i2?.avatar || i2?.face || '';
+      const nickname = i2?.nick || i2?.nickname || i2?.name || i2?.userName || '';
+      console.log('[userInfo] from GetUinEncryptMc:', { nickname, uin: uinStr });
+      return {
+        nickname: nickname || 'QQ音乐用户',
+        avatar,
+        uin: uinStr,
+        vipLevel: i2?.vipLevel || 0,
+        isVip: !!(i2?.isVip || i2?.vip || i2?.vipStatus),
+        follow: i2?.follow || 0,
+        fans: i2?.fans || 0,
+      };
+    }
+  } catch (e) {
+    console.warn('[userInfo] GetUinEncryptMc failed:', e.message);
+  }
+
+  // 兜底：从 cookie 里尝试找名字（部分登录方式 cookie 里会有 nick）
+  const cookieNick = (cookie || '').match(/(?:^|;\s*)nick=([^;]+)/);
+  const fallbackNick = cookieNick ? decodeURIComponent(cookieNick[1]) : 'QQ音乐用户';
+  console.log('[userInfo] all interfaces failed, fallback nick:', fallbackNick);
   return {
-    nickname: nickname || 'QQ音乐用户',
-    avatar,
-    uin: String(uin),
-    vipLevel: i?.vipLevel || 0,
-    isVip: !!(i?.isVip || i?.vip || i?.vipStatus || i?.svipLevel || i?.payPackId),
-    follow: i?.follow || 0,
-    fans: i?.fans || 0,
+    nickname: fallbackNick,
+    avatar: uinStr ? `https://q1.qlogo.cn/g?b=qq&nk=${uinStr}&s=640` : '',
+    uin: uinStr,
+    vipLevel: 0,
+    isVip: false,
+    follow: 0,
+    fans: 0,
   };
 }
 
