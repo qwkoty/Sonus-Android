@@ -83,14 +83,14 @@ export const useAuthStore = create((set, get) => {
 
     // ===== QQ 音乐登录方法（原有，保持不变） =====
     // 登录成功写入（由 Login 页调用）
-    setAuth: ({ cookie, uin, key, nickname }) => {
+    setAuth: ({ cookie, uin, key, nickname, avatar }) => {
       const next = {
         isLoggedIn: true,
         cookie,
         uin: String(uin || ''),
         key: key || '',
         nickname: nickname || 'QQ音乐用户',
-        userInfo: null,
+        userInfo: avatar ? { avatar } : null,
       };
       set(next);
       savePersisted(next);
@@ -98,12 +98,14 @@ export const useAuthStore = create((set, get) => {
     },
 
     fetchUserInfo: async () => {
-      const { cookie, uin, isLoggedIn } = get();
+      const { cookie, uin, isLoggedIn, userInfo } = get();
       if (!isLoggedIn || !cookie || !uin) return;
       set({ loadingInfo: true });
       try {
         const info = await music.userInfo(cookie, uin);
         console.log('[fetchUserInfo] result:', info);
+        // 保留 WebView 已提取的头像
+        if (userInfo?.avatar && !info?.avatar) info.avatar = userInfo.avatar;
         set({ userInfo: info, nickname: info?.nickname || get().nickname, loadingInfo: false });
       } catch (e) {
         console.error('[fetchUserInfo] failed:', e);

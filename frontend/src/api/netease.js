@@ -195,9 +195,9 @@ async function songUrl(id, cookie) {
     if (rawUrl2) return await getProxyUrl(rawUrl2);
   } catch (e) {}
 
-  // 尝试 3：免登录 outer URL，302 跳转到真实 CDN
+  // 尝试 3：免登录 outer URL，必须带 .mp3 后缀才会 302 到真实 CDN
   try {
-    const outerUrl = `${NCM_BASE}/song/media/outer/url?id=${encodeURIComponent(rawId)}`;
+    const outerUrl = `${NCM_BASE}/song/media/outer/url?id=${encodeURIComponent(rawId)}.mp3`;
     const r3 = await CookieReader.httpGet(outerUrl, NCM_BASE);
     // 跟随 302 后 finalUrl 就是真实 CDN 链接
     const finalUrl = r3?.finalUrl || '';

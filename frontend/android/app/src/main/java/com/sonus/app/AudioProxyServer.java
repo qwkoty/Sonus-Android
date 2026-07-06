@@ -45,24 +45,26 @@ public class AudioProxyServer extends NanoHTTPD {
             URL url = new URL(targetUrl);
             String host = url.getHost().toLowerCase();
             boolean isNetease = host.contains("126.net") || host.contains("music.163.com");
+            // 网易云 CDN 直链（126.net）通常是公开可访问的，加 Referer/Cookie 反而可能触发风控
+            boolean isNeteaseCdn = isNetease && host.endsWith(".126.net");
             String referer = isNetease ? "https://music.163.com/" : "https://y.qq.com/";
             String cookieDomain = isNetease ? "https://music.163.com" : "https://y.qq.com";
-            // 网易云音频 CDN 域名如 m701.music.126.net，CookieManager 需要按 music.163.com 主域查
-            if (isNetease && host.endsWith(".126.net")) {
-                cookieDomain = "https://music.163.com";
-            }
 
             HttpURLConnection conn = (HttpURLConnection) url.openConnection();
             conn.setRequestMethod("GET");
             conn.setRequestProperty("User-Agent", USER_AGENT);
-            conn.setRequestProperty("Referer", referer);
+            if (!isNeteaseCdn) {
+                conn.setRequestProperty("Referer", referer);
+            }
 
-            // 注入对应平台登录 Cookie
-            CookieManager cm = CookieManager.getInstance();
-            cm.flush();
-            String cookies = cm.getCookie(cookieDomain);
-            if (cookies != null && !cookies.isEmpty()) {
-                conn.setRequestProperty("Cookie", cookies);
+            // 注入对应平台登录 Cookie（CDN 直链不需要）
+            if (!isNeteaseCdn) {
+                CookieManager cm = CookieManager.getInstance();
+                cm.flush();
+                String cookies = cm.getCookie(cookieDomain);
+                if (cookies != null && !cookies.isEmpty()) {
+                    conn.setRequestProperty("Cookie", cookies);
+                }
             }
 
             // 支持 Range 请求（Audio 元素 seek 时会发 Range）

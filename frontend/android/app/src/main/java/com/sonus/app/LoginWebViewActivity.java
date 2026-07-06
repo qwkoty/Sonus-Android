@@ -157,9 +157,11 @@ public class LoginWebViewActivity extends Activity {
 
         if (hasUin) {
             loginDetected = true;
+            // 提取页面上的昵称/头像，比后端接口更可靠
+            extractUserInfoFromPage();
             if (!musicKey.isEmpty()) {
-                // 票据齐全，可以完成登录
-                finishWithResult(true);
+                // 票据齐全，可以完成登录（稍等 JS 回调完成）
+                webView.postDelayed(() -> finishWithResult(true), 400);
             } else {
                 // 缺票据，跳到播放器页触发 qm_keyst 写入，轮询等待
                 webView.loadUrl(PLAYER_URL);
@@ -210,13 +212,49 @@ public class LoginWebViewActivity extends Activity {
         webView.postDelayed(holder[0], 1500);
     }
 
+    private String cachedNickname = "";
+    private String cachedAvatar = "";
+
     private void finishWithResult(boolean loggedIn) {
         // 最终 flush，确保 Cookie 持久化到磁盘
         CookieManager.getInstance().flush();
         Intent resultIntent = new Intent();
         resultIntent.putExtra("loggedIn", loggedIn);
+        resultIntent.putExtra("nickname", cachedNickname);
+        resultIntent.putExtra("avatar", cachedAvatar);
         setResult(loggedIn ? RESULT_OK : RESULT_CANCELED, resultIntent);
         finish();
+    }
+
+    /**
+     * 注入 JS 读取 QQ 音乐页面上的用户信息（window.g_user / __INITIAL_STATE__ / DOM）
+     */
+    private void extractUserInfoFromPage() {
+        if (webView == null) return;
+        webView.evaluateJavascript(
+            "(function(){" +
+            "  try{" +
+            "    if(window.g_user && window.g_user.nick){ return JSON.stringify({nick: window.g_user.nick, avatar: window.g_user.headpic || window.g_user.avatar || ''}); }" +
+            "    if(window.__INITIAL_STATE__ && window.__INITIAL_STATE__.userInfo){ var u=window.__INITIAL_STATE__.userInfo; return JSON.stringify({nick: u.nick || u.nickname || '', avatar: u.headpic || u.avatar || ''}); }" +
+            "    var el=document.querySelector('.mod_user_name, .user_name, .profile__username, [class*=\"nick\"], [class*=\"user-name\"]');" +
+            "    if(el && el.innerText){ return JSON.stringify({nick: el.innerText.trim(), avatar: ''}); }" +
+            "    return JSON.stringify({nick:'', avatar:''});" +
+            "  }catch(e){ return JSON.stringify({nick:'', avatar:''}); }" +
+            "})();",
+            new android.webkit.ValueCallback<String>() {
+                @Override
+                public void onReceiveValue(String value) {
+                    try {
+                        if (value == null || value.isEmpty() || value.equals("null")) return;
+                        String json = value.replace("\\\"", "\"").replace("\"{", "{").replace("}\"", "}");
+                        if (json.startsWith("\"")) json = json.substring(1, json.length() - 1);
+                        org.json.JSONObject obj = new org.json.JSONObject(json);
+                        cachedNickname = obj.optString("nick", "");
+                        cachedAvatar = obj.optString("avatar", "");
+                    } catch (Exception e) {}
+                }
+            }
+        );
     }
 
     private Runnable pollRunnable;

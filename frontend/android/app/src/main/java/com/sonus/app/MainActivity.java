@@ -124,7 +124,9 @@ public class MainActivity extends BridgeActivity {
                 if (plugin instanceof CookieReaderPlugin) {
                     boolean loggedIn = resultCode == RESULT_OK;
                     if (requestCode == 1001) {
-                        ((CookieReaderPlugin) plugin).notifyLoginResult(loggedIn);
+                        String nickname = data != null ? data.getStringExtra("nickname") : "";
+                        String avatar = data != null ? data.getStringExtra("avatar") : "";
+                        ((CookieReaderPlugin) plugin).notifyLoginResult(loggedIn, nickname, avatar);
                     } else {
                         ((CookieReaderPlugin) plugin).notifyNeteaseLoginResult(loggedIn);
                     }

@@ -38,14 +38,33 @@ export default function Login({ onBack }) {
       }
       setWebviewPhase('polling');
       setWebviewTip('请在弹出的窗口中登录 QQ 音乐…');
-      await CookieReader.openLoginWebView();
+      const wvRes = await CookieReader.openLoginWebView();
       setWebviewTip('登录成功，正在同步账号信息…');
-      let cookies = await CookieReader.getCookiesForUrl('https://y.qq.com');
-      for (let i = 0; i < 3 && (!cookies.qqmusic_key); i++) {
-        await new Promise(r => setTimeout(r, 800));
-        cookies = await CookieReader.getCookiesForUrl('https://y.qq.com');
+      // WebView 已返回 cookie + 页面提取的昵称/头像
+      const cookies = {
+        cookie: wvRes?.cookie || '',
+        uin: '',
+        qqmusic_key: '',
+        loggedIn: wvRes?.loggedIn || false,
+      };
+      // 从 cookie 字符串中解析 uin 和 key
+      if (cookies.cookie) {
+        const uinMatch = cookies.cookie.match(/(?:^|;\s*)(?:uin|wxuin)=o?(\d+)/);
+        if (uinMatch) cookies.uin = uinMatch[1];
+        const keyMatch = cookies.cookie.match(/(?:^|;\s*)(qm_keyst|qqmusic_key|music_key)=([^;]+)/);
+        if (keyMatch) cookies.qqmusic_key = keyMatch[2];
       }
-      await handleCookieLogin(cookies);
+      // 如果 WebView 没拿到昵称，再fallback读 CookieManager
+      if (!wvRes?.nickname) {
+        const cm = await CookieReader.getCookiesForUrl('https://y.qq.com');
+        if (cm?.cookie) {
+          cookies.cookie = cm.cookie;
+          cookies.uin = cm.uin || cookies.uin;
+          cookies.qqmusic_key = cm.qqmusic_key || cookies.qqmusic_key;
+          cookies.loggedIn = cm.loggedIn;
+        }
+      }
+      await handleCookieLogin(cookies, wvRes?.nickname, wvRes?.avatar);
     } catch (e) {
       setWebviewPhase('error');
       setWebviewTip('登录已取消：' + (e.message || ''));
@@ -64,27 +83,32 @@ export default function Login({ onBack }) {
     }
   };
 
-  const handleCookieLogin = async (cookies) => {
+  const handleCookieLogin = async (cookies, wvNickname, wvAvatar) => {
     if (!cookies.cookie || !cookies.uin) {
       setWebviewPhase('error');
       setWebviewTip('Cookie 信息不完整，请重试');
       return;
     }
     setWebviewTip('登录成功，正在同步账号…');
+    // 优先使用 WebView 从页面提取的昵称/头像
+    let nickname = wvNickname || '';
+    let avatar = wvAvatar || '';
     try {
       const loginRes = await music.loginByCookie(cookies.cookie);
       if (Number(loginRes?.code) === 0) {
-        setAuth({ cookie: loginRes.cookie || cookies.cookie, uin: loginRes.uin || cookies.uin, key: loginRes.key || cookies.qqmusic_key, nickname: loginRes.nickname || 'QQ音乐用户' });
-      } else {
-        setAuth({ cookie: cookies.cookie, uin: cookies.uin, key: cookies.qqmusic_key, nickname: 'QQ音乐用户' });
+        nickname = nickname || loginRes.nickname;
+        avatar = avatar || loginRes.avatar;
       }
-      setWebviewPhase('success');
-      setView('account');
-    } catch (e) {
-      setAuth({ cookie: cookies.cookie, uin: cookies.uin, key: cookies.qqmusic_key, nickname: 'QQ音乐用户' });
-      setWebviewPhase('success');
-      setView('account');
-    }
+    } catch (e) {}
+    setAuth({
+      cookie: cookies.cookie,
+      uin: cookies.uin,
+      key: cookies.qqmusic_key,
+      nickname: nickname || 'QQ音乐用户',
+      avatar: avatar || '',
+    });
+    setWebviewPhase('success');
+    setView('account');
   };
 
   const handleLoadPlaylists = async () => {

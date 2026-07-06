@@ -284,12 +284,21 @@ public class CookieReaderPlugin extends Plugin {
         call.resolve(ret);
     }
 
-    public void notifyLoginResult(boolean loggedIn) {
+    public void notifyLoginResult(boolean loggedIn, String nickname, String avatar) {
         if (pendingLoginCall == null) return;
-        JSObject ret = new JSObject();
-        ret.put("loggedIn", loggedIn);
-        if (loggedIn) pendingLoginCall.resolve(ret);
-        else pendingLoginCall.reject("User cancelled login");
+        if (loggedIn) {
+            CookieManager cm = CookieManager.getInstance();
+            cm.flush();
+            String cookie = cm.getCookie("https://y.qq.com");
+            JSObject ret = new JSObject();
+            ret.put("loggedIn", true);
+            ret.put("cookie", cookie != null ? cookie : "");
+            ret.put("nickname", nickname != null ? nickname : "");
+            ret.put("avatar", avatar != null ? avatar : "");
+            pendingLoginCall.resolve(ret);
+        } else {
+            pendingLoginCall.reject("User cancelled login");
+        }
         pendingLoginCall = null;
     }
 

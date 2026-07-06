@@ -15,7 +15,7 @@ export interface CookieReaderPlugin {
   clearCookiesForUrl(options: { url: string }): Promise<void>;
   httpGet(options: { url: string; cookieDomain?: string; cookies?: string }): Promise<HttpGetResult>;
   syncStreamCookies(options?: { url?: string }): Promise<void>;
-  openLoginWebView(): Promise<{ loggedIn: boolean }>;
+  openLoginWebView(): Promise<{ loggedIn: boolean; cookie: string; nickname: string; avatar: string }>;
   openNeteaseLoginWebView(): Promise<{ loggedIn: boolean; cookie: string }>;
   getProxyPort(): Promise<{ port: number; available: boolean }>;
 }
