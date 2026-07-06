@@ -3,7 +3,6 @@ import { Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Repeat1, ListMusic
 import { usePlayerStore } from '../store/usePlayerStore';
 import { useAuthStore } from '../store/useAuthStore';
 import { music } from '../api/music';
-import { netease } from '../api/netease';
 import Visualizer from '../components/Visualizer';
 import FloatingLyrics from '../components/FloatingLyrics';
 import LyricScroll from '../components/LyricScroll';
@@ -132,27 +131,11 @@ function Row({ track, active, onPlay }) {
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <span style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flex: 1, color: active ? 'var(--accent-dynamic)' : 'var(--text-primary)' }}>{track.title}</span>
-          <PlatformBadge platform={track.platform} />
         </div>
         <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{track.artist}{track.album ? ` · ${track.album}` : ''}</div>
       </div>
       <span style={{ fontSize: 11, color: 'var(--text-muted)', flexShrink: 0 }}>{track.duration ? fmt(track.duration) : ''}</span>
     </div>
-  );
-}
-
-// 平台来源徽章：QQ 音乐（青绿）/ 网易云（红色）
-function PlatformBadge({ platform }) {
-  const isNcm = platform === 'ncm';
-  return (
-    <span style={{
-      flexShrink: 0, fontSize: 9, fontWeight: 700, padding: '2px 6px', borderRadius: 5, letterSpacing: '.04em',
-      color: isNcm ? '#ff8a9b' : '#7ee2c8',
-      background: isNcm ? 'rgba(230, 0, 38, .16)' : 'rgba(0, 245, 212, .14)',
-      border: `1px solid ${isNcm ? 'rgba(230, 0, 38, .3)' : 'rgba(0, 245, 212, .28)'}`,
-    }}>
-      {isNcm ? '网易云' : 'QQ'}
-    </span>
   );
 }
 
@@ -193,8 +176,6 @@ export default function Player({ onProfile }) {
   const [sq, setSq] = useState(false); const [qo, setQo] = useState(false); const [viz, setViz] = useState(false);
   const [controlsExpanded, setControlsExpanded] = useState(() => { try { return localStorage.getItem('sonus_controls_expanded') !== 'false'; } catch { return true } });
   const [query, setQuery] = useState(''); const [results, setResults] = useState([]); const [searching, setSearching] = useState(false); const st = useRef(null);
-  // 搜索平台过滤：'all' | 'qq' | 'ncm'
-  const [searchTab, setSearchTab] = useState('all');
   const [vm, setVm] = useState(() => { try { return localStorage.getItem('sonus_viz_mode') || 'ring' } catch { return 'ring' } });
   const [v3m, setV3m] = useState(() => { try { const v = localStorage.getItem('sonus_3d_mode'); const valid = ['coverflow','liquidmetal']; return valid.includes(v) ? v : 'liquidmetal'; } catch { return 'liquidmetal' } });
   const [ac, setAc] = useState(() => { try { return localStorage.getItem('sonus_accent') || '#00F5D4' } catch { return '#00F5D4' } });
@@ -214,20 +195,11 @@ export default function Player({ onProfile }) {
     if (!kw.trim()) { setResults([]); return; }
     setSearching(true);
     try {
-      // 并发搜索 QQ 音乐 + 网易云，合并结果（每条已带 platform 字段）
-      const [qqRes, ncmRes] = await Promise.allSettled([
-        music.search(kw, 30),
-        netease.search(kw, 30),
-      ]);
-      const qq = qqRes.status === 'fulfilled' ? (qqRes.value || []) : [];
-      const ncm = ncmRes.status === 'fulfilled' ? (ncmRes.value || []) : [];
-      setResults([...qq, ...ncm]);
+      const qq = await music.search(kw, 30);
+      setResults(qq || []);
     } catch (e) { setError('搜索失败') } finally { setSearching(false); }
   };
   const onQ = v => { setQuery(v); if (st.current) clearTimeout(st.current); if (!v.trim()) { setResults([]); return; } st.current = setTimeout(() => doSearch(v), 350); };
-
-  // 按平台过滤搜索结果
-  const filteredResults = searchTab === 'all' ? results : results.filter(t => t.platform === searchTab);
 
   const hp = (e) => {
     if (!pr.current || !duration || !isFinite(duration)) return;
@@ -362,27 +334,17 @@ export default function Player({ onProfile }) {
       )}
 
       {/* 搜索浮窗 */}
-      <FloatPanel open={sq} onClose={() => setSq(false)} title="搜索 · QQ + 网易云" width={420}>
+      <FloatPanel open={sq} onClose={() => setSq(false)} title="搜索 · QQ 音乐" width={420}>
         <div style={{ padding: '0 2px 12px' }}>
           <div className="glass-input-wrap" style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', height: 48, borderRadius: 18 }}>
             <Search size={16} color="var(--text-secondary)" />
             <input value={query} onChange={e => onQ(e.target.value)} placeholder="歌曲、歌手、专辑…" autoFocus style={{ flex: 1, fontSize: 14, background: 'transparent', border: 'none', outline: 'none', color: '#fff' }} />
             {query && <button onClick={() => { setQuery(''); setResults([]); }} className="glass-button" style={{ width: 24, height: 24, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><X size={14} /></button>}
           </div>
-          {/* 平台导航栏 */}
-          <div style={{ display: 'flex', gap: 6, marginTop: 10, padding: '3px', borderRadius: 12, background: 'rgba(255,255,255,0.05)' }}>
-            {[
-              { key: 'all', label: '全部' },
-              { key: 'qq', label: 'QQ 音乐' },
-              { key: 'ncm', label: '网易云' },
-            ].map(tab => (
-              <button key={tab.key} onClick={() => setSearchTab(tab.key)} style={{ flex: 1, padding: '7px 0', borderRadius: 9, border: 'none', background: searchTab === tab.key ? 'rgba(255,255,255,0.12)' : 'transparent', color: searchTab === tab.key ? '#fff' : 'var(--text-secondary)', fontSize: 12, fontWeight: searchTab === tab.key ? 700 : 500, cursor: 'pointer', transition: 'all .2s ease' }}>{tab.label}</button>
-            ))}
-          </div>
         </div>
         {searching && results.length === 0 ? <div style={{ display: 'flex', justifyContent: 'center', padding: 28 }}><Loader2 size={18} className="spin-icon" color="var(--text-secondary)" /></div>
-          : filteredResults.length === 0 ? <div style={{ textAlign: 'center', padding: 28, color: 'var(--text-muted)', fontSize: 12, letterSpacing: '.3px' }}>{query ? '无结果' : '输入关键词开始搜索'}</div>
-            : filteredResults.map(t => <Row key={t.id} track={t} active={currentTrack?.id === t.id} onPlay={tr => { playTrack(tr); setSq(false); }} />)}
+          : results.length === 0 ? <div style={{ textAlign: 'center', padding: 28, color: 'var(--text-muted)', fontSize: 12, letterSpacing: '.3px' }}>{query ? '无结果' : '输入关键词开始搜索'}</div>
+            : results.map(t => <Row key={t.id} track={t} active={currentTrack?.id === t.id} onPlay={tr => { playTrack(tr); setSq(false); }} />)}
       </FloatPanel>
 
       {/* 队列浮窗 */}

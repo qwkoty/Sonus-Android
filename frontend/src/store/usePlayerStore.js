@@ -1,6 +1,5 @@
 import { create } from 'zustand';
 import { music } from '../api/music';
-import { netease } from '../api/netease';
 import { useAuthStore } from './useAuthStore';
 import { getAudio, initAudioSystem } from '../audio/engine';
 
@@ -97,7 +96,7 @@ export const usePlayerStore = create((set, get) => {
   audio.addEventListener('error', () => {
     const err = audio.error;
     console.error('Audio error', err?.code, err?.message, audio.src);
-    set({ isPlaying: false, isLoadingUrl: false, error: `音源加载失败 (${err?.code || '?'})，自动切换下一首` });
+    set({ isPlaying: false, isLoadingUrl: false, error: `音源加载失败 (${err?.code || '?'}), 自动切换下一首` });
     setTimeout(() => {
       const { playMode, currentTrack } = get();
       if (currentTrack && playMode !== 'single') get().next();
@@ -147,25 +146,13 @@ export const usePlayerStore = create((set, get) => {
       }
 
       const { cookie, uin, key } = authCreds();
-      // 网易云登录态（独立于 QQ）
-      const { neteaseCookie } = useAuthStore.getState();
-      const isNcm = track.platform === 'ncm';
 
       let url = track.url || '';
       if (!url && track.rawId) {
         try {
-          if (isNcm) {
-            // 网易云：通过 ncm.songUrl 获取，URL 已包装为本地代理
-            url = await netease.songUrl(track.rawId, neteaseCookie || '');
-            if (!url) {
-              console.warn('[playTrack] ncm songUrl 返回空 (可能 VIP/版权)', track.rawId);
-            }
-          } else {
-            // QQ 音乐：原有流程
-            url = await music.stream(track.rawId, cookie, uin, key, track.mediaMid || '');
-            if (!url) {
-              console.warn('[playTrack] qq stream 返回空 (可能 VIP/版权)', track.rawId);
-            }
+          url = await music.stream(track.rawId, cookie, uin, key, track.mediaMid || '');
+          if (!url) {
+            console.warn('[playTrack] qq stream 返回空 (可能 VIP/版权)', track.rawId);
           }
         } catch (e) {
           console.error('获取播放链接失败', e);
@@ -176,10 +163,7 @@ export const usePlayerStore = create((set, get) => {
 
       if (track.rawId) {
         try {
-          // 平台感知获取歌词
-          const lyricText = isNcm
-            ? await netease.lyric(track.rawId, neteaseCookie || '')
-            : await music.lyric(track.rawId);
+          const lyricText = await music.lyric(track.rawId);
           const parsed = parseLyric(lyricText || '');
           set({ lyrics: parsed });
         } catch (e) {}
@@ -200,8 +184,7 @@ export const usePlayerStore = create((set, get) => {
         }
       } else {
         console.warn('[playTrack] no url');
-        const platformLabel = isNcm ? '网易云' : 'QQ音乐';
-        set({ isLoadingUrl: false, error: `${platformLabel}：暂无可用音源，请检查登录态或换一首` });
+        set({ isLoadingUrl: false, error: 'QQ音乐：暂无可用音源，请检查登录态或换一首' });
       }
     },
 

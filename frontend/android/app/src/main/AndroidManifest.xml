@@ -34,14 +34,6 @@
             android:screenOrientation="sensorLandscape"
             android:exported="false" />
 
-        <!-- 网易云音乐登录 WebView Activity -->
-        <activity
-            android:name=".NeteaseLoginWebViewActivity"
-            android:theme="@style/AppTheme.NoActionBarLaunch"
-            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode|navigation|density"
-            android:screenOrientation="sensorLandscape"
-            android:exported="false" />
-
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"
@@ -57,7 +49,7 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <!-- 保持屏幕关闭时仍可播放（音频焦点由系统处理） -->
     <uses-permission android:name="android.permission.WAKE_LOCK" />
-    <!-- 前台服务：用���实现后台播放（后续可按需接入 MediaSession） -->
+    <!-- 前台服务：用于实现后台播放（后续可按需接入 MediaSession） -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
 </manifest>

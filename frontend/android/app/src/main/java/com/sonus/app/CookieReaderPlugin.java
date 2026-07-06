@@ -24,9 +24,7 @@ import java.net.URL;
 public class CookieReaderPlugin extends Plugin {
 
     private static final int LOGIN_REQUEST_CODE = 1001;
-    private static final int NETEASE_LOGIN_REQUEST_CODE = 1002;
     private PluginCall pendingLoginCall = null;
-    private PluginCall pendingNeteaseLoginCall = null;
 
     @PluginMethod()
     public void getCookiesForUrl(PluginCall call) {
@@ -98,7 +96,6 @@ public class CookieReaderPlugin extends Plugin {
     /**
      * 原生 HTTP GET 请求。
      * 自动从 CookieManager 读取 cookieDomain 对应域的 Cookie 注入请求头。
-     * 响应的 Set-Cookie 会自动写入 CookieManager，支持网易云等扫码登录。
      * Android 原生层发请求，不受 WebView CORS 限制。
      */
     @PluginMethod()
@@ -118,7 +115,6 @@ public class CookieReaderPlugin extends Plugin {
             conn.setRequestMethod("GET");
             conn.setRequestProperty("User-Agent",
                 "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
-            // Referer 跟随 cookieDomain，不再硬编码 QQ
             String referer = cookieDomain;
             if (!referer.endsWith("/")) referer += "/";
             conn.setRequestProperty("Referer", referer);
@@ -141,38 +137,8 @@ public class CookieReaderPlugin extends Plugin {
 
             int status = conn.getResponseCode();
 
-            // 捕获响应 Set-Cookie 并写入 CookieManager（支持网易云扫码登录）
-            // 同时把 name=value 部分拼接成 cookie 字符串返回给前端，避免前端二次读 CookieManager 失败
-            StringBuilder sbSetCookies = new StringBuilder();
-            try {
-                java.util.Map<String, java.util.List<String>> headerFields = conn.getHeaderFields();
-                // getHeaderFields 返回大小写不敏感的 Map，尝试多种 key
-                java.util.List<String> setCookies = headerFields.get("Set-Cookie");
-                if (setCookies == null || setCookies.isEmpty()) {
-                    setCookies = headerFields.get("set-cookie");
-                }
-                if (setCookies != null && !setCookies.isEmpty()) {
-                    CookieManager cm = CookieManager.getInstance();
-                    String cookieBase = cookieDomain;
-                    if (!cookieBase.endsWith("/")) cookieBase += "/";
-                    for (String setCookie : setCookies) {
-                        // 写入 CookieManager
-                        try { cm.setCookie(cookieBase, setCookie); } catch (Exception ignored) {}
-                        // 提取 name=value 部分（第一个分号前），拼接成 cookie 字符串
-                        String nv = setCookie.split(";")[0].trim();
-                        if (!nv.isEmpty()) {
-                            if (sbSetCookies.length() > 0) sbSetCookies.append("; ");
-                            sbSetCookies.append(nv);
-                        }
-                    }
-                    cm.flush();
-                }
-            } catch (Exception e) {}
-
             JSObject ret = new JSObject();
             ret.put("status", status);
-            ret.put("setCookies", sbSetCookies.toString());
-            ret.put("finalUrl", conn.getURL().toString());
 
             if (status >= 200 && status < 300) {
                 BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream(), "UTF-8"));
@@ -254,22 +220,6 @@ public class CookieReaderPlugin extends Plugin {
     }
 
     /**
-     * 打开网易云音乐登录 WebView Activity。
-     * 登录成功后 CookieManager 会持有 music.163.com 的 MUSIC_U 等登录 Cookie。
-     */
-    @PluginMethod()
-    public void openNeteaseLoginWebView(PluginCall call) {
-        try {
-            pendingNeteaseLoginCall = call;
-            Intent intent = new Intent(getContext(), NeteaseLoginWebViewActivity.class);
-            getActivity().startActivityForResult(intent, NETEASE_LOGIN_REQUEST_CODE);
-        } catch (Exception e) {
-            pendingNeteaseLoginCall = null;
-            call.reject("Failed to open netease login webview: " + e.getMessage());
-        }
-    }
-
-    /**
      * 返回本地音频代理服务器端口。
      * 前端拿到端口后，把 QQ 音乐 CDN 播放链接包装成
      * http://localhost:PORT/?url=<encoded stream url>
@@ -300,26 +250,5 @@ public class CookieReaderPlugin extends Plugin {
             pendingLoginCall.reject("User cancelled login");
         }
         pendingLoginCall = null;
-    }
-
-    /**
-     * 网易云登录 WebView 回调：由 MainActivity.onActivityResult(requestCode=1002) 调用。
-     * 登录成功时读取 music.163.com 的 Cookie 一并返回给前端。
-     */
-    public void notifyNeteaseLoginResult(boolean loggedIn) {
-        if (pendingNeteaseLoginCall == null) return;
-        if (loggedIn) {
-            // 读取 music.163.com 的完整 Cookie 返回给前端
-            CookieManager cm = CookieManager.getInstance();
-            cm.flush();
-            String cookie = cm.getCookie("https://music.163.com");
-            JSObject ret = new JSObject();
-            ret.put("loggedIn", true);
-            ret.put("cookie", cookie != null ? cookie : "");
-            pendingNeteaseLoginCall.resolve(ret);
-        } else {
-            pendingNeteaseLoginCall.reject("User cancelled netease login");
-        }
-        pendingNeteaseLoginCall = null;
     }
 }

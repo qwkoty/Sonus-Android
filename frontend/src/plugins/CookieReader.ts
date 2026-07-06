@@ -3,12 +3,9 @@ import { registerPlugin } from '@capacitor/core';
 
 export interface CookieReaderResult {
   cookie: string; uin: string; qqmusic_key: string; login_type: string; loggedIn: boolean;
-  neteaseUid?: string; neteaseLoggedIn?: boolean;
 }
 export interface HttpGetResult {
   status: number; body: string; ok: boolean;
-  setCookies?: string; // 响应 Set-Cookie 拼接的 name=value 字符串（用于网易云扫码登录）
-  finalUrl?: string; // 跟随重定向后的最终 URL（用于网易云 outer URL 302 跳转）
 }
 export interface CookieReaderPlugin {
   getCookiesForUrl(options: { url: string }): Promise<CookieReaderResult>;
@@ -16,7 +13,6 @@ export interface CookieReaderPlugin {
   httpGet(options: { url: string; cookieDomain?: string; cookies?: string }): Promise<HttpGetResult>;
   syncStreamCookies(options?: { url?: string }): Promise<void>;
   openLoginWebView(): Promise<{ loggedIn: boolean; cookie: string; nickname: string; avatar: string }>;
-  openNeteaseLoginWebView(): Promise<{ loggedIn: boolean; cookie: string }>;
   getProxyPort(): Promise<{ port: number; available: boolean }>;
 }
 
@@ -59,11 +55,6 @@ export const CookieReader = {
   openLoginWebView: async () => {
     if (!IS_CAP()) throw new Error('Not in Capacitor');
     return Native.openLoginWebView();
-  },
-  // 打开网易云音乐登录 WebView（与 QQ 音乐同思路，但针对 music.163.com 域）
-  openNeteaseLoginWebView: async (): Promise<{ loggedIn: boolean; cookie: string }> => {
-    if (!IS_CAP()) throw new Error('Not in Capacitor');
-    return Native.openNeteaseLoginWebView();
   },
   // 获取本地音频代理服务器端口；非原生环境返回 0
   getProxyPort: async (): Promise<{ port: number; available: boolean }> => {

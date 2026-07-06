@@ -8,11 +8,9 @@ import java.net.URL;
 
 /**
  * 本地音频代理服务器
- * 解决 WebView Audio 元素跨域请求 CDN 被拒绝（403/CORS）的问题。
+ * 解决 WebView Audio 元素跨域请求 QQ 音乐 CDN 被拒绝（403/CORS）的问题。
  * Audio 请求 http://localhost:PORT/?url=<stream url>
- * 代理服务器按目标 URL 所属平台注入对应 Referer + Cookie，转发流式响应。
- *
- * 支持：QQ 音乐 (qqmusic.qq.com / y.qq.com) 和 网易云音乐 (music.126.net / 126.net)
+ * 代理服务器注入 QQ 音乐 Referer + Cookie，转发流式响应。
  */
 public class AudioProxyServer extends NanoHTTPD {
 
@@ -43,28 +41,19 @@ public class AudioProxyServer extends NanoHTTPD {
 
         try {
             URL url = new URL(targetUrl);
-            String host = url.getHost().toLowerCase();
-            boolean isNetease = host.contains("126.net") || host.contains("music.163.com");
-            // 网易云 CDN 直链（126.net）通常是公开可访问的，加 Referer/Cookie 反而可能触发风控
-            boolean isNeteaseCdn = isNetease && host.endsWith(".126.net");
-            String referer = isNetease ? "https://music.163.com/" : "https://y.qq.com/";
-            String cookieDomain = isNetease ? "https://music.163.com" : "https://y.qq.com";
+            String cookieDomain = "https://y.qq.com";
 
             HttpURLConnection conn = (HttpURLConnection) url.openConnection();
             conn.setRequestMethod("GET");
             conn.setRequestProperty("User-Agent", USER_AGENT);
-            if (!isNeteaseCdn) {
-                conn.setRequestProperty("Referer", referer);
-            }
+            conn.setRequestProperty("Referer", "https://y.qq.com/");
 
-            // 注入对应平台登录 Cookie（CDN 直链不需要）
-            if (!isNeteaseCdn) {
-                CookieManager cm = CookieManager.getInstance();
-                cm.flush();
-                String cookies = cm.getCookie(cookieDomain);
-                if (cookies != null && !cookies.isEmpty()) {
-                    conn.setRequestProperty("Cookie", cookies);
-                }
+            // 注入 QQ 音乐登录 Cookie
+            CookieManager cm = CookieManager.getInstance();
+            cm.flush();
+            String cookies = cm.getCookie(cookieDomain);
+            if (cookies != null && !cookies.isEmpty()) {
+                conn.setRequestProperty("Cookie", cookies);
             }
 
             // 支持 Range 请求（Audio 元素 seek 时会发 Range）
@@ -86,7 +75,7 @@ public class AudioProxyServer extends NanoHTTPD {
             // 转发响应头
             String contentType = conn.getContentType();
             if (contentType == null || contentType.isEmpty()) {
-                contentType = isNetease ? "audio/mpeg" : "audio/mpeg";
+                contentType = "audio/mpeg";
             }
             int contentLength = conn.getContentLength();
             String contentRange = conn.getHeaderField("Content-Range");
