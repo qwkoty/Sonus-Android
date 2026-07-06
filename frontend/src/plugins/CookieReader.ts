@@ -7,6 +7,7 @@ export interface CookieReaderResult {
 }
 export interface HttpGetResult {
   status: number; body: string; ok: boolean;
+  setCookies?: string; // 响应 Set-Cookie 拼接的 name=value 字符串（用于网易云扫码登录）
 }
 export interface CookieReaderPlugin {
   getCookiesForUrl(options: { url: string }): Promise<CookieReaderResult>;

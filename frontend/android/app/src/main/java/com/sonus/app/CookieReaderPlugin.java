@@ -140,15 +140,28 @@ public class CookieReaderPlugin extends Plugin {
             int status = conn.getResponseCode();
 
             // 捕获响应 Set-Cookie 并写入 CookieManager（支持网易云扫码登录）
+            // 同时把 name=value 部分拼接成 cookie 字符串返回给前端，避免前端二次读 CookieManager 失败
+            StringBuilder sbSetCookies = new StringBuilder();
             try {
                 java.util.Map<String, java.util.List<String>> headerFields = conn.getHeaderFields();
+                // getHeaderFields 返回大小写不敏感的 Map，尝试多种 key
                 java.util.List<String> setCookies = headerFields.get("Set-Cookie");
+                if (setCookies == null || setCookies.isEmpty()) {
+                    setCookies = headerFields.get("set-cookie");
+                }
                 if (setCookies != null && !setCookies.isEmpty()) {
                     CookieManager cm = CookieManager.getInstance();
                     String cookieBase = cookieDomain;
                     if (!cookieBase.endsWith("/")) cookieBase += "/";
                     for (String setCookie : setCookies) {
-                        cm.setCookie(cookieBase, setCookie);
+                        // 写入 CookieManager
+                        try { cm.setCookie(cookieBase, setCookie); } catch (Exception ignored) {}
+                        // 提取 name=value 部分（第一个分号前），拼接成 cookie 字符串
+                        String nv = setCookie.split(";")[0].trim();
+                        if (!nv.isEmpty()) {
+                            if (sbSetCookies.length() > 0) sbSetCookies.append("; ");
+                            sbSetCookies.append(nv);
+                        }
                     }
                     cm.flush();
                 }
@@ -156,6 +169,7 @@ public class CookieReaderPlugin extends Plugin {
 
             JSObject ret = new JSObject();
             ret.put("status", status);
+            ret.put("setCookies", sbSetCookies.toString());
 
             if (status >= 200 && status < 300) {
                 BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream(), "UTF-8"));

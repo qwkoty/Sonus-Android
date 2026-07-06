@@ -140,6 +140,12 @@ export default function Login({ onBack }) {
           setNcmTip('已扫描，请在手机上确认登录');
         } else if (code === 803) {
           stopNcmPolling();
+          // cookie 为空说明 Set-Cookie 捕获失败，提示错误而非误标记登录成功
+          if (!r.cookie) {
+            setNcmPhase('error');
+            setNcmTip('登录态获取失败（cookie 为空），请重试');
+            return;
+          }
           setNcmTip('登录成功，正在同步账号…');
           // 登录成功：先用 cookie 拉取账号信息，再写入 store
           try {

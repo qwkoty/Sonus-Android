@@ -41,23 +41,32 @@ async function qrKey() {
 //   802 = 已扫描等待确认
 //   803 = 登录成功（携带 cookie）
 async function qrCheck(key) {
-  const d = await ncmGet(`/api/login/qrcode/client/login?key=${encodeURIComponent(key)}&type=1`);
+  // 直接调原生 httpGet，拿响应体 + setCookies（Set-Cookie 拼接字符串）
+  const url = `${NCM_BASE}/api/login/qrcode/client/login?key=${encodeURIComponent(key)}&type=1`;
+  const r = await CookieReader.httpGet(url, NCM_BASE);
+  if (!r.ok || !r.body) return { code: 0, message: 'HTTP ' + r.status };
+  const d = JSON.parse(r.body);
   const code = Number(d?.code);
   const result = { code, message: d?.message || d?.msg || '' };
   if (code === 803) {
-    // 登录成功：原生层会捕获 Set-Cookie，从 CookieManager 读取完整 cookie
-    try {
-      const r = await CookieReader.getCookiesForUrl(NCM_BASE);
-      const cookie = r?.cookie || '';
-      const musicU = extractMusicU(cookie);
-      if (cookie && musicU) {
-        result.cookie = cookie;
-      } else {
-        // 即便没解析出 MUSIC_U 也把 cookie 带回去，由上层决定是否继续
-        result.cookie = cookie;
+    // 登录成功：优先用原生层返回的 setCookies（Set-Cookie 拼接字符串）
+    let cookie = r.setCookies || '';
+    // fallback：如果 setCookies 为空，尝试从 CookieManager 读取
+    if (!cookie) {
+      try {
+        const cr = await CookieReader.getCookiesForUrl(NCM_BASE);
+        cookie = cr?.cookie || '';
+      } catch (e) {
+        console.warn('[ncm.qrCheck] getCookiesForUrl 失败', e);
       }
-    } catch (e) {
-      console.warn('[ncm.qrCheck] 读取 cookie 失败', e);
+    }
+    // 再 fallback：从响应体里找 cookie 字段（网易云某些接口会在 body 里返回）
+    if (!cookie && d?.cookie) {
+      cookie = typeof d.cookie === 'string' ? d.cookie : '';
+    }
+    result.cookie = cookie;
+    if (!cookie) {
+      console.warn('[ncm.qrCheck] 803 但 cookie 为空，setCookies=', r.setCookies);
     }
   }
   return result;

@@ -211,7 +211,11 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
           const band = Math.min(1, Math.abs(v - 0.5) * 2);
           bandArr[idx] = band;
           // 赤道（band≈0）对应高频，两极（band≈1）对应低频
-          freqBand[idx] = Math.min(63, Math.floor((1 - band) * 63));
+          // 每 8 个粒子为一组，组内 8 个粒子覆盖 8 个相邻频段
+          // 避免同一纬度所有粒子挤到同一频段，导致该频段无能量时整片不动
+          const groupOffset = idx % 8;
+          const baseBandIdx = Math.min(56, Math.floor((1 - band) * 56));
+          freqBand[idx] = baseBandIdx + groupOffset; // 0-63
 
           // coverflow 默认形态：轻微穹顶平面
           const cbz = -planeSize * DOME_DEPTH_RATIO * (1 - Math.cos(dc * Math.PI / 2));
@@ -414,15 +418,19 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
           const band = bandArr[i];
           const energy = spectrumSmooth[freqBand[i]];
           const baseR = planeSize * LIQUID_RADIUS_RATIO * (0.82 + (coverLight[i] || 0.5) * 0.36);
+          // 所有粒子都有总能量 baseline，确保即使某频段无能量也跟随节奏跳动
           // 赤道（band≈0）对应高频，振幅最大；向两极 band≈1 对应低频，振幅依次减小
-          const displacement = energy * planeSize * 0.34 * (0.18 + 0.82 * (1 - band));
-          // 细微液面波纹，越往赤道越明显
-          const wave = (midSmooth * 0.6 + trebleSmooth * 0.4) * Math.sin(u * 56 + time * 5 + band * 10) * planeSize * 0.028 * (1 - band);
+          const baseline = totalEnergy * 0.32;
+          const displacement = (energy + baseline) * planeSize * 0.34 * (0.18 + 0.82 * (1 - band));
+          // 细微液面波纹，所有粒子都有，越往赤道越明显
+          const wave = (midSmooth * 0.6 + trebleSmooth * 0.4) * Math.sin(u * 56 + time * 5 + band * 10) * planeSize * 0.028 * (0.3 + 0.7 * (1 - band));
           // 两极起伏：低频区有舒缓的横波，向赤道递减，让两极也有律动
           const poleWave = (midSmooth * 0.6 + bassAttack * 0.4) * Math.sin(u * 48 + time * 4.5) * planeSize * 0.035 * band;
           // 鼓点冲击集中在两极（低频区）
           const bassBoost = bassPulse * band * planeSize * 0.22;
-          const r = baseR + displacement + wave + poleWave + bassBoost;
+          // 赤道也加一点高频脉冲，避免赤道只有 displacement 而无鼓点感
+          const treblePulse = bassPulse * 0.35 * (1 - band) * planeSize * 0.10;
+          const r = baseR + displacement + wave + poleWave + bassBoost + treblePulse;
           x = nx * r;
           y = ny * r;
           z = nz * r;
