@@ -262,7 +262,32 @@ async function userInfoAPK(uin, cookie = '') {
   const gtk = getGtk(pskeyMatch ? pskeyMatch[1] : (skeyMatch ? skeyMatch[1] : ''));
   const uinStr = String(uin || extractUinFromCookie(cookie) || '0');
 
-  // 尝试接口 0：c.y.qq.com 公开用户主页接口（不需要登录 Cookie，最稳定）
+  // 尝试接口 0：QQ 空间公开接口 cgi_get_portrait.fcg，只传 uin 就能拿到昵称
+  // 返回 JSONP: portraitCallBack({...,"uinStr":["昵称",...],...})
+  try {
+    const portraitUrl = `https://r.qzone.qq.com/fcg-bin/cgi_get_portrait.fcg?uins=${encodeURIComponent(uinStr)}&g_tk=0`;
+    const r0 = await CookieReader.httpGet(portraitUrl, 'https://user.qzone.qq.com');
+    const body = r0?.body || '';
+    // 解析 JSONP: 提取昵称（在数组里第一个元素）
+    const m = body.match(/"([^"]+)"\s*,\s*\[/);
+    if (m && m[1] && !/^\d+$/.test(m[1])) {
+      const nickname = decodeURIComponent(m[1]) || m[1];
+      console.log('[userInfo] from cgi_get_portrait:', { nickname, uin: uinStr });
+      return {
+        nickname,
+        avatar: `https://q1.qlogo.cn/g?b=qq&nk=${uinStr}&s=640`,
+        uin: uinStr,
+        vipLevel: 0,
+        isVip: false,
+        follow: 0,
+        fans: 0,
+      };
+    }
+  } catch (e) {
+    console.warn('[userInfo] cgi_get_portrait failed:', e.message);
+  }
+
+  // 尝试接口 1：c.y.qq.com 公开用户主页接口（不需要登录 Cookie）
   try {
     const profileUrl = `https://c.y.qq.com/rsc/fcgi-bin/fcg_get_profile_homepage.fcg?cid=205360838&userid=${encodeURIComponent(uinStr)}&reqfrom=1&reqtype=0&_=Date.now()`;
     const r0 = await CookieReader.httpGet(profileUrl, 'https://y.qq.com');
@@ -286,7 +311,7 @@ async function userInfoAPK(uin, cookie = '') {
     console.warn('[userInfo] fcg_get_profile_homepage failed:', e.message);
   }
 
-  // 尝试接口 1：music.UserInfo.userInfoServer.GetLoginUserInfo（登录态）
+  // 尝试接口 2：music.UserInfo.userInfoServer.GetLoginUserInfo（登录态）
   try {
     const d = await nativeGet(qqUrl({
       comm: {
@@ -322,43 +347,7 @@ async function userInfoAPK(uin, cookie = '') {
     console.warn('[userInfo] GetLoginUserInfo failed:', e.message);
   }
 
-  // 尝试接口 2：music.login.UserV3.GetUinEncryptMc（常用用户信息接口）
-  try {
-    const d2 = await nativeGet(qqUrl({
-      comm: {
-        uin: uinStr,
-        format: 'json',
-        ct: 24,
-        cv: 0,
-        g_tk: gtk,
-        t: Date.now(),
-      },
-      req_0: {
-        module: 'music.login.UserV3',
-        method: 'GetUinEncryptMc',
-        param: { uin: uinStr },
-      },
-    }), cookie);
-    const i2 = d2?.req_0?.data;
-    if (i2 && (i2.nick || i2.nickname || i2.name)) {
-      const avatar = i2?.headpic || i2?.headimg || i2?.avatar || i2?.face || '';
-      const nickname = i2?.nick || i2?.nickname || i2?.name || i2?.userName || '';
-      console.log('[userInfo] from GetUinEncryptMc:', { nickname, uin: uinStr });
-      return {
-        nickname: nickname || 'QQ音乐用户',
-        avatar,
-        uin: uinStr,
-        vipLevel: i2?.vipLevel || 0,
-        isVip: !!(i2?.isVip || i2?.vip || i2?.vipStatus),
-        follow: i2?.follow || 0,
-        fans: i2?.fans || 0,
-      };
-    }
-  } catch (e) {
-    console.warn('[userInfo] GetUinEncryptMc failed:', e.message);
-  }
-
-  // 兜底：从 cookie 里尝试找名字（部分登录方式 cookie 里会有 nick）
+  // 兜底：从 cookie 里尝试找名字
   const cookieNick = (cookie || '').match(/(?:^|;\s*)nick=([^;]+)/);
   const fallbackNick = cookieNick ? decodeURIComponent(cookieNick[1]) : 'QQ音乐用户';
   console.log('[userInfo] all interfaces failed, fallback nick:', fallbackNick);

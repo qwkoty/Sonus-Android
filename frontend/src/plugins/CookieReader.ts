@@ -9,11 +9,12 @@ export interface HttpGetResult {
   status: number; body: string; ok: boolean;
   setCookies?: string; // 响应 Set-Cookie 拼接的 name=value 字符串（用于网易云扫码登录）
   finalUrl?: string; // 跟随重定向后的最终 URL（用于网易云 outer URL 302 跳转）
+  location?: string; // noRedirect 模式下的 Location 头
 }
 export interface CookieReaderPlugin {
   getCookiesForUrl(options: { url: string }): Promise<CookieReaderResult>;
   clearCookiesForUrl(options: { url: string }): Promise<void>;
-  httpGet(options: { url: string; cookieDomain?: string; cookies?: string }): Promise<HttpGetResult>;
+  httpGet(options: { url: string; cookieDomain?: string; cookies?: string; noRedirect?: boolean }): Promise<HttpGetResult>;
   syncStreamCookies(options?: { url?: string }): Promise<void>;
   openLoginWebView(): Promise<{ loggedIn: boolean; cookie: string; nickname: string; avatar: string }>;
   openNeteaseLoginWebView(): Promise<{ loggedIn: boolean; cookie: string }>;
@@ -44,11 +45,13 @@ export const CookieReader = {
   // cookieDomain 省略时自动从请求 URL 提取 origin，保证 Cookie 域匹配
   // 原生 HTTP GET：自动注入 Cookie。
   // 如果传了 cookies 字符串，直接注入该字符串；否则从 CookieManager 读取 cookieDomain 对应域。
-  httpGet: async (url: string, cookieDomain?: string, cookies?: string): Promise<HttpGetResult> => {
+  // noRedirect=true 时不跟随 302，便于读取 Location 头
+  httpGet: async (url: string, cookieDomain?: string, cookies?: string, noRedirect?: boolean): Promise<HttpGetResult> => {
     if (!IS_CAP()) throw new Error('Not in Capacitor');
     const domain = cookieDomain || deriveOrigin(url) || 'https://y.qq.com';
-    const payload: { url: string; cookieDomain?: string; cookies?: string } = { url, cookieDomain: domain };
+    const payload: { url: string; cookieDomain?: string; cookies?: string; noRedirect?: boolean } = { url, cookieDomain: domain };
     if (cookies) payload.cookies = cookies;
+    if (noRedirect) payload.noRedirect = true;
     return Native.httpGet(payload);
   },
   // 把 y.qq.com 登录 Cookie 同步到音频流域名，让 Audio 元素播放时带登录态

@@ -106,6 +106,7 @@ public class CookieReaderPlugin extends Plugin {
         String urlStr = call.getString("url");
         String cookieDomain = call.getString("cookieDomain", "https://y.qq.com");
         String explicitCookies = call.getString("cookies", "");
+        boolean noRedirect = call.getBoolean("noRedirect", false);
 
         if (urlStr == null || urlStr.isEmpty()) {
             call.reject("Must provide url");
@@ -124,7 +125,8 @@ public class CookieReaderPlugin extends Plugin {
             conn.setRequestProperty("Referer", referer);
             conn.setConnectTimeout(15000);
             conn.setReadTimeout(15000);
-            conn.setInstanceFollowRedirects(true);
+            // noRedirect=true 时不跟随重定向，便于读取 Location 头（outer URL 302）
+            conn.setInstanceFollowRedirects(!noRedirect);
 
             // 注入 Cookie：优先使用调用方传入的 cookies 字符串，否则从 CookieManager 读取
             String cookiesToInject = null;
@@ -173,6 +175,11 @@ public class CookieReaderPlugin extends Plugin {
             ret.put("status", status);
             ret.put("setCookies", sbSetCookies.toString());
             ret.put("finalUrl", conn.getURL().toString());
+            // noRedirect 模式下返回 Location 头（用于 outer URL 302 跳转）
+            if (noRedirect) {
+                String location = conn.getHeaderField("Location");
+                ret.put("location", location != null ? location : "");
+            }
 
             if (status >= 200 && status < 300) {
                 BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream(), "UTF-8"));
@@ -181,6 +188,10 @@ public class CookieReaderPlugin extends Plugin {
                 while ((line = reader.readLine()) != null) sb.append(line);
                 reader.close();
                 ret.put("body", sb.toString());
+                ret.put("ok", true);
+            } else if (noRedirect && status >= 300 && status < 400) {
+                // 3xx 重定向：ok=true，不下载 body（避免下载整个 mp3）
+                ret.put("body", "");
                 ret.put("ok", true);
             } else {
                 ret.put("body", "");

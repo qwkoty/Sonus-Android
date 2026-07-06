@@ -195,18 +195,22 @@ async function songUrl(id, cookie) {
     if (rawUrl2) return await getProxyUrl(rawUrl2);
   } catch (e) {}
 
-  // 尝试 3：免登录 outer URL，必须带 .mp3 后缀才会 302 到真实 CDN
+  // 尝试 3：免登录 outer URL，302 跳转到真实 CDN
+  // 用 noRedirect=true 避免下载整个 mp3 二进制流
   try {
-    const outerUrl = `${NCM_BASE}/song/media/outer/url?id=${encodeURIComponent(rawId)}.mp3`;
-    const r3 = await CookieReader.httpGet(outerUrl, NCM_BASE);
-    // 跟随 302 后 finalUrl 就是真实 CDN 链接
+    const outerUrl = `${NCM_BASE}/song/media/outer/url?id=${rawId}`;
+    const r3 = await CookieReader.httpGet(outerUrl, NCM_BASE, '', true);
+    const location = r3?.location || '';
+    console.log('[ncm.songUrl] outer status:', r3?.status, 'location:', location);
+    if (location && (location.includes('126.net') || /\.(mp3|m4a|flac|aac|ogg|wav)(\?|$)/i.test(location))) {
+      return await getProxyUrl(location);
+    }
+    // 某些版本不返回 Location，尝试 finalUrl
     const finalUrl = r3?.finalUrl || '';
-    const isAudio = /\.(mp3|m4a|flac|aac|ogg|wav)(\?|$)/i.test(finalUrl);
-    if (finalUrl && isAudio) {
-      console.log('[ncm.songUrl] outer fallback finalUrl:', finalUrl);
+    if (finalUrl && finalUrl !== outerUrl && (finalUrl.includes('126.net') || /\.(mp3|m4a|flac|aac|ogg|wav)(\?|$)/i.test(finalUrl))) {
       return await getProxyUrl(finalUrl);
     }
-    console.warn('[ncm.songUrl] outer fallback invalid finalUrl:', finalUrl);
+    console.warn('[ncm.songUrl] outer invalid location:', location, 'finalUrl:', finalUrl);
   } catch (e) {
     console.warn('[ncm.songUrl] outer fallback failed', e);
   }
