@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, memo } from 'react';
 import { getSpectrumBars, readTimeDomainData } from '../audio/engine';
 
 const NUM_BARS = 64;
@@ -27,7 +27,7 @@ const hexToHsl = (hex) => {
 // 把用户选的真实 HSL 转成 canvas 可用颜色，不再硬改饱和度/亮度
 const hsl = (h, s, l, a = 1) => `hsla(${Math.round(h)}, ${Math.round(s)}%, ${Math.round(l)}%, ${a})`;
 
-export default function Visualizer({ isPlaying, mode = 'ring', accent = '#4FC3F7' }) {
+function Visualizer({ isPlaying, mode = 'ring', accent = '#4FC3F7' }) {
   const canvasRef = useRef(null);
   const rafRef = useRef(null);
   const smoothRef = useRef(new Float32Array(NUM_BARS));
@@ -479,3 +479,5 @@ export default function Visualizer({ isPlaying, mode = 'ring', accent = '#4FC3F7
     />
   );
 }
+
+export default memo(Visualizer);

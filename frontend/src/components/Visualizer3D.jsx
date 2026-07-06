@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, memo } from 'react';
 import * as THREE from 'three';
 import { getSpectrumBars } from '../audio/engine';
 import { getProxyUrl } from '../api/music';
@@ -37,7 +37,7 @@ function createParticleTexture() {
 // 3D 封面粒子画：2 万粒子构成可切换的动画形态
 // 电影镜头：用户双指捏合缩放 + 双指划拉旋转（手势驱动），关闭自动旋转
 // 动画预设：coverflow（粒子封面） / liquidmetal（液态金属）
-export default function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPlaying = false, onReady }) {
+function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPlaying = false, onReady }) {
   const containerRef = useRef(null);
   const accentRef = useRef(accent);
   const coverRef = useRef(cover);
@@ -178,6 +178,9 @@ export default function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'c
     const basePositions = new Float32Array(COUNT * 3);
     const baseNormals = new Float32Array(COUNT * 3);
     const coverLight = new Float32Array(COUNT);
+    const bandArr = new Float32Array(COUNT);
+    const freqBand = new Uint8Array(COUNT);
+    const spectrumSmooth = new Float32Array(64);
 
     const buildBase = () => {
       let idx = 0;
@@ -194,6 +197,9 @@ export default function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'c
           origUV[idx * 2] = u;
           origUV[idx * 2 + 1] = v;
           distFromCenter[idx] = dc;
+          const band = Math.min(1, Math.abs(v - 0.5) * 2);
+          bandArr[idx] = band;
+          freqBand[idx] = Math.min(63, Math.floor(band * 63));
 
           let bx = 0, by = 0, bz = 0, nx = 0, ny = 0, nz = 0;
           if (shape === 'liquidmetal') {
@@ -305,6 +311,9 @@ export default function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'c
       bassRelease += (bass - bassRelease) * 0.12;
       midSmooth += (mid - midSmooth) * 0.22;
       trebleSmooth += (treble - trebleSmooth) * 0.28;
+      for (let i = 0; i < 64; i++) {
+        spectrumSmooth[i] += (data[i] - spectrumSmooth[i]) * 0.25;
+      }
 
       const bassPulse = Math.max(0, bassAttack - bassRelease);
       const totalEnergy = (bassAttack + midSmooth * 0.7 + trebleSmooth * 0.4) / 2.1;
@@ -345,19 +354,17 @@ export default function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'c
           y = by + waveY * amp;
           z = bz + waveZ * amp;
         } else if (shape === 'liquidmetal') {
-          // 液态金属：震感更强、频率更高的表面波纹 + 鼓点热点
-          const baseR = planeSize * LIQUID_RADIUS_RATIO;
-          const light = coverLight[i] || 0.5;
-          let r = baseR * (0.82 + light * 0.36);
-          r += midSmooth * Math.sin(u * 90 + time * 9) * planeSize * 0.05;
-          r += trebleSmooth * Math.sin(v * 110 - time * 11) * planeSize * 0.035;
-          r += midSmooth * Math.cos((u + v) * 130 + time * 10) * planeSize * 0.025;
-          r += trebleSmooth * Math.sin((u - v) * 150 + time * 12) * planeSize * 0.020;
-          const hot1 = Math.exp(-Math.pow((u - 0.3) * 6, 2) - Math.pow((v - 0.3) * 6, 2));
-          const hot2 = Math.exp(-Math.pow((u - 0.7) * 6, 2) - Math.pow((v - 0.6) * 6, 2));
-          const hot3 = Math.exp(-Math.pow((u - 0.5) * 8, 2) - Math.pow((v - 0.15) * 8, 2));
-          const hot4 = Math.exp(-Math.pow((u - 0.2) * 7, 2) - Math.pow((v - 0.75) * 7, 2));
-          r += bassPulse * (hot1 + hot2 + hot3 + hot4) * planeSize * 0.32;
+          // 液态金属：球体横面中间为低频，向两极（周围）依次增高
+          const band = bandArr[i];
+          const energy = spectrumSmooth[freqBand[i]];
+          const baseR = planeSize * LIQUID_RADIUS_RATIO * (0.82 + (coverLight[i] || 0.5) * 0.36);
+          // 中间横面（band≈0）对应低频，振幅最小；向两极 band≈1 对应高频，振幅依次增大
+          const displacement = energy * planeSize * 0.34 * (0.18 + 0.82 * band);
+          // 细微液面波纹，越往两极越明显
+          const wave = midSmooth * Math.sin(u * 56 + time * 5 + band * 10) * planeSize * 0.028 * band;
+          // 鼓点冲击集中在中间横面（低频区）
+          const bassBoost = bassPulse * (1 - band) * planeSize * 0.22;
+          const r = baseR + displacement + wave + bassBoost;
           x = nx * r;
           y = ny * r;
           z = nz * r;
@@ -493,3 +500,5 @@ export default function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'c
     />
   );
 }
+
+export default memo(Visualizer3D);
