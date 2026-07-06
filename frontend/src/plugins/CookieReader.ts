@@ -3,6 +3,7 @@ import { registerPlugin } from '@capacitor/core';
 
 export interface CookieReaderResult {
   cookie: string; uin: string; qqmusic_key: string; login_type: string; loggedIn: boolean;
+  neteaseUid?: string; neteaseLoggedIn?: boolean;
 }
 export interface HttpGetResult {
   status: number; body: string; ok: boolean;

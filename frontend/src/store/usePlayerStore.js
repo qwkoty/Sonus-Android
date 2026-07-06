@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { music } from '../api/music';
+import { netease } from '../api/netease';
 import { useAuthStore } from './useAuthStore';
 import { getAudio, initAudioSystem } from '../audio/engine';
 
@@ -146,11 +147,20 @@ export const usePlayerStore = create((set, get) => {
       }
 
       const { cookie, uin, key } = authCreds();
+      // 网易云登录态（独立于 QQ）
+      const { neteaseCookie } = useAuthStore.getState();
+      const isNcm = track.platform === 'ncm';
 
       let url = track.url || '';
       if (!url && track.rawId) {
         try {
-          url = await music.stream(track.rawId, cookie, uin, key, track.mediaMid || '');
+          if (isNcm) {
+            // 网易云：通过 ncm.songUrl 获取，URL 已包装为本地代理
+            url = await netease.songUrl(track.rawId, neteaseCookie || '');
+          } else {
+            // QQ 音乐：原有流程
+            url = await music.stream(track.rawId, cookie, uin, key, track.mediaMid || '');
+          }
         } catch (e) {
           console.error('获取播放链接失败', e);
         }
@@ -158,7 +168,10 @@ export const usePlayerStore = create((set, get) => {
 
       if (track.rawId) {
         try {
-          const lyricText = await music.lyric(track.rawId);
+          // 平台感知获取歌词
+          const lyricText = isNcm
+            ? await netease.lyric(track.rawId, neteaseCookie || '')
+            : await music.lyric(track.rawId);
           const parsed = parseLyric(lyricText || '');
           set({ lyrics: parsed });
         } catch (e) {}

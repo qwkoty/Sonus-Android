@@ -96,6 +96,7 @@ public class CookieReaderPlugin extends Plugin {
     /**
      * 原生 HTTP GET 请求。
      * 自动从 CookieManager 读取 cookieDomain 对应域的 Cookie 注入请求头。
+     * 响应的 Set-Cookie 会自动写入 CookieManager，支持网易云等扫码登录。
      * Android 原生层发请求，不受 WebView CORS 限制。
      */
     @PluginMethod()
@@ -115,7 +116,10 @@ public class CookieReaderPlugin extends Plugin {
             conn.setRequestMethod("GET");
             conn.setRequestProperty("User-Agent",
                 "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
-            conn.setRequestProperty("Referer", "https://y.qq.com/");
+            // Referer 跟随 cookieDomain，不再硬编码 QQ
+            String referer = cookieDomain;
+            if (!referer.endsWith("/")) referer += "/";
+            conn.setRequestProperty("Referer", referer);
             conn.setConnectTimeout(15000);
             conn.setReadTimeout(15000);
             conn.setInstanceFollowRedirects(true);
@@ -134,6 +138,22 @@ public class CookieReaderPlugin extends Plugin {
             }
 
             int status = conn.getResponseCode();
+
+            // 捕获响应 Set-Cookie 并写入 CookieManager（支持网易云扫码登录）
+            try {
+                java.util.Map<String, java.util.List<String>> headerFields = conn.getHeaderFields();
+                java.util.List<String> setCookies = headerFields.get("Set-Cookie");
+                if (setCookies != null && !setCookies.isEmpty()) {
+                    CookieManager cm = CookieManager.getInstance();
+                    String cookieBase = cookieDomain;
+                    if (!cookieBase.endsWith("/")) cookieBase += "/";
+                    for (String setCookie : setCookies) {
+                        cm.setCookie(cookieBase, setCookie);
+                    }
+                    cm.flush();
+                }
+            } catch (Exception e) {}
+
             JSObject ret = new JSObject();
             ret.put("status", status);
 

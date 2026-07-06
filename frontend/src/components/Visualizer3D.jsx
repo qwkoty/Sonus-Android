@@ -210,7 +210,8 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
           distFromCenter[idx] = dc;
           const band = Math.min(1, Math.abs(v - 0.5) * 2);
           bandArr[idx] = band;
-          freqBand[idx] = Math.min(63, Math.floor(band * 63));
+          // 赤道（band≈0）对应高频，两极（band≈1）对应低频
+          freqBand[idx] = Math.min(63, Math.floor((1 - band) * 63));
 
           // coverflow 默认形态：轻微穹顶平面
           const cbz = -planeSize * DOME_DEPTH_RATIO * (1 - Math.cos(dc * Math.PI / 2));
@@ -409,19 +410,19 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
           y = by + waveY * amp;
           z = bz + waveZ * amp;
         } else if (targetShape === 'liquidmetal') {
-          // 液态金属：球体横面中间为低频，向两极（周围）依次增高
+          // 液态金属：球体赤道为高频，向两极（周围）依次降低为低频
           const band = bandArr[i];
           const energy = spectrumSmooth[freqBand[i]];
           const baseR = planeSize * LIQUID_RADIUS_RATIO * (0.82 + (coverLight[i] || 0.5) * 0.36);
-          // 中间横面（band≈0）对应低频，振幅最小；向两极 band≈1 对应高频，振幅依次增大
-          const displacement = energy * planeSize * 0.34 * (0.18 + 0.82 * band);
-          // 细微液面波纹，越往两极越明显
-          const wave = midSmooth * Math.sin(u * 56 + time * 5 + band * 10) * planeSize * 0.028 * band;
-          // 赤道起伏：中间横面有舒缓的横波，向两极递减，让低频区也有律动
-          const equatorWave = (midSmooth * 0.6 + bassAttack * 0.4) * Math.sin(u * 48 + time * 4.5) * planeSize * 0.035 * (1 - band);
-          // 鼓点冲击集中在中间横面（低频区）
-          const bassBoost = bassPulse * (1 - band) * planeSize * 0.22;
-          const r = baseR + displacement + wave + equatorWave + bassBoost;
+          // 赤道（band≈0）对应高频，振幅最大；向两极 band≈1 对应低频，振幅依次减小
+          const displacement = energy * planeSize * 0.34 * (0.18 + 0.82 * (1 - band));
+          // 细微液面波纹，越往赤道越明显
+          const wave = (midSmooth * 0.6 + trebleSmooth * 0.4) * Math.sin(u * 56 + time * 5 + band * 10) * planeSize * 0.028 * (1 - band);
+          // 两极起伏：低频区有舒缓的横波，向赤道递减，让两极也有律动
+          const poleWave = (midSmooth * 0.6 + bassAttack * 0.4) * Math.sin(u * 48 + time * 4.5) * planeSize * 0.035 * band;
+          // 鼓点冲击集中在两极（低频区）
+          const bassBoost = bassPulse * band * planeSize * 0.22;
+          const r = baseR + displacement + wave + poleWave + bassBoost;
           x = nx * r;
           y = ny * r;
           z = nz * r;
