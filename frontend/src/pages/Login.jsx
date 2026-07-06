@@ -136,13 +136,10 @@ export default function Login({ onBack }) {
 }
 
 function AccountView({ userInfo, nickname, uin, playlists, loadingPlaylists, onLoadPlaylists, onLogout }) {
-  const rawAvatar = userInfo?.avatar;
-  const fallbackAvatar = uin ? `https://q1.qlogo.cn/g?b=qq&nk=${uin}&s=640` : '';
-  const avatar = rawAvatar || fallbackAvatar;
   return (
     <div className="glass-panel-strong" style={{ position: 'relative', zIndex: 1, padding: 26, borderRadius: 26, width: '100%', maxWidth: 400, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
       <div style={{ width: 84, height: 84, borderRadius: '50%', background: 'rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', marginBottom: 14, border: '2px solid rgba(0, 245, 212, .35)', boxShadow: '0 0 0 1px rgba(0, 245, 212, .10), 0 12px 36px rgba(0,0,0,0.32)' }}>
-        {avatar ? <img src={avatar} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <User size={38} color="var(--text-secondary)" />}
+        {userInfo?.avatar ? <img src={userInfo.avatar} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <User size={38} color="var(--text-secondary)" />}
       </div>
 
       <div style={{ fontSize: 21, fontWeight: 760, color: 'var(--text-primary)', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 8 }}>

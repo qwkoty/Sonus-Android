@@ -88,7 +88,7 @@ async function searchAPK(keyword, limit = 30) {
     mediaMid: s.file?.media_mid || s.mid || '',
     platform: 'qq',
     title: s.name || '',
-    artist: (s.singer || []).map((a) => a.name).join(' / ') || '未知歌手',
+    artist: (s.singer || []).map((a) => a.name).join(' / '),
     album: s.album?.name || '',
     cover: s.album?.mid ? `https://y.gtimg.cn/music/photo_new/T002R300x300M000${s.album.mid}.jpg` : '',
     duration: s.interval || 0,
@@ -225,14 +225,11 @@ async function userInfoAPK(uin, cookie = '') {
     req_0: { module: 'music.UserInfo.userInfoServer', method: 'GetLoginUserInfo', param: {} },
   }), cookie);
   const i = d?.req_0?.data;
-  const avatar = i?.headpic || i?.headimg || i?.avatar || i?.face || i?.headPic || '';
-  console.log('[userInfo] raw fields:', { nick: i?.nick, headpic: i?.headpic, headimg: i?.headimg, avatar: i?.avatar, face: i?.face, headPic: i?.headPic });
   return {
     nickname: i?.nick || 'QQ音乐用户',
-    avatar,
+    avatar: i?.headpic || '',
     uin: String(uin),
     vipLevel: i?.vipLevel || 0,
-    isVip: !!(i?.isVip || i?.vip || i?.vipStatus || i?.svipLevel || i?.payPackId),
     follow: i?.follow || 0,
     fans: i?.fans || 0,
   };

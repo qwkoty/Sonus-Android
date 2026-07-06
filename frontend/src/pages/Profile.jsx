@@ -46,10 +46,10 @@ export default function Profile({ onBack }) {
 
   useEffect(() => {
     if (isLoggedIn) {
-      fetchUserInfo();
+      if (!userInfo) fetchUserInfo();
       loadPlaylists();
     }
-  }, [isLoggedIn, fetchUserInfo, loadPlaylists]);
+  }, [isLoggedIn]);
 
   const openPlaylistDetail = async (pl) => {
     setLoadingDetail(true);
@@ -79,34 +79,14 @@ export default function Profile({ onBack }) {
     }
   };
 
-  const rawAvatar = userInfo?.avatar;
-  const fallbackAvatar = uin ? `https://q1.qlogo.cn/g?b=qq&nk=${uin}&s=640` : '';
-  const avatar = rawAvatar || fallbackAvatar;
-  const [avatarError, setAvatarError] = useState(false);
-
-  useEffect(() => {
-    setAvatarError(false);
-  }, [avatar]);
-
-  const AvatarImg = ({ iconSize = 26 }) => (
-    avatar && !avatarError ? (
-      <img
-        src={music.cover(avatar)}
-        alt=""
-        onError={() => setAvatarError(true)}
-        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-      />
-    ) : (
-      <UserIcon size={iconSize} color="var(--text-muted)" />
-    )
-  );
+  const avatar = userInfo?.avatar;
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'radial-gradient(ellipse at 30% 18%, rgba(0, 245, 212, .08) 0%, rgba(0,0,0,0.48) 55%, rgba(0,0,0,0.85) 100%)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
       {/* 顶部导航 */}
       <div className="glass-panel" style={{ padding: 'calc(10px + env(safe-area-inset-top)) 16px 10px', display: 'flex', alignItems: 'center', gap: 12, borderRadius: 0, borderLeft: 'none', borderRight: 'none', borderTop: 'none', flexShrink: 0 }}>
-        <button onClick={onBack} className="glass-button" style={{ width: 38, height: 38, borderRadius: 11, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-primary)' }}>
-          <ArrowLeft size={18} />
+        <button onClick={onBack} className="glass-button" style={{ width: 38, height: 38, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', padding: 0, border: '2px solid rgba(0, 245, 212, .32)', boxShadow: '0 0 0 1px rgba(0, 245, 212, .10)' }} title="返回">
+          {avatar ? <img src={music.cover(avatar)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <UserIcon size={18} color="var(--text-muted)" />}
         </button>
         <span style={{ fontSize: 16, fontWeight: 760, flex: 1, letterSpacing: '.04em' }}>{playlistDetail ? playlistDetail.name : '我的音乐'}</span>
         <button onClick={() => { fetchUserInfo(); loadPlaylists(); }} className="glass-button" style={{ width: 38, height: 38, borderRadius: 11, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-secondary)' }} title="刷新">
@@ -120,11 +100,11 @@ export default function Profile({ onBack }) {
         <div className="glass-panel" style={{ width: 340, flexShrink: 0, display: 'flex', flexDirection: 'column', borderRadius: 18, overflow: 'hidden' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: 14, borderBottom: '1px solid rgba(255,255,255,0.06)', flexShrink: 0 }}>
             <div style={{ width: 58, height: 58, borderRadius: '50%', overflow: 'hidden', flexShrink: 0, background: 'rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid rgba(0, 245, 212, .32)', boxShadow: '0 0 0 1px rgba(0, 245, 212, .10)' }}>
-              <AvatarImg iconSize={26} />
+              {avatar ? <img src={music.cover(avatar)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <UserIcon size={26} color="var(--text-muted)" />}
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
               <span style={{ fontSize: 17, fontWeight: 760, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block' }}>{loadingInfo && !nickname ? '加载中…' : nickname}</span>
-              <span style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2, display: 'block' }}>
+              <span style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 3, display: 'block' }}>
                 {userInfo?.follow > 0 || userInfo?.fans > 0
                   ? `关注 ${userInfo.follow || 0} · 粉丝 ${userInfo.fans || 0}`
                   : 'QQ音乐账号'}
