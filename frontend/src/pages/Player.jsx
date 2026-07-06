@@ -219,7 +219,7 @@ export default function Player({ onProfile }) {
       <div style={{ position: 'absolute', inset: 0 }}>
         <FloatingLyrics lyrics={lyrics} isPlaying={isPlaying} />
         {vm === '3d' ? <Suspense key={`${currentTrack?.cover || currentTrack?.id || 'none'}-${v3m}`}><Visualizer3D accent={ac} cover={currentTrack?.cover || ''} mode={v3m} isPlaying={isPlaying} /></Suspense> : <Visualizer isPlaying={isPlaying} mode={vm} accent={ac} />}
-        {lyricPanel && <LyricScroll currentLyric={currentLyric || ''} accent={ac} />}
+        {lyricPanel && <LyricScroll currentLyric={currentLyric || ''} lyrics={lyrics} currentTime={currentTime} accent={ac} />}
       </div>
 
       {/* 暗角遮罩 */}
