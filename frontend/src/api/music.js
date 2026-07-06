@@ -82,10 +82,10 @@ async function searchAPK(keyword, limit = 30) {
     },
     comm: { g_tk: 5381, uin: '0', format: 'json', ct: 24, cv: 0, platform: 'h5' },
   }));
-  return (d?.req_0?.data?.body?.song?.list || []).map((s) => ({
-    id: `qq_${s.mid}`,
-    rawId: s.mid,
-    mediaMid: s.file?.media_mid || '',
+  return (d?.req_0?.data?.body?.song?.list || []).filter(Boolean).map((s) => ({
+    id: `qq_${s.mid || Math.random().toString(36).slice(2)}`,
+    rawId: s.mid || '',
+    mediaMid: s.file?.media_mid || s.mid || '',
     platform: 'qq',
     title: s.name || '',
     artist: (s.singer || []).map((a) => a.name).join(' / '),
@@ -245,7 +245,7 @@ async function playlistsAPK(uin, cookie = '') {
       param: { uin: String(uin), num: 100, order: 0 },
     },
   }), cookie);
-  return (d?.req_0?.data?.v_playlist || []).map((p) => ({
+  return (d?.req_0?.data?.v_playlist || []).filter(Boolean).map((p) => ({
     id: p.tid || p.dirId || '',
     name: p.diss_name || p.dirName || '歌单',
     cover: p.diss_cover || p.picurl || '',
@@ -268,13 +268,13 @@ async function playlistAPK(id, cookie = '') {
   return {
     name: dirinfo?.title || '歌单',
     cover: dirinfo?.picurl || '',
-    tracks: songlist.map((s) => ({
-      id: `qq_${s.mid}`,
-      rawId: s.mid,
-      mediaMid: s.file?.media_mid || '',
+    tracks: songlist.filter(Boolean).map((s) => ({
+      id: `qq_${s.mid || s.songmid || Math.random().toString(36).slice(2)}`,
+      rawId: s.mid || s.songmid || '',
+      mediaMid: s.file?.media_mid || s.mid || '',
       platform: 'qq',
-      title: s.name || s.title || '',
-      artist: (s.singer || []).map((a) => a.name).join(' / '),
+      title: s.name || s.title || '未知歌曲',
+      artist: (s.singer || []).map((a) => a.name).join(' / ') || '未知歌手',
       album: s.album?.name || '',
       cover: s.album?.mid ? `https://y.gtimg.cn/music/photo_new/T002R300x300M000${s.album.mid}.jpg` : '',
       duration: s.interval || 0,
