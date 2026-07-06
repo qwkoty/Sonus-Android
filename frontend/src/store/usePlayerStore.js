@@ -157,13 +157,21 @@ export const usePlayerStore = create((set, get) => {
           if (isNcm) {
             // 网易云：通过 ncm.songUrl 获取，URL 已包装为本地代理
             url = await netease.songUrl(track.rawId, neteaseCookie || '');
+            if (!url) {
+              console.warn('[playTrack] ncm songUrl 返回空 (可能 VIP/版权)', track.rawId);
+            }
           } else {
             // QQ 音乐：原有流程
             url = await music.stream(track.rawId, cookie, uin, key, track.mediaMid || '');
+            if (!url) {
+              console.warn('[playTrack] qq stream 返回空 (可能 VIP/版权)', track.rawId);
+            }
           }
         } catch (e) {
           console.error('获取播放链接失败', e);
         }
+      } else if (!track.rawId) {
+        console.warn('[playTrack] track.rawId 为空，无法获取播放链接', track);
       }
 
       if (track.rawId) {

@@ -136,18 +136,25 @@ async function playlist(id, cookie) {
 
 // ==================== 播放链接 ====================
 // 返回本地代理包装后的 URL；空 URL 返回 ''
+// 多档音质尝试：320k -> 128k -> 96k，提高免费歌曲播放成功率
 async function songUrl(id, cookie) {
   const rawId = String(id).replace(/^ncm_/, '');
-  const d = await ncmGet(`/api/song/enhance/player/url?id=${encodeURIComponent(rawId)}&br=320000`, cookie);
-  if (Number(d?.code) !== 200) {
-    throw new Error(`songUrl 失败: code=${d?.code}`);
+  const brCandidates = [320000, 128000, 96000];
+  for (const br of brCandidates) {
+    try {
+      const d = await ncmGet(`/api/song/enhance/player/url?id=${encodeURIComponent(rawId)}&br=${br}`, cookie);
+      if (Number(d?.code) !== 200) continue;
+      const data = d?.data || [];
+      const item = data.find((it) => it && it.url) || data[0];
+      const rawUrl = item?.url || '';
+      if (!rawUrl) continue;
+      // 网易云 CDN 直链同样需要本地代理转发，绕过 WebView Audio 跨域 403
+      return await getProxyUrl(rawUrl);
+    } catch (e) {
+      // 继续尝试下一档音质
+    }
   }
-  const data = d?.data || [];
-  const item = data.find((it) => it && it.url) || data[0];
-  const rawUrl = item?.url || '';
-  if (!rawUrl) return '';
-  // 网易云 CDN 直链同样需要本地代理转发，绕过 WebView Audio 跨域 403
-  return await getProxyUrl(rawUrl);
+  return '';
 }
 
 // ==================== 歌词 ====================
