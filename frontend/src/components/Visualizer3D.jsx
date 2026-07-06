@@ -4,6 +4,8 @@ import { getSpectrumBars } from '../audio/engine';
 import { getProxyUrl } from '../api/music';
 
 const GRID = 142;             // 142x142 = 20164 ≈ 2 万粒子
+const SPHERE_U = 160;         // 球面 u 细分
+const SPHERE_V = 128;         // 球面 v 细分
 const FOV = 55;
 
 function hexToRGB(hex) {
@@ -18,18 +20,20 @@ function hexToRGB(hex) {
 
 // 3D 封面粒子画：2 万粒子在 X-Y 平面排满封面图像（每粒子颜色 = 封面对应像素）
 // 电影镜头：用户双指捏合缩放 + 双指划拉旋转（手势驱动）
-// 风吹动画：粒子 Z 方向像旗帜被风吹起那样起伏，阵风强度随时间起伏
-// 音频响应：中心 = 低频（bass），向外依次 mid / treble，叠加到风吹位移上
-export default function Visualizer3D({ accent = '#4FC3F7', cover = '', onReady }) {
+// 液态金属：球面粒子随音频高频震荡，呈现金属流体感
+export default function Visualizer3D({ accent = '#4FC3F7', cover = '', shape = 'cover', onReady }) {
   const containerRef = useRef(null);
   const accentRef = useRef(accent);
   const coverRef = useRef(cover);
+  const shapeRef = useRef(shape);
   const imageDataRef = useRef(null);  // 封面像素 RGBA
   const hasCoverRef = useRef(false);
+  const coverLightRef = useRef(null); // 封面亮度采样（液态金属用）
   const onReadyRef = useRef(onReady);
   useEffect(() => { onReadyRef.current = onReady; }, [onReady]);
   useEffect(() => { accentRef.current = accent; }, [accent]);
   useEffect(() => { coverRef.current = cover; }, [cover]);
+  useEffect(() => { shapeRef.current = shape; }, [shape]);
 
   // 手势状态（双指缩放 + 旋转；单指划动旋转）
   const gestureRef = useRef({
@@ -49,7 +53,7 @@ export default function Visualizer3D({ accent = '#4FC3F7', cover = '', onReady }
   // 加载封面并采样为 ImageData
   // 通过本地代理加载，代理返回 CORS 头，img 设 crossOrigin 后 canvas 不会被污染
   useEffect(() => {
-    if (!cover) { imageDataRef.current = null; hasCoverRef.current = false; return; }
+    if (!cover) { imageDataRef.current = null; coverLightRef.current = null; hasCoverRef.current = false; return; }
     let cancelled = false;
     (async () => {
       try {
@@ -68,14 +72,23 @@ export default function Visualizer3D({ accent = '#4FC3F7', cover = '', onReady }
             const s = Math.min(iw, ih);
             const sx = (iw - s) / 2, sy = (ih - s) / 2;
             cx.drawImage(img, sx, sy, s, s, 0, 0, SIZE, SIZE);
-            imageDataRef.current = cx.getImageData(0, 0, SIZE, SIZE).data;
+            const data = cx.getImageData(0, 0, SIZE, SIZE).data;
+            imageDataRef.current = data;
+            // 预计算封面亮度图（液态金属根据亮度凹凸）
+            const light = new Float32Array(SIZE * SIZE);
+            for (let i = 0; i < SIZE * SIZE; i++) {
+              const o = i * 4;
+              light[i] = (data[o] * 0.299 + data[o + 1] * 0.587 + data[o + 2] * 0.114) / 255;
+            }
+            coverLightRef.current = light;
             hasCoverRef.current = true;
-          } catch (e) {
+          } catch {
             imageDataRef.current = null;
+            coverLightRef.current = null;
             hasCoverRef.current = false;
           }
         };
-        img.onerror = () => { imageDataRef.current = null; hasCoverRef.current = false; };
+        img.onerror = () => { imageDataRef.current = null; coverLightRef.current = null; hasCoverRef.current = false; };
         img.src = proxyUrl;
       } catch {
         // 代理不可用时直接加载（canvas 会被污染，退化为渐变色）
@@ -91,14 +104,22 @@ export default function Visualizer3D({ accent = '#4FC3F7', cover = '', onReady }
             const s = Math.min(iw, ih);
             const sx = (iw - s) / 2, sy = (ih - s) / 2;
             cx.drawImage(img, sx, sy, s, s, 0, 0, SIZE, SIZE);
-            imageDataRef.current = cx.getImageData(0, 0, SIZE, SIZE).data;
+            const data = cx.getImageData(0, 0, SIZE, SIZE).data;
+            imageDataRef.current = data;
+            const light = new Float32Array(SIZE * SIZE);
+            for (let i = 0; i < SIZE * SIZE; i++) {
+              const o = i * 4;
+              light[i] = (data[o] * 0.299 + data[o + 1] * 0.587 + data[o + 2] * 0.114) / 255;
+            }
+            coverLightRef.current = light;
             hasCoverRef.current = true;
           } catch {
             imageDataRef.current = null;
+            coverLightRef.current = null;
             hasCoverRef.current = false;
           }
         };
-        img.onerror = () => { imageDataRef.current = null; hasCoverRef.current = false; };
+        img.onerror = () => { imageDataRef.current = null; coverLightRef.current = null; hasCoverRef.current = false; };
         img.src = cover;
       }
     })();
@@ -125,9 +146,8 @@ export default function Visualizer3D({ accent = '#4FC3F7', cover = '', onReady }
     container.appendChild(renderer.domElement);
 
     const FILL = 1.0;            // 平面占可见区比例，1.0 = 撑满短边
-    const MAX_Z_RATIO = 0.09;    // Z 起伏最大占可见半边比例（降低整体高度，留给冲击感）
 
-    let planeSize, cameraZ;
+    let planeSize, cameraZ, sphereR;
 
     const computeLayout = () => {
       W = container.offsetWidth;
@@ -138,20 +158,50 @@ export default function Visualizer3D({ accent = '#4FC3F7', cover = '', onReady }
       const halfFovRad = (FOV / 2) * Math.PI / 180;
       const visibleHalf = cameraZ * Math.tan(halfFovRad);
       planeSize = visibleHalf * FILL;   // 撑满短边方向
+      sphereR = planeSize * 0.78;       // 球体半径
       camera.aspect = aspect;
       camera.position.z = cameraZ;
       camera.updateProjectionMatrix();
     };
     computeLayout();
 
-    // ---- 粒子网格：X-Y 平面排满 planeSize x planeSize 正方形 ----
-    const COUNT = GRID * GRID;
-    const positions = new Float32Array(COUNT * 3);
-    const colors = new Float32Array(COUNT * 3);
-    const origUV = new Float32Array(COUNT * 2);       // 原始归一化 uv (0..1)
-    const distFromCenter = new Float32Array(COUNT);   // 距中心归一化距离
+    // ===== 几何数据 =====
+    let COUNT = 0;
+    let positions = null;
+    let colors = null;
+    let origUV = null;
+    let distFromCenter = null;
+    let normals = null; // 液态金属用
 
-    const buildGrid = () => {
+    const geometry = new THREE.BufferGeometry();
+    let material;
+    let points;
+
+    const sampleCover = (u, v) => {
+      const d = imageDataRef.current;
+      if (!d) return null;
+      const px = Math.min(GRID - 1, Math.max(0, Math.floor(u * GRID)));
+      const py = Math.min(GRID - 1, Math.max(0, Math.floor(v * GRID)));
+      const i = (py * GRID + px) * 4;
+      return [d[i] / 255, d[i + 1] / 255, d[i + 2] / 255];
+    };
+
+    const sampleCoverLight = (u, v) => {
+      const d = coverLightRef.current;
+      if (!d) return 0.5;
+      const px = Math.min(GRID - 1, Math.max(0, Math.floor(u * GRID)));
+      const py = Math.min(GRID - 1, Math.max(0, Math.floor(v * GRID)));
+      return d[py * GRID + px] || 0.5;
+    };
+
+    // 封面模式：X-Y 平面网格
+    const buildCoverGrid = () => {
+      COUNT = GRID * GRID;
+      positions = new Float32Array(COUNT * 3);
+      colors = new Float32Array(COUNT * 3);
+      origUV = new Float32Array(COUNT * 2);
+      distFromCenter = new Float32Array(COUNT);
+      normals = null;
       let idx = 0;
       const half = planeSize;
       const step = (planeSize * 2) / (GRID - 1);
@@ -171,49 +221,83 @@ export default function Visualizer3D({ accent = '#4FC3F7', cover = '', onReady }
           idx++;
         }
       }
+      geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+      geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+      material = new THREE.PointsMaterial({
+        size: planeSize * 2 / GRID * 1.08,
+        vertexColors: true,
+        transparent: true,
+        opacity: 1.0,
+        depthWrite: false,
+        sizeAttenuation: true,
+        blending: THREE.NormalBlending,
+      });
     };
-    buildGrid();
 
-    const geometry = new THREE.BufferGeometry();
-    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-    geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+    // 液态金属模式：UV 球面
+    const buildLiquidSphere = () => {
+      COUNT = SPHERE_U * SPHERE_V;
+      positions = new Float32Array(COUNT * 3);
+      colors = new Float32Array(COUNT * 3);
+      origUV = new Float32Array(COUNT * 2);
+      distFromCenter = null;
+      normals = new Float32Array(COUNT * 3);
+      let idx = 0;
+      for (let iv = 0; iv < SPHERE_V; iv++) {
+        for (let iu = 0; iu < SPHERE_U; iu++) {
+          const u = iu / SPHERE_U;
+          const v = iv / (SPHERE_V - 1);
+          origUV[idx * 2] = u;
+          origUV[idx * 2 + 1] = v;
+          const theta = v * Math.PI;
+          const phi = u * Math.PI * 2;
+          const nx = Math.sin(theta) * Math.cos(phi);
+          const ny = Math.cos(theta);
+          const nz = Math.sin(theta) * Math.sin(phi);
+          normals[idx * 3] = nx;
+          normals[idx * 3 + 1] = ny;
+          normals[idx * 3 + 2] = nz;
+          positions[idx * 3] = nx * sphereR;
+          positions[idx * 3 + 1] = ny * sphereR;
+          positions[idx * 3 + 2] = nz * sphereR;
+          idx++;
+        }
+      }
+      geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+      geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+      material = new THREE.PointsMaterial({
+        size: Math.max(1.5, sphereR / 120),
+        vertexColors: true,
+        transparent: true,
+        opacity: 0.95,
+        depthWrite: false,
+        sizeAttenuation: true,
+        blending: THREE.AdditiveBlending,
+      });
+    };
 
-    const material = new THREE.PointsMaterial({
-      size: planeSize * 2 / GRID * 0.92,   // 粒子稍大，铺满无间隙
-      vertexColors: true,
-      transparent: true,
-      opacity: 1.0,
-      depthWrite: false,
-      sizeAttenuation: true,
-      blending: THREE.NormalBlending, // 正常混合，封面颜色真实还原
-    });
-
-    const points = new THREE.Points(geometry, material);
-    scene.add(points);
+    const buildGeometry = () => {
+      if (shapeRef.current === 'liquid') buildLiquidSphere();
+      else buildCoverGrid();
+      points = new THREE.Points(geometry, material);
+      scene.add(points);
+    };
+    buildGeometry();
 
     let raf;
     const posAttr = geometry.attributes.position;
     const colorAttr = geometry.attributes.color;
 
-    const sampleCover = (u, v) => {
-      const d = imageDataRef.current;
-      if (!d) return null;
-      const px = Math.min(GRID - 1, Math.max(0, Math.floor(u * GRID)));
-      const py = Math.min(GRID - 1, Math.max(0, Math.floor(v * GRID)));
-      const i = (py * GRID + px) * 4;
-      return [d[i] / 255, d[i + 1] / 255, d[i + 2] / 255];
-    };
-
     // 封面颜色只设置一次（封面固定时大幅省性能）；无封面时每帧用渐变 + 能量
     let coverColorApplied = false;
     const applyCoverColors = () => {
-      if (!hasCoverRef.current) return false;
+      if (!hasCoverRef.current || shapeRef.current !== 'cover') return false;
       for (let i = 0; i < COUNT; i++) {
         const u = origUV[i * 2];
         const v = origUV[i * 2 + 1];
         const s = sampleCover(u, v);
-        const boost = 0.95;
-        const minBright = 0.12;   // 暗部保底，避免深色背景里消失
+        const boost = 1.35;
+        const minBright = 0.28;   // 暗部保底，让深色封面也清晰可见
         colorAttr.array[i * 3]     = Math.max(s[0] * boost, minBright * (0.6 + s[0]));
         colorAttr.array[i * 3 + 1] = Math.max(s[1] * boost, minBright * (0.6 + s[1]));
         colorAttr.array[i * 3 + 2] = Math.max(s[2] * boost, minBright * (0.6 + s[2]));
@@ -223,17 +307,23 @@ export default function Visualizer3D({ accent = '#4FC3F7', cover = '', onReady }
     };
 
     let firstFrame = true;
-    // bass 采用 attack/release 分离：攻击快（捕捉鼓点瞬间）+ 衰减稍慢（保留余韵）
-    // bassPulse = attack 超过 release 的部分 = 短促的鼓点冲击
     let bassAttack = 0;
     let bassRelease = 0;
     let midSmooth = 0;
     let trebleSmooth = 0;
 
+    // 液态金属热点坐标
+    const hotSpots = [
+      { u: 0.30, v: 0.30, k: 6 },
+      { u: 0.70, v: 0.60, k: 6 },
+      { u: 0.50, v: 0.18, k: 8 },
+      { u: 0.20, v: 0.75, k: 7 },
+    ];
+
     const animate = () => {
       const { data, hasData } = getSpectrumBars(64);
 
-      // 频段分组：bass 低频居中，向外依次 mid、treble
+      // 频段分组
       let bass = 0, mid = 0, treble = 0;
       if (hasData) {
         for (let i = 0; i < 8; i++) bass += data[i];
@@ -243,113 +333,154 @@ export default function Visualizer3D({ accent = '#4FC3F7', cover = '', onReady }
         for (let i = 32; i < 64; i++) treble += data[i];
         treble /= 32;
       } else {
-        // 待机动画：明显律动的能量起伏，让风吹效果始终可见
         const t = Date.now() * 0.001;
         bass = 0.20 + Math.sin(t * 0.60) * 0.10 + Math.sin(t * 1.25) * 0.06;
         mid = 0.14 + Math.sin(t * 0.90 + 1) * 0.07;
         treble = 0.10 + Math.sin(t * 1.20 + 2) * 0.05;
       }
-      // bass：攻击快（0.55 立刻跟上鼓点）、回落稍快（0.28 不拖泥），release 慢（0.12 留余韵）
-      // 这样鼓点来时中心瞬间弹起又快速落下，形成"砰"的冲击而非缓慢起伏
       if (bass > bassAttack) bassAttack += (bass - bassAttack) * 0.55;
       else bassAttack += (bass - bassAttack) * 0.28;
       bassRelease += (bass - bassRelease) * 0.12;
       midSmooth += (mid - midSmooth) * 0.22;
       trebleSmooth += (treble - trebleSmooth) * 0.28;
 
-      // 鼓点脉冲：攻击超过残影的部分 = 短促爆发，让震感"砸"下来
       const bassPulse = Math.max(0, bassAttack - bassRelease);
-
-      // 整体呼吸缩放：基础呼吸 + 鼓点冲击（pulse 让画面随鼓点轻微"砸"一下，增强震感）
       const time = Date.now() * 0.001;
       const breath = 1 + Math.sin(time * 0.6) * 0.020 + bassAttack * 0.04 + bassPulse * 0.10;
-      const zAmp = planeSize * MAX_Z_RATIO;
       const hasCover = hasCoverRef.current;
-
-      // 封面就绪后应用一次颜色
-      if (hasCover && !coverColorApplied) {
-        coverColorApplied = applyCoverColors();
-      } else if (!hasCover) {
-        coverColorApplied = false;
-      }
-
-      // 每帧更新 Z；无封面时同时更新 color
-      const needColorUpdate = !hasCover;
-      // 风吹参数：整个面轻柔飘动，幅度收敛避免画面剧烈起伏
-      const windSpeed = 2.0;
-      const windFreqX = 3.0;   // X 方向波纹频率
-      const windFreqY = 2.0;   // Y 方向波纹频率
-      const windGust = 1.0 + Math.sin(time * 0.7) * 0.15 + bassAttack * 0.25; // 阵风强度（收敛，bass 影响减小避免盖过音频冲击）
-
-      // 主题色解析
       const accentRGB = hexToRGB(accentRef.current || '#4FC3F7');
 
-      for (let i = 0; i < COUNT; i++) {
-        const u = origUV[i * 2];
-        const v = origUV[i * 2 + 1];
-        const dc = distFromCenter[i]; // 0 中心 ~ 1 边角
+      const currentShape = shapeRef.current;
+      const g = gestureRef.current;
 
-        // 音频响应：中心 = bass（低频），向外依次 mid、treble（高频）
-        // 三个频段按距中心距离分层，分界线更锐利
-        const bFreq = Math.max(0, 1 - dc * 3.5);                 // 中心低频：dc<0.28 有响应
-        const mFreq = Math.max(0, 1 - Math.abs(dc - 0.50) * 3.6); // 中环 mid：峰值在 0.50
-        const tFreq = Math.max(0, 1 - Math.abs(dc - 0.85) * 5.0); // 外环 treble：峰值在 0.85
-        // bass 锐化：低电平压制、高电平突出，制造"砰"的冲击；bassPulse 叠加短促爆发
-        const bassSharp = Math.pow(bassAttack, 1.4);
-        let localEnergy = (bassSharp + bassPulse * 1.6) * bFreq * 1.1
-                        + midSmooth * mFreq * 0.85
-                        + trebleSmooth * tFreq * 0.70;
+      if (currentShape === 'cover') {
+        // ===== 封面模式：压平 Z 起伏，避免侧面看到穹顶膨胀 =====
+        const MAX_Z_RATIO = 0.035;
+        const zAmp = planeSize * MAX_Z_RATIO;
 
-        // 风吹效果：作为底层微弱动画，不盖过音频
-        const wave1 = Math.sin(u * windFreqX * Math.PI + time * windSpeed) * 0.18;
-        const wave2 = Math.sin(v * windFreqY * Math.PI + time * windSpeed * 0.7) * 0.12;
-        const ripple = Math.sin((u + v) * 10 + time * 3.0) * 0.04;
-        const swirl = Math.sin(u * 6 + v * 4 + time * 1.4) * 0.05;
-        const windZ = (wave1 + wave2 + ripple + swirl) * windGust;
-
-        // 音频能量叠加到 Z：中心低频鼓点冲击，中圈 mid，外圈 treble
-        // 高度降低（2.4→1.15），冲击感由 bassPulse 的短促爆发承担
-        const falloff = Math.pow(1 - dc, 0.75); // 边缘衰减减弱，让外圈高频也可见
-        const audioZ = localEnergy * 1.15 * falloff * breath;
-
-        posAttr.array[i * 3 + 2] = (windZ + audioZ) * zAmp;
-
-        if (needColorUpdate) {
-          // 无封面时：按频段染色 + 中心亮外圈暗
-          const windGlow = Math.abs(windZ) * 0.4;
-          const bassGlow = bFreq * (bassAttack + bassPulse * 1.5) * 1.4;
-          const midGlow = mFreq * midSmooth * 0.9;
-          const trebleGlow = tFreq * trebleSmooth * 1.1;
-          const intensity = 0.22 + localEnergy * 1.1 + windGlow;
-          const outFactor = 1 - dc * 0.5;
-          // 中心偏白（低频亮），中间主题色，外圈偏冷/深
-          colorAttr.array[i * 3]     = Math.min(1, accentRGB.r * intensity * outFactor + bassGlow * 0.45 + midGlow * 0.2 + trebleGlow * 0.15);
-          colorAttr.array[i * 3 + 1] = Math.min(1, accentRGB.g * intensity * outFactor + bassGlow * 0.45 + midGlow * 0.25 + trebleGlow * 0.15);
-          colorAttr.array[i * 3 + 2] = Math.min(1, accentRGB.b * intensity * outFactor + bassGlow * 0.45 + midGlow * 0.25 + trebleGlow * 0.45 + windGlow * 0.3);
+        // 封面就绪后应用一次颜色
+        if (hasCover && !coverColorApplied) {
+          coverColorApplied = applyCoverColors();
+        } else if (!hasCover) {
+          coverColorApplied = false;
         }
+        const needColorUpdate = !hasCover;
+
+        // 风吹参数：极轻柔，不盖过音频
+        const windSpeed = 2.0;
+        const windFreqX = 3.0;
+        const windFreqY = 2.0;
+        const windGust = 1.0 + Math.sin(time * 0.7) * 0.10 + bassAttack * 0.15;
+
+        for (let i = 0; i < COUNT; i++) {
+          const u = origUV[i * 2];
+          const v = origUV[i * 2 + 1];
+          const dc = distFromCenter[i];
+
+          // 音频响应：中心 = bass，向外依次 mid、treble
+          const bFreq = Math.max(0, 1 - dc * 3.5);
+          const mFreq = Math.max(0, 1 - Math.abs(dc - 0.50) * 3.6);
+          const tFreq = Math.max(0, 1 - Math.abs(dc - 0.85) * 5.0);
+          const bassSharp = Math.pow(bassAttack, 1.4);
+          let localEnergy = (bassSharp + bassPulse * 1.6) * bFreq * 1.1
+                          + midSmooth * mFreq * 0.85
+                          + trebleSmooth * tFreq * 0.70;
+
+          // 风吹：小幅度
+          const wave1 = Math.sin(u * windFreqX * Math.PI + time * windSpeed) * 0.10;
+          const wave2 = Math.sin(v * windFreqY * Math.PI + time * windSpeed * 0.7) * 0.07;
+          const ripple = Math.sin((u + v) * 10 + time * 3.0) * 0.02;
+          const swirl = Math.sin(u * 6 + v * 4 + time * 1.4) * 0.03;
+          const windZ = (wave1 + wave2 + ripple + swirl) * windGust;
+
+          // 音频能量叠加到 Z：幅度收敛，侧面看仍是平面
+          const falloff = Math.pow(1 - dc, 0.75);
+          const audioZ = localEnergy * 0.55 * falloff * breath;
+
+          posAttr.array[i * 3 + 2] = (windZ + audioZ) * zAmp;
+
+          if (needColorUpdate) {
+            const windGlow = Math.abs(windZ) * 0.4;
+            const bassGlow = bFreq * (bassAttack + bassPulse * 1.5) * 1.4;
+            const midGlow = mFreq * midSmooth * 0.9;
+            const trebleGlow = tFreq * trebleSmooth * 1.1;
+            const intensity = 0.22 + localEnergy * 1.1 + windGlow;
+            const outFactor = 1 - dc * 0.5;
+            colorAttr.array[i * 3]     = Math.min(1, accentRGB.r * intensity * outFactor + bassGlow * 0.45 + midGlow * 0.2 + trebleGlow * 0.15);
+            colorAttr.array[i * 3 + 1] = Math.min(1, accentRGB.g * intensity * outFactor + bassGlow * 0.45 + midGlow * 0.25 + trebleGlow * 0.15);
+            colorAttr.array[i * 3 + 2] = Math.min(1, accentRGB.b * intensity * outFactor + bassGlow * 0.45 + midGlow * 0.25 + trebleGlow * 0.45 + windGlow * 0.3);
+          }
+        }
+        posAttr.needsUpdate = true;
+        if (needColorUpdate) colorAttr.needsUpdate = true;
+
+        // 微俯仰 + 随风轻微摇摆
+        points.rotation.y = g.rotation;
+        points.rotation.x = -0.12 + Math.sin(time * 0.6) * 0.03;
+        points.rotation.z = Math.cos(time * 0.45) * 0.015;
+        const sc = breath;
+        points.scale.set(sc, sc, 1);
+      } else {
+        // ===== 液态金属模式：高频球面波纹 =====
+        // 封面亮度决定基础半径凹凸
+        const baseR = sphereR * 0.88;
+
+        for (let i = 0; i < COUNT; i++) {
+          const u = origUV[i * 2];
+          const v = origUV[i * 2 + 1];
+          const nx = normals[i * 3];
+          const ny = normals[i * 3 + 1];
+          const nz = normals[i * 3 + 2];
+
+          const light = hasCover ? sampleCoverLight(u, v) : 0.5;
+          let r = baseR * (0.82 + light * 0.36);
+
+          // 高频震动波纹（时间频率提高，让金属表面持续颤动）
+          r += midSmooth    * Math.sin(u * 90 + time * 9)  * sphereR * 0.05;
+          r += trebleSmooth * Math.sin(v * 110 - time * 11) * sphereR * 0.035;
+          r += midSmooth    * Math.cos((u + v) * 130 + time * 10) * sphereR * 0.025;
+          r += trebleSmooth * Math.sin((u - v) * 150 + time * 12) * sphereR * 0.020;
+
+          // 鼓点热点：高频冲击
+          let hotSum = 0;
+          for (const h of hotSpots) {
+            hotSum += Math.exp(-Math.pow((u - h.u) * h.k, 2) - Math.pow((v - h.v) * h.k, 2));
+          }
+          r += bassPulse * hotSum * sphereR * 0.32;
+          // bass 整体膨胀
+          r += bassAttack * sphereR * 0.06 * (0.6 + light * 0.4);
+
+          posAttr.array[i * 3] = nx * r;
+          posAttr.array[i * 3 + 1] = ny * r;
+          posAttr.array[i * 3 + 2] = nz * r;
+
+          // 颜色：封面亮度 + 主题色 + 音频能量
+          const energy = bassAttack * 1.2 + midSmooth * 0.8 + trebleSmooth * 0.9 + bassPulse * 1.5;
+          const metal = 0.55 + light * 0.35 + energy * 0.7;
+          const shine = Math.pow(Math.abs(Math.sin(u * 90 + time * 9)), 3) * 0.25;
+          colorAttr.array[i * 3]     = Math.min(1, accentRGB.r * metal + shine + bassPulse * 0.3);
+          colorAttr.array[i * 3 + 1] = Math.min(1, accentRGB.g * metal + shine + bassPulse * 0.3);
+          colorAttr.array[i * 3 + 2] = Math.min(1, accentRGB.b * metal + shine + bassPulse * 0.45 + trebleSmooth * 0.2);
+        }
+        posAttr.needsUpdate = true;
+        colorAttr.needsUpdate = true;
+
+        // 液态金属自动缓慢旋转 + 手势旋转
+        points.rotation.y = time * 0.08 + g.rotation;
+        points.rotation.x = Math.sin(time * 0.25) * 0.10;
+        points.rotation.z = Math.cos(time * 0.18) * 0.06;
+        const sc = 0.96 + bassAttack * 0.04 + bassPulse * 0.05;
+        points.scale.set(sc, sc, sc);
       }
-      posAttr.needsUpdate = true;
-      if (needColorUpdate) colorAttr.needsUpdate = true;
 
       // ===== 电影镜头：仅手势驱动（无自动旋转）=====
-      const g = gestureRef.current;
       g.zoom += (g.targetZoom - g.zoom) * 0.18;
       g.rotation += (g.targetRotation - g.rotation) * 0.18;
-      // 缩放限制 0.4 ~ 3.0
       const clampedZoom = Math.max(0.4, Math.min(3.0, g.zoom));
       camera.position.z = cameraZ / clampedZoom;
-      // 仅用户手势旋转
-      points.rotation.y = g.rotation;
-      // 微俯仰 + 随风轻微摇摆
-      points.rotation.x = -0.18 + Math.sin(time * 0.6) * 0.04;
-      points.rotation.z = Math.cos(time * 0.45) * 0.02;
       camera.position.x = 0;
       camera.position.y = 0;
       camera.lookAt(0, 0, 0);
-
-      // 整体呼吸缩放（基础呼吸 + bass 增强）
-      const sc = breath;
-      points.scale.set(sc, sc, 1);
 
       renderer.render(scene, camera);
 
@@ -365,7 +496,7 @@ export default function Visualizer3D({ accent = '#4FC3F7', cover = '', onReady }
     const dom = renderer.domElement;
     const dist = (t1, t2) => Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
     const angle = (t1, t2) => Math.atan2(t2.clientY - t1.clientY, t2.clientX - t1.clientX);
-    const ROTATE_SENSITIVITY = 0.006; // 单指水平滑动灵敏度
+    const ROTATE_SENSITIVITY = 0.006;
     const onTouchStart = (e) => {
       const g = gestureRef.current;
       if (e.touches.length === 1) {
@@ -387,10 +518,8 @@ export default function Visualizer3D({ accent = '#4FC3F7', cover = '', onReady }
         e.preventDefault();
         const d = dist(e.touches[0], e.touches[1]);
         const a = angle(e.touches[0], e.touches[1]);
-        // 缩放 = 当前距离 / 起始距离
         const scale = d / Math.max(1, g.startDist);
         g.targetZoom = Math.max(0.4, Math.min(3.0, g.startZoom * scale));
-        // 旋转 = 当前角度 - 起始角度
         g.targetRotation = g.startRot + (a - g.startAngle);
       } else if (g.dragging && e.touches.length === 1) {
         e.preventDefault();
@@ -403,7 +532,6 @@ export default function Visualizer3D({ accent = '#4FC3F7', cover = '', onReady }
       if (e.touches.length < 2) g.pinching = false;
       if (e.touches.length < 1) g.dragging = false;
     };
-    // 鼠标滚轮缩放（桌面端调试用）
     const onWheel = (e) => {
       const g = gestureRef.current;
       g.targetZoom = Math.max(0.4, Math.min(3.0, g.targetZoom * (e.deltaY > 0 ? 0.92 : 1.08)));
@@ -416,10 +544,11 @@ export default function Visualizer3D({ accent = '#4FC3F7', cover = '', onReady }
 
     const handleResize = () => {
       computeLayout();
-      buildGrid();
-      posAttr.needsUpdate = true;
-      material.size = planeSize * 2 / GRID * 0.92;
-      coverColorApplied = false;   // 网格重建后需重新应用封面颜色
+      scene.remove(points);
+      geometry.dispose();
+      if (material) material.dispose();
+      buildGeometry();
+      coverColorApplied = false;
       renderer.setSize(W, H);
     };
     window.addEventListener('resize', handleResize);
@@ -433,7 +562,7 @@ export default function Visualizer3D({ accent = '#4FC3F7', cover = '', onReady }
       dom.removeEventListener('wheel', onWheel);
       renderer.dispose();
       geometry.dispose();
-      material.dispose();
+      if (material) material.dispose();
       if (renderer.domElement.parentNode) {
         renderer.domElement.parentNode.removeChild(renderer.domElement);
       }

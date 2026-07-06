@@ -17,6 +17,11 @@ const VIZ_MODES = [
   { key: '3d', label: '3D', icon: '◆' }
 ];
 
+const VIZ_SHAPES = [
+  { key: 'cover', label: '封面' },
+  { key: 'liquid', label: '液态金属' }
+];
+
 const PRESETS = [
   '#00F5D4', // Mineradio 青绿
   '#f4d28a', // 香槟金
@@ -153,6 +158,7 @@ export default function Player({ onProfile }) {
   const [sq, setSq] = useState(false); const [qo, setQo] = useState(false); const [viz, setViz] = useState(false);
   const [query, setQuery] = useState(''); const [results, setResults] = useState([]); const [searching, setSearching] = useState(false); const st = useRef(null);
   const [vm, setVm] = useState(() => { try { return localStorage.getItem('sonus_viz_mode') || 'ring' } catch { return 'ring' } });
+  const [shape, setShape] = useState(() => { try { return localStorage.getItem('sonus_3d_shape') || 'cover' } catch { return 'cover' } });
   const [ac, setAc] = useState(() => { try { return localStorage.getItem('sonus_accent') || '#00F5D4' } catch { return '#00F5D4' } });
   const [lyricPanel, setLyricPanel] = useState(() => { try { return localStorage.getItem('sonus_lyric_panel') !== 'false' } catch { return true } });
   const pr = useRef(null); const [sk, setSk] = useState(false);
@@ -186,7 +192,7 @@ export default function Player({ onProfile }) {
       {/* 可视化背景层 */}
       <div style={{ position: 'absolute', inset: 0 }}>
         <FloatingLyrics lyrics={lyrics} isPlaying={isPlaying} />
-        {vm === '3d' ? <Suspense><Visualizer3D accent={ac} cover={currentTrack?.cover || ''} /></Suspense> : <Visualizer isPlaying={isPlaying} mode={vm} accent={ac} />}
+        {vm === '3d' ? <Suspense><Visualizer3D accent={ac} cover={currentTrack?.cover || ''} shape={shape} /></Suspense> : <Visualizer isPlaying={isPlaying} mode={vm} accent={ac} />}
         {lyricPanel && <LyricScroll currentLyric={currentLyric || ''} accent={ac} />}
       </div>
 
@@ -300,6 +306,14 @@ export default function Player({ onProfile }) {
               {VIZ_MODES.map(m => <button key={m.key} onClick={() => { setVm(m.key); try { localStorage.setItem('sonus_viz_mode', m.key); } catch { } }} className={`glass-button${vm === m.key ? ' is-active' : ''}`} style={{ flex: 1, padding: '14px 4px', borderRadius: 14, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, fontSize: 11, transition: 'all .2s' }}><span style={{ fontSize: 20 }}>{m.icon}</span>{m.label}</button>)}
             </div>
           </div>
+          {vm === '3d' && (
+            <div>
+              <div style={{ fontSize: 10, fontWeight: 760, letterSpacing: '.14em', color: 'var(--fc-muted)', textTransform: 'uppercase', marginBottom: 10 }}>3D 样式</div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                {VIZ_SHAPES.map(s => <button key={s.key} onClick={() => { setShape(s.key); try { localStorage.setItem('sonus_3d_shape', s.key); } catch { } }} className={`glass-button${shape === s.key ? ' is-active' : ''}`} style={{ flex: 1, padding: '12px 4px', borderRadius: 12, fontSize: 12, transition: 'all .2s' }}>{s.label}</button>)}
+              </div>
+            </div>
+          )}
           <ColorPicker value={ac} onChange={setAc} />
           <Toggle label="歌词面板" value={lyricPanel} onChange={v => { setLyricPanel(v); try { localStorage.setItem('sonus_lyric_panel', String(v)); } catch { } }} />
         </div>
