@@ -50,6 +50,17 @@ export const usePlayerStore = create((set, get) => {
     set({ currentTime: time, currentLyric: getCurrentLyric(lyrics, time) });
   });
 
+  // 歌词高亮需要比 timeupdate 更平滑的时间，用 RAF 单独更新 lyricTime
+  let lyricRaf = 0;
+  const updateLyricTime = () => {
+    const { isPlaying } = get();
+    if (isPlaying && audio) {
+      set({ lyricTime: audio.currentTime || 0 });
+    }
+    lyricRaf = requestAnimationFrame(updateLyricTime);
+  };
+  lyricRaf = requestAnimationFrame(updateLyricTime);
+
   audio.addEventListener('loadedmetadata', () => {
     let d = audio.duration;
     if (!isFinite(d) || !d) {
@@ -96,6 +107,7 @@ export const usePlayerStore = create((set, get) => {
     currentTrack: null,
     isPlaying: false,
     currentTime: 0,
+    lyricTime: 0,
     duration: 0,
     volume: 0.8,
     playlist: [],
@@ -120,6 +132,7 @@ export const usePlayerStore = create((set, get) => {
         currentTrack: track,
         isPlaying: false,
         currentTime: 0,
+        lyricTime: 0,
         duration: track?.duration || 0,
         isLoadingUrl: true,
         lyrics: [],

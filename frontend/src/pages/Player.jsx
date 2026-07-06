@@ -169,7 +169,7 @@ function FloatPanel({ open, onClose, title, width = 360, children }) {
 }
 
 export default function Player({ onProfile }) {
-  const { currentTrack, isPlaying, currentTime, duration, volume, playMode, playlist, togglePlay, next, prev, seek, setVolume, toggleMode, playTrack, lyrics, currentLyric, isLoadingUrl, error, clearError, setError } = usePlayerStore();
+  const { currentTrack, isPlaying, currentTime, lyricTime, duration, volume, playMode, playlist, togglePlay, next, prev, seek, setVolume, toggleMode, playTrack, lyrics, currentLyric, isLoadingUrl, error, clearError, setError } = usePlayerStore();
   const { userInfo, isLoggedIn } = useAuthStore();
   const [sq, setSq] = useState(false); const [qo, setQo] = useState(false); const [viz, setViz] = useState(false);
   const [controlsExpanded, setControlsExpanded] = useState(() => { try { return localStorage.getItem('sonus_controls_expanded') !== 'false'; } catch { return true } });
@@ -219,7 +219,7 @@ export default function Player({ onProfile }) {
       <div style={{ position: 'absolute', inset: 0 }}>
         <FloatingLyrics lyrics={lyrics} isPlaying={isPlaying} />
         {vm === '3d' ? <Suspense key={`${currentTrack?.cover || currentTrack?.id || 'none'}-${v3m}`}><Visualizer3D accent={ac} cover={currentTrack?.cover || ''} mode={v3m} isPlaying={isPlaying} /></Suspense> : <Visualizer isPlaying={isPlaying} mode={vm} accent={ac} />}
-        {lyricPanel && <LyricScroll currentLyric={currentLyric || ''} lyrics={lyrics} currentTime={currentTime} accent={ac} />}
+        {lyricPanel && <LyricScroll currentLyric={currentLyric || ''} lyrics={lyrics} currentTime={lyricTime} accent={ac} />}
       </div>
 
       {/* 暗角遮罩 */}
