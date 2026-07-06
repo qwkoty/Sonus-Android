@@ -1,11 +1,7 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState } from 'react';
 
-function easeOutCubic(t) {
-  return 1 - Math.pow(1 - t, 3);
-}
-
-// 估算当前行内唱到的字词位置（标准 LRC 只有行时间戳，按行时长线性分配）
-function estimateWordProgress(lyrics, currentTime) {
+// 估算当前行演唱进度（标准 LRC 只有行时间戳，按行时长线性分配）
+function estimateLineProgress(lyrics, currentTime) {
   if (!lyrics?.length || currentTime == null) return 0;
   let lineIndex = -1;
   for (let i = 0; i < lyrics.length; i++) {
@@ -17,10 +13,10 @@ function estimateWordProgress(lyrics, currentTime) {
   const line = lyrics[lineIndex];
   const nextTime = lyrics[lineIndex + 1]?.time ?? (line.time + 5);
   const duration = Math.max(0.5, nextTime - line.time);
-  return easeOutCubic(Math.max(0, Math.min(1, (currentTime - line.time) / duration)));
+  return Math.max(0, Math.min(1, (currentTime - line.time) / duration));
 }
 
-// 中央歌词：当前行大字显示，主题色；读到的字高亮放大
+// 中央歌词：一行大字，主题色；已唱部分被一道白色高光从左到右平滑扫过
 export default function LyricScroll({ currentLyric = '', lyrics = [], currentTime = 0, accent = '#00F5D4' }) {
   const [display, setDisplay] = useState(currentLyric);
   const [phase, setPhase] = useState('in');
@@ -31,19 +27,16 @@ export default function LyricScroll({ currentLyric = '', lyrics = [], currentTim
     const t = setTimeout(() => {
       setDisplay(currentLyric);
       setPhase('in');
-    }, 160);
+    }, 140);
     return () => clearTimeout(t);
   }, [currentLyric, display]);
 
-  const words = useMemo(() => {
-    if (!display || display.trim() === '') return [];
-    return display.split(/(\s+)/).filter(Boolean);
-  }, [display]);
-
-  const wordProgress = estimateWordProgress(lyrics, currentTime);
-  const activeIndex = words.length ? Math.min(words.length - 1, Math.floor(wordProgress * words.length)) : -1;
-
+  const progress = estimateLineProgress(lyrics, currentTime);
+  const pct = Math.round(progress * 100);
   const isEmpty = !display || display.trim() === '';
+
+  // 已唱部分白色 + 微光，未唱部分主题色，过渡带 4% 制造扫过感
+  const gradient = `linear-gradient(90deg, #fff ${pct}%, ${accent} ${Math.min(100, pct + 4)}%)`;
 
   return (
     <div style={{
@@ -60,45 +53,45 @@ export default function LyricScroll({ currentLyric = '', lyrics = [], currentTim
       pointerEvents: 'none',
     }}>
       <p style={{
-        fontSize: 23,
+        fontSize: 24,
         fontWeight: 800,
-        lineHeight: 1.6,
+        lineHeight: 1.55,
         textAlign: 'center',
         maxWidth: 'min(720px, 88vw)',
         opacity: phase === 'in' ? 1 : 0,
-        transform: phase === 'in' ? 'translateY(0) scale(1)' : 'translateY(16px) scale(0.97)',
-        transition: 'opacity .28s cubic-bezier(.16,1,.3,1), transform .28s cubic-bezier(.16,1,.3,1)',
-        color: accent,
-        textShadow: `0 2px 18px rgba(0,0,0,0.9), 0 0 30px ${accent}30`,
+        transform: phase === 'in' ? 'translateY(0) scale(1)' : 'translateY(14px) scale(0.98)',
+        transition: 'opacity .24s cubic-bezier(.16,1,.3,1), transform .24s cubic-bezier(.16,1,.3,1)',
+        background: isEmpty ? accent : gradient,
+        WebkitBackgroundClip: 'text',
+        WebkitTextFillColor: 'transparent',
+        backgroundClip: 'text',
+        textShadow: `0 2px 18px rgba(0,0,0,0.9)`,
         whiteSpace: 'pre-wrap',
         margin: 0,
+        filter: phase === 'in' ? 'none' : 'blur(2px)',
       }}>
-        {isEmpty ? (
-          <span style={{ opacity: 0 }}> </span>
-        ) : (
-          words.map((word, i) => {
-            const active = i <= activeIndex;
-            const current = i === activeIndex;
-            return (
-              <span
-                key={i}
-                style={{
-                  display: 'inline-block',
-                  marginRight: word.match(/\s/) ? '0.12em' : undefined,
-                  color: active ? '#fff' : accent,
-                  transform: current ? 'scale(1.08)' : 'scale(1)',
-                  textShadow: active
-                    ? `0 0 16px ${accent}, 0 0 32px ${accent}66`
-                    : `0 2px 10px rgba(0,0,0,0.6)`,
-                  transition: 'color 0.15s ease, transform 0.15s ease, text-shadow 0.15s ease',
-                }}
-              >
-                {word.trim() === '' ? '\u00A0' : word}
-              </span>
-            );
-          })
-        )}
+        {display || ' '}
       </p>
+      {/* 扫过高光层，增强氛围 */}
+      {!isEmpty && (
+        <div
+          aria-hidden
+          style={{
+            position: 'absolute',
+            top: '50%',
+            left: `${pct}%`,
+            transform: 'translate(-50%, -50%)',
+            width: 60,
+            height: 60,
+            borderRadius: '50%',
+            background: `radial-gradient(circle, ${accent}40 0%, transparent 70%)`,
+            opacity: phase === 'in' ? 0.8 : 0,
+            transition: 'left 0.08s linear, opacity 0.24s ease',
+            pointerEvents: 'none',
+            zIndex: -1,
+          }}
+        />
+      )}
     </div>
   );
 }

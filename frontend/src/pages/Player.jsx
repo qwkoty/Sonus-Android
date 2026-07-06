@@ -183,7 +183,7 @@ export default function Player({ onProfile }) {
 
   const pct = duration ? (currentTime / duration) * 100 : 0;
   const mi = playMode === 'single' ? <Repeat1 size={16} /> : playMode === 'random' ? <Shuffle size={16} /> : <Repeat size={16} />;
-  const av = userInfo?.avatar;
+  const av = userInfo?.avatar || (userInfo?.uin ? `https://q1.qlogo.cn/g?b=qq&nk=${userInfo.uin}&s=640` : '');
 
   useEffect(() => { document.documentElement.style.setProperty('--accent-dynamic', ac); }, [ac]);
   useEffect(() => { try { localStorage.setItem('sonus_controls_expanded', String(controlsExpanded)); } catch { } }, [controlsExpanded]);

@@ -225,9 +225,11 @@ async function userInfoAPK(uin, cookie = '') {
     req_0: { module: 'music.UserInfo.userInfoServer', method: 'GetLoginUserInfo', param: {} },
   }), cookie);
   const i = d?.req_0?.data;
+  const avatar = i?.headpic || i?.headimg || i?.avatar || i?.face || i?.headPic || '';
+  console.log('[userInfo] raw fields:', { nick: i?.nick, headpic: i?.headpic, headimg: i?.headimg, avatar: i?.avatar, face: i?.face, headPic: i?.headPic });
   return {
     nickname: i?.nick || 'QQ音乐用户',
-    avatar: i?.headpic || '',
+    avatar,
     uin: String(uin),
     vipLevel: i?.vipLevel || 0,
     isVip: !!(i?.isVip || i?.vip || i?.vipStatus || i?.svipLevel || i?.payPackId),

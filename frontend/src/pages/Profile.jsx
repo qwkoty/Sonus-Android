@@ -46,10 +46,10 @@ export default function Profile({ onBack }) {
 
   useEffect(() => {
     if (isLoggedIn) {
-      if (!userInfo) fetchUserInfo();
+      fetchUserInfo();
       loadPlaylists();
     }
-  }, [isLoggedIn, userInfo, fetchUserInfo, loadPlaylists]);
+  }, [isLoggedIn, fetchUserInfo, loadPlaylists]);
 
   const openPlaylistDetail = async (pl) => {
     setLoadingDetail(true);
@@ -79,7 +79,9 @@ export default function Profile({ onBack }) {
     }
   };
 
-  const avatar = userInfo?.avatar;
+  const rawAvatar = userInfo?.avatar;
+  const fallbackAvatar = uin ? `https://q1.qlogo.cn/g?b=qq&nk=${uin}&s=640` : '';
+  const avatar = rawAvatar || fallbackAvatar;
   const [avatarError, setAvatarError] = useState(false);
 
   useEffect(() => {

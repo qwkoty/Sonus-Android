@@ -62,8 +62,10 @@ export const useAuthStore = create((set, get) => {
       set({ loadingInfo: true });
       try {
         const info = await music.userInfo(cookie, uin);
+        console.log('[fetchUserInfo] result:', info);
         set({ userInfo: info, nickname: info?.nickname || get().nickname, loadingInfo: false });
       } catch (e) {
+        console.error('[fetchUserInfo] failed:', e);
         set({ loadingInfo: false });
       }
     },
