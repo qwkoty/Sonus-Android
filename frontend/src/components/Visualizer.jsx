@@ -79,7 +79,7 @@ export default function Visualizer({ isPlaying, mode = 'ring', accent = '#4FC3F7
     const drawRadialWave = (spectrum, hasData) => {
       const C = palette();
       const data = spectrum;
-      const [H] = hexToHsl(accentRef.current);
+      const [H, S] = hexToHsl(accentRef.current);
 
       const smooth = smoothRef.current;
       for (let i = 0; i < NUM_BARS; i++) {
@@ -141,7 +141,7 @@ export default function Visualizer({ isPlaying, mode = 'ring', accent = '#4FC3F7
         const lightness = 60 - layerProgress * 15;
 
         ctx.save();
-        ctx.fillStyle = `hsla(${hue}, 75%, ${lightness}%, ${alpha + layerValue * 0.15})`;
+        ctx.fillStyle = `hsla(${hue}, ${S}%, ${lightness}%, ${alpha + layerValue * 0.15})`;
         ctx.beginPath();
         for (let s = 0; s <= FILL_STEPS; s++) {
           const angle = (s / FILL_STEPS) * Math.PI * 2;
@@ -161,11 +161,11 @@ export default function Visualizer({ isPlaying, mode = 'ring', accent = '#4FC3F7
       // === 2. 中心发光核心（跟随低频脉动，增强脉冲范围）===
       const coreR = INNER_R * (3.0 + bassSmooth * 5.5);
       const coreGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, coreR);
-      coreGrad.addColorStop(0, `hsla(${H}, 90%, 92%, ${0.8 + bassSmooth * 0.2})`);
-      coreGrad.addColorStop(0.2, `hsla(${H}, 85%, 70%, ${0.5 + bassSmooth * 0.3})`);
-      coreGrad.addColorStop(0.5, `hsla(${H}, 75%, 55%, ${0.25 + bassSmooth * 0.15})`);
-      coreGrad.addColorStop(0.8, `hsla(${H}, 70%, 50%, 0.08)`);
-      coreGrad.addColorStop(1, `hsla(${H}, 70%, 50%, 0)`);
+      coreGrad.addColorStop(0, `hsla(${H}, ${S}%, 92%, ${0.8 + bassSmooth * 0.2})`);
+      coreGrad.addColorStop(0.2, `hsla(${H}, ${S}%, 70%, ${0.5 + bassSmooth * 0.3})`);
+      coreGrad.addColorStop(0.5, `hsla(${H}, ${S}%, 55%, ${0.25 + bassSmooth * 0.15})`);
+      coreGrad.addColorStop(0.8, `hsla(${H}, ${S}%, 50%, 0.08)`);
+      coreGrad.addColorStop(1, `hsla(${H}, ${S}%, 50%, 0)`);
       ctx.fillStyle = coreGrad;
       ctx.beginPath();
       ctx.arc(cx, cy, coreR, 0, Math.PI * 2);
@@ -175,7 +175,7 @@ export default function Visualizer({ isPlaying, mode = 'ring', accent = '#4FC3F7
       const wave = readTimeDomainData();
       const waveHasData = wave.length > 0 && isPlaying;
       ctx.save();
-      ctx.strokeStyle = `hsla(${H}, 85%, 75%, ${hasData ? 0.6 : 0.25})`;
+      ctx.strokeStyle = `hsla(${H}, ${S}%, 75%, ${hasData ? 0.6 : 0.25})`;
       ctx.lineWidth = Math.max(1, minDim * 0.0015);
       ctx.shadowColor = C.glow;
       ctx.shadowBlur = minDim * 0.008;
@@ -226,7 +226,7 @@ export default function Visualizer({ isPlaying, mode = 'ring', accent = '#4FC3F7
         const freqRange = Math.max(1, freqEnd - freqStart);
 
         ctx.save();
-        ctx.strokeStyle = `hsla(${H + ring * 12}, 80%, ${70 - ring * 5}%, ${alpha})`;
+        ctx.strokeStyle = `hsla(${H + ring * 12}, ${S}%, ${70 - ring * 5}%, ${alpha})`;
         ctx.lineWidth = Math.max(1.0, minDim * (0.0025 - ring * 0.0003));
         ctx.shadowColor = C.glow;
         ctx.shadowBlur = minDim * (0.008 - ring * 0.001);
@@ -267,7 +267,7 @@ export default function Visualizer({ isPlaying, mode = 'ring', accent = '#4FC3F7
           continue;
         }
         ctx.save();
-        ctx.strokeStyle = `hsla(${H}, 90%, 75%, ${sw.alpha})`;
+        ctx.strokeStyle = `hsla(${H}, ${S}%, 75%, ${sw.alpha})`;
         ctx.lineWidth = sw.width;
         ctx.beginPath();
         ctx.arc(cx, cy, sw.radius, 0, Math.PI * 2);
@@ -277,9 +277,9 @@ export default function Visualizer({ isPlaying, mode = 'ring', accent = '#4FC3F7
 
       // === 6. 外圈光晕 ===
       const outerGrad = ctx.createRadialGradient(cx, cy, MAX_R * 0.7, cx, cy, MAX_R);
-      outerGrad.addColorStop(0, `hsla(${H}, 70%, 55%, 0)`);
-      outerGrad.addColorStop(0.7, `hsla(${H}, 70%, 55%, ${0.03 + bassSmooth * 0.04})`);
-      outerGrad.addColorStop(1, `hsla(${H}, 70%, 55%, 0)`);
+      outerGrad.addColorStop(0, `hsla(${H}, ${S}%, 55%, 0)`);
+      outerGrad.addColorStop(0.7, `hsla(${H}, ${S}%, 55%, ${0.03 + bassSmooth * 0.04})`);
+      outerGrad.addColorStop(1, `hsla(${H}, ${S}%, 55%, 0)`);
       ctx.fillStyle = outerGrad;
       ctx.beginPath();
       ctx.arc(cx, cy, MAX_R, 0, Math.PI * 2);
@@ -292,7 +292,7 @@ export default function Visualizer({ isPlaying, mode = 'ring', accent = '#4FC3F7
           const rippleR = INNER_R + (MAX_R - INNER_R) * ripplePhase;
           const rippleAlpha = (1 - ripplePhase) * 0.15;
           ctx.save();
-          ctx.strokeStyle = `hsla(${H}, 75%, 65%, ${rippleAlpha})`;
+          ctx.strokeStyle = `hsla(${H}, ${S}%, 65%, ${rippleAlpha})`;
           ctx.lineWidth = Math.max(1, minDim * 0.001);
           ctx.beginPath();
           ctx.arc(cx, cy, rippleR, 0, Math.PI * 2);
@@ -305,8 +305,8 @@ export default function Visualizer({ isPlaying, mode = 'ring', accent = '#4FC3F7
       const sparkR = INNER_R * (0.8 + bassSmooth * 1.6);
       const sparkGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, sparkR);
       sparkGrad.addColorStop(0, `rgba(255,255,255,${0.85 + bassSmooth * 0.15})`);
-      sparkGrad.addColorStop(0.5, `hsla(${H}, 85%, 85%, 0.4)`);
-      sparkGrad.addColorStop(1, `hsla(${H}, 85%, 85%, 0)`);
+      sparkGrad.addColorStop(0.5, `hsla(${H}, ${S}%, 85%, 0.4)`);
+      sparkGrad.addColorStop(1, `hsla(${H}, ${S}%, 85%, 0)`);
       ctx.fillStyle = sparkGrad;
       ctx.beginPath();
       ctx.arc(cx, cy, sparkR, 0, Math.PI * 2);

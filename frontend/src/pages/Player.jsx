@@ -153,7 +153,7 @@ function Sheet({ open, onClose, title, children, h = '78vh' }) {
 }
 
 export default function Player({ onProfile }) {
-  const { currentTrack, isPlaying, currentTime, duration, volume, playMode, playlist, togglePlay, next, prev, seek, setVolume, toggleMode, playTrack, lyrics, currentLyric, isLoadingUrl, error, clearError, setError } = usePlayerStore();
+  const { currentTrack, isPlaying, currentTime, lyricTime, duration, volume, playMode, playlist, togglePlay, next, prev, seek, setVolume, toggleMode, playTrack, lyrics, currentLyric, isLoadingUrl, error, clearError, setError } = usePlayerStore();
   const { userInfo, isLoggedIn } = useAuthStore();
   const [sq, setSq] = useState(false); const [qo, setQo] = useState(false); const [viz, setViz] = useState(false);
   const [query, setQuery] = useState(''); const [results, setResults] = useState([]); const [searching, setSearching] = useState(false); const st = useRef(null);
@@ -193,7 +193,7 @@ export default function Player({ onProfile }) {
       <div style={{ position: 'absolute', inset: 0 }}>
         <FloatingLyrics lyrics={lyrics} isPlaying={isPlaying} />
         {vm === '3d' ? <Suspense><Visualizer3D accent={ac} cover={currentTrack?.cover || ''} shape={shape} /></Suspense> : <Visualizer isPlaying={isPlaying} mode={vm} accent={ac} />}
-        {lyricPanel && <LyricScroll currentLyric={currentLyric || ''} accent={ac} />}
+        {lyricPanel && <LyricScroll currentLyric={currentLyric || ''} lyrics={lyrics} currentTime={lyricTime} accent={ac} />}
       </div>
 
       {/* 暗角遮罩 */}
