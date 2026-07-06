@@ -1,10 +1,11 @@
 import { useState, useEffect, useCallback } from 'react';
-import { ChevronRight, Loader2, Music2, LogOut, Play, User as UserIcon, RefreshCw } from 'lucide-react';
+import { ArrowLeft, ChevronRight, Loader2, Music2, LogOut, Play, User as UserIcon, RefreshCw } from 'lucide-react';
 import { useAuthStore } from '../store/useAuthStore';
 import { usePlayerStore } from '../store/usePlayerStore';
 import { music } from '../api/music';
 
 function TrackRow({ track, index, active, onPlay }) {
+  if (!track || !track.id) return null;
   return (
     <button onClick={() => onPlay(track)} className={`glass-row ${active ? 'is-active' : ''}`} style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '8px 10px', textAlign: 'left' }}>
       <span style={{ width: 24, textAlign: 'center', fontSize: 12, color: active ? 'var(--accent-dynamic)' : 'var(--text-muted)', fontWeight: 600, flexShrink: 0 }}>
@@ -14,8 +15,8 @@ function TrackRow({ track, index, active, onPlay }) {
         {track.cover ? <img src={music.cover(track.cover)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Music2 size={16} color="var(--text-muted)" /></div>}
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: active ? 'var(--accent-dynamic)' : 'var(--text-primary)' }}>{track.title}</div>
-        <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{track.artist}</div>
+        <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: active ? 'var(--accent-dynamic)' : 'var(--text-primary)' }}>{track.title || '未知歌曲'}</div>
+        <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{track.artist || '未知歌手'}</div>
       </div>
     </button>
   );
@@ -64,8 +65,11 @@ export default function Profile({ onBack }) {
   };
 
   const playFromPlaylist = (track) => {
-    if (playlistDetail?.tracks?.length) {
+    if (!track || !playlistDetail?.tracks?.length) return;
+    try {
       playTrackFromList(track, playlistDetail.tracks);
+    } catch (e) {
+      console.error('播放歌单歌曲失败', e);
     }
   };
 
@@ -100,7 +104,11 @@ export default function Profile({ onBack }) {
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
               <span style={{ fontSize: 17, fontWeight: 760, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block' }}>{loadingInfo && !nickname ? '加载中…' : nickname}</span>
-              <span style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2, display: 'block' }}>{userInfo?.uin ? `QQ: ${userInfo.uin}` : 'QQ 音乐账号'}</span>
+              <span style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2, display: 'block' }}>
+                {userInfo?.follow > 0 || userInfo?.fans > 0
+                  ? `关注 ${userInfo.follow || 0} · 粉丝 ${userInfo.fans || 0}`
+                  : 'QQ音乐账号'}
+              </span>
             </div>
           </div>
 

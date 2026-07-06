@@ -95,7 +95,7 @@ export default function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'c
             cx.drawImage(img, sx, sy, s, s, 0, 0, SIZE, SIZE);
             imageDataRef.current = cx.getImageData(0, 0, SIZE, SIZE).data;
             hasCoverRef.current = true;
-          } catch (e) {
+          } catch {
             imageDataRef.current = null;
             hasCoverRef.current = false;
           }
@@ -149,8 +149,8 @@ export default function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'c
     container.appendChild(renderer.domElement);
 
     const FILL = 1.0;
-    const MAX_Z_RATIO = 0.09;
-    const DOME_DEPTH_RATIO = 0.22;       // 穹顶弯曲，比之前更圆润
+    const MAX_Z_RATIO = 0.045;
+    const DOME_DEPTH_RATIO = 0.02;       // 压平穹顶，侧面看不再膨胀
     const LIQUID_RADIUS_RATIO = 0.56;
 
     let planeSize, cameraZ;
@@ -349,13 +349,15 @@ export default function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'c
           const baseR = planeSize * LIQUID_RADIUS_RATIO;
           const light = coverLight[i] || 0.5;
           let r = baseR * (0.82 + light * 0.36);
-          r += midSmooth * Math.sin(u * 60 + time * 5) * planeSize * 0.05;
-          r += trebleSmooth * Math.sin(v * 70 - time * 7) * planeSize * 0.03;
-          r += midSmooth * Math.cos((u + v) * 90 + time * 6) * planeSize * 0.02;
+          r += midSmooth * Math.sin(u * 90 + time * 9) * planeSize * 0.05;
+          r += trebleSmooth * Math.sin(v * 110 - time * 11) * planeSize * 0.035;
+          r += midSmooth * Math.cos((u + v) * 130 + time * 10) * planeSize * 0.025;
+          r += trebleSmooth * Math.sin((u - v) * 150 + time * 12) * planeSize * 0.020;
           const hot1 = Math.exp(-Math.pow((u - 0.3) * 6, 2) - Math.pow((v - 0.3) * 6, 2));
           const hot2 = Math.exp(-Math.pow((u - 0.7) * 6, 2) - Math.pow((v - 0.6) * 6, 2));
           const hot3 = Math.exp(-Math.pow((u - 0.5) * 8, 2) - Math.pow((v - 0.15) * 8, 2));
-          r += bassPulse * (hot1 + hot2 + hot3) * planeSize * 0.30;
+          const hot4 = Math.exp(-Math.pow((u - 0.2) * 7, 2) - Math.pow((v - 0.75) * 7, 2));
+          r += bassPulse * (hot1 + hot2 + hot3 + hot4) * planeSize * 0.32;
           x = nx * r;
           y = ny * r;
           z = nz * r;

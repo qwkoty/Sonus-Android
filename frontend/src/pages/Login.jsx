@@ -144,12 +144,13 @@ function AccountView({ userInfo, nickname, uin, playlists, loadingPlaylists, onL
 
       <div style={{ fontSize: 21, fontWeight: 760, color: 'var(--text-primary)', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 8 }}>
         {nickname}
-        {userInfo?.vipLevel > 0 && (
-          <span style={{ fontSize: 10, fontWeight: 800, padding: '2px 8px', borderRadius: 6, background: 'linear-gradient(135deg, #fff3c2, var(--champagne), #c9963d)', color: '#201303', boxShadow: '0 0 12px rgba(244,210,138,.24)' }}>VIP{userInfo.vipLevel}</span>
-        )}
       </div>
 
-      <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 22, letterSpacing: '.3px' }}>QQ: {uin}</div>
+      <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 22, letterSpacing: '.3px' }}>
+        {userInfo?.follow > 0 || userInfo?.fans > 0
+          ? `关注 ${userInfo.follow || 0} · 粉丝 ${userInfo.fans || 0}`
+          : 'QQ音乐账号'}
+      </div>
 
       <button onClick={onLoadPlaylists} disabled={loadingPlaylists} className="glass-button-accent" style={{ width: '100%', padding: '13px 16px', borderRadius: 14, fontSize: 14, fontWeight: 700, color: '#050608', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, opacity: loadingPlaylists ? 0.6 : 1 }}>
         {loadingPlaylists ? <><Loader2 size={16} className="spin-icon" /> 加载中…</> : <><ListMusic size={16} /> 查看我的歌单</>}
