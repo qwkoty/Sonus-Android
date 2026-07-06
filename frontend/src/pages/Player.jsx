@@ -3,6 +3,7 @@ import { Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Repeat1, ListMusic
 import { usePlayerStore } from '../store/usePlayerStore';
 import { useAuthStore } from '../store/useAuthStore';
 import { music } from '../api/music';
+import { netease } from '../api/netease';
 import Visualizer from '../components/Visualizer';
 import FloatingLyrics from '../components/FloatingLyrics';
 import LyricScroll from '../components/LyricScroll';
@@ -129,11 +130,29 @@ function Row({ track, active, onPlay }) {
         <img src={c} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: active ? 'var(--accent-dynamic)' : 'var(--text-primary)' }}>{track.title}</div>
-        <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 2 }}>{track.artist}{track.album ? ` · ${track.album}` : ''}</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flex: 1, color: active ? 'var(--accent-dynamic)' : 'var(--text-primary)' }}>{track.title}</span>
+          <PlatformBadge platform={track.platform} />
+        </div>
+        <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{track.artist}{track.album ? ` · ${track.album}` : ''}</div>
       </div>
       <span style={{ fontSize: 11, color: 'var(--text-muted)', flexShrink: 0 }}>{track.duration ? fmt(track.duration) : ''}</span>
     </div>
+  );
+}
+
+// 平台来源徽章：QQ 音乐（青绿）/ 网易云（红色）
+function PlatformBadge({ platform }) {
+  const isNcm = platform === 'ncm';
+  return (
+    <span style={{
+      flexShrink: 0, fontSize: 9, fontWeight: 700, padding: '2px 6px', borderRadius: 5, letterSpacing: '.04em',
+      color: isNcm ? '#ff8a9b' : '#7ee2c8',
+      background: isNcm ? 'rgba(230, 0, 38, .16)' : 'rgba(0, 245, 212, .14)',
+      border: `1px solid ${isNcm ? 'rgba(230, 0, 38, .3)' : 'rgba(0, 245, 212, .28)'}`,
+    }}>
+      {isNcm ? '网易云' : 'QQ'}
+    </span>
   );
 }
 
@@ -192,7 +211,16 @@ export default function Player({ onProfile }) {
   const doSearch = async kw => {
     if (!kw.trim()) { setResults([]); return; }
     setSearching(true);
-    try { setResults(await music.search(kw, 30) || []) } catch (e) { setError('搜索失败') } finally { setSearching(false); }
+    try {
+      // 并发搜索 QQ 音乐 + 网易云，合并结果（每条已带 platform 字段）
+      const [qqRes, ncmRes] = await Promise.allSettled([
+        music.search(kw, 30),
+        netease.search(kw, 30),
+      ]);
+      const qq = qqRes.status === 'fulfilled' ? (qqRes.value || []) : [];
+      const ncm = ncmRes.status === 'fulfilled' ? (ncmRes.value || []) : [];
+      setResults([...qq, ...ncm]);
+    } catch (e) { setError('搜索失败') } finally { setSearching(false); }
   };
   const onQ = v => { setQuery(v); if (st.current) clearTimeout(st.current); if (!v.trim()) { setResults([]); return; } st.current = setTimeout(() => doSearch(v), 350); };
 
@@ -329,7 +357,7 @@ export default function Player({ onProfile }) {
       )}
 
       {/* 搜索浮窗 */}
-      <FloatPanel open={sq} onClose={() => setSq(false)} title="搜索" width={420}>
+      <FloatPanel open={sq} onClose={() => setSq(false)} title="搜索 · QQ + 网易云" width={420}>
         <div style={{ padding: '0 2px 12px' }}>
           <div className="glass-input-wrap" style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', height: 48, borderRadius: 18 }}>
             <Search size={16} color="var(--text-secondary)" />

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { ArrowLeft, ChevronRight, Loader2, Music2, LogOut, Play, User as UserIcon, RefreshCw, Cloud } from 'lucide-react';
+import { ArrowLeft, ChevronRight, Loader2, Music2, LogOut, Play, User as UserIcon, RefreshCw, Cloud, LogIn } from 'lucide-react';
 import { useAuthStore } from '../store/useAuthStore';
 import { usePlayerStore } from '../store/usePlayerStore';
 import { music } from '../api/music';
@@ -7,6 +7,7 @@ import { netease } from '../api/netease';
 
 function TrackRow({ track, index, active, onPlay }) {
   if (!track || !track.id) return null;
+  const isNcm = track.platform === 'ncm';
   return (
     <button onClick={() => onPlay(track)} className={`glass-row ${active ? 'is-active' : ''}`} style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '8px 10px', textAlign: 'left' }}>
       <span style={{ width: 24, textAlign: 'center', fontSize: 12, color: active ? 'var(--accent-dynamic)' : 'var(--text-muted)', fontWeight: 600, flexShrink: 0 }}>
@@ -16,7 +17,10 @@ function TrackRow({ track, index, active, onPlay }) {
         {track.cover ? <img src={coverFor(track)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Music2 size={16} color="var(--text-muted)" /></div>}
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: active ? 'var(--accent-dynamic)' : 'var(--text-primary)' }}>{track.title || '未知歌曲'}</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flex: 1, color: active ? 'var(--accent-dynamic)' : 'var(--text-primary)' }}>{track.title || '未知歌曲'}</span>
+          <span style={{ flexShrink: 0, fontSize: 9, fontWeight: 700, padding: '2px 6px', borderRadius: 5, letterSpacing: '.04em', color: isNcm ? '#ff8a9b' : '#7ee2c8', background: isNcm ? 'rgba(230, 0, 38, .16)' : 'rgba(0, 245, 212, .14)', border: `1px solid ${isNcm ? 'rgba(230, 0, 38, .3)' : 'rgba(0, 245, 212, .28)'}` }}>{isNcm ? '网易云' : 'QQ'}</span>
+        </div>
         <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{track.artist || '未知歌手'}</div>
       </div>
     </button>
@@ -30,7 +34,7 @@ function coverFor(track) {
   return music.cover(track.cover);
 }
 
-export default function Profile({ onBack }) {
+export default function Profile({ onBack, onLogin }) {
   const {
     isLoggedIn, cookie, uin, userInfo, nickname, fetchUserInfo, logout, loadingInfo,
     neteaseLoggedIn, neteaseCookie, neteaseUid, neteaseUserInfo, neteaseNickname,
@@ -39,7 +43,8 @@ export default function Profile({ onBack }) {
   const { playTrackFromList, currentTrack } = usePlayerStore();
 
   // 当前选中的平台 tab：'qq' | 'ncm'
-  const [platform, setPlatform] = useState('qq');
+  // 默认优先选已登录的平台
+  const [platform, setPlatform] = useState(() => (isLoggedIn ? 'qq' : (neteaseLoggedIn ? 'ncm' : 'qq')));
 
   // QQ 歌单
   const [qqPlaylists, setQqPlaylists] = useState([]);
@@ -137,6 +142,7 @@ export default function Profile({ onBack }) {
 
   // ===== 当前平台用户信息 =====
   const isNcm = platform === 'ncm';
+  const currentLoggedIn = isNcm ? neteaseLoggedIn : isLoggedIn;
   const currentAvatar = isNcm ? (neteaseUserInfo?.avatar || '') : (userInfo?.avatar || (uin ? `https://q1.qlogo.cn/g?b=qq&nk=${uin}&s=640` : ''));
   const currentNickname = isNcm ? neteaseNickname : nickname;
   const currentLoadingInfo = isNcm ? loadingNeteaseInfo : loadingInfo;
@@ -163,9 +169,12 @@ export default function Profile({ onBack }) {
   const handleLogout = () => {
     if (isNcm) {
       neteaseLogout();
-      setPlatform('qq');
+      // 退出网易云后：QQ 已登录则切到 QQ，否则保持显示网易云未登录卡片
+      if (isLoggedIn) setPlatform('qq');
     } else {
       logout();
+      // 退出 QQ 后：网易云已登录则切到网易云
+      if (neteaseLoggedIn) setPlatform('ncm');
     }
   };
 
@@ -199,57 +208,73 @@ export default function Profile({ onBack }) {
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden', gap: 12, padding: 12 }}>
         {/* 左栏 */}
         <div className="glass-panel" style={{ width: 340, flexShrink: 0, display: 'flex', flexDirection: 'column', borderRadius: 18, overflow: 'hidden' }}>
-          {/* 平台 tab 切换器 */}
+          {/* 平台 tab 切换器：始终显示两个平台，未登录的淡色显示 */}
           <div style={{ display: 'flex', gap: 4, padding: '10px 10px 0', flexShrink: 0 }}>
-            <PlatformTab active={platform === 'qq'} onClick={() => setPlatform('qq')} icon={<Music2 size={14} />} label="QQ音乐" />
-            {neteaseLoggedIn && (
-              <PlatformTab active={platform === 'ncm'} onClick={() => setPlatform('ncm')} icon={<Cloud size={14} />} label="网易云" />
-            )}
+            <PlatformTab active={platform === 'qq'} onClick={() => setPlatform('qq')} icon={<Music2 size={14} />} label="QQ音乐" dim={!isLoggedIn} />
+            <PlatformTab active={platform === 'ncm'} onClick={() => setPlatform('ncm')} icon={<Cloud size={14} />} label="网易云" dim={!neteaseLoggedIn} />
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '12px 14px 14px', borderBottom: '1px solid rgba(255,255,255,0.06)', flexShrink: 0 }}>
-            <div style={{ width: 58, height: 58, borderRadius: '50%', overflow: 'hidden', flexShrink: 0, background: 'rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: `2px solid ${isNcm ? 'rgba(230, 0, 38, .32)' : 'rgba(0, 245, 212, .32)'}`, boxShadow: '0 0 0 1px rgba(255,255,255,.06)' }}>
-              <AvatarImg iconSize={26} />
-            </div>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <span style={{ fontSize: 17, fontWeight: 760, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block' }}>{currentLoadingInfo && !currentNickname ? '加载中…' : currentNickname}</span>
-              <span style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2, display: 'block' }}>{currentSubText}</span>
-            </div>
-          </div>
-
-          <div style={{ fontSize: 10, fontWeight: 760, letterSpacing: '.14em', color: 'var(--fc-muted)', textTransform: 'uppercase', padding: '10px 14px 6px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
-            <span>我的歌单</span>
-            <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{visiblePlaylists.length} 个</span>
-          </div>
-
-          <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch', padding: '0 8px 8px' }}>
-            {!isLoggedIn && !neteaseLoggedIn ? (
-              <div style={{ textAlign: 'center', padding: 30, color: 'var(--text-muted)', fontSize: 12 }}>请先登录</div>
-            ) : loadingPlaylists ? (
-              <div style={{ display: 'flex', justifyContent: 'center', padding: 30 }}><Loader2 size={22} className="spin-icon" style={{ color: 'var(--accent-dynamic)' }} /></div>
-            ) : visiblePlaylists.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: 30, color: 'var(--text-muted)', fontSize: 12 }}>暂无歌单</div>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                {visiblePlaylists.map((pl) => (
-                  <button key={`${platform}_${pl.id}`} onClick={() => openPlaylistDetail(pl)} className={`glass-row ${playlistDetail?.name === pl.name ? 'is-active' : ''}`} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', borderRadius: 12, textAlign: 'left' }}>
-                    <div style={{ width: 44, height: 44, borderRadius: 10, overflow: 'hidden', flexShrink: 0, background: 'rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      {pl.cover ? <img src={isNcm ? pl.cover : music.cover(pl.cover)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <Music2 size={18} color="var(--text-secondary)" />}
-                    </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{pl.name}</div>
-                      <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>{pl.songCount ?? 0} 首</div>
-                    </div>
-                    <ChevronRight size={15} color="var(--text-muted)" />
-                  </button>
-                ))}
+          {currentLoggedIn ? (
+            <>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '12px 14px 14px', borderBottom: '1px solid rgba(255,255,255,0.06)', flexShrink: 0 }}>
+                <div style={{ width: 58, height: 58, borderRadius: '50%', overflow: 'hidden', flexShrink: 0, background: 'rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: `2px solid ${isNcm ? 'rgba(230, 0, 38, .32)' : 'rgba(0, 245, 212, .32)'}`, boxShadow: '0 0 0 1px rgba(255,255,255,.06)' }}>
+                  <AvatarImg iconSize={26} />
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <span style={{ fontSize: 17, fontWeight: 760, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block' }}>{currentLoadingInfo && !currentNickname ? '加载中…' : currentNickname}</span>
+                  <span style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2, display: 'block' }}>{currentSubText}</span>
+                </div>
               </div>
-            )}
-          </div>
 
-          <button onClick={handleLogout} className="glass-button" style={{ margin: 8, padding: '11px', borderRadius: 14, fontSize: 13, fontWeight: 600, color: '#ff9fa6', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, flexShrink: 0 }}>
-            <LogOut size={15} /> 退出{isNcm ? '网易云' : 'QQ'}登录
-          </button>
+              <div style={{ fontSize: 10, fontWeight: 760, letterSpacing: '.14em', color: 'var(--fc-muted)', textTransform: 'uppercase', padding: '10px 14px 6px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+                <span>我的歌单</span>
+                <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{visiblePlaylists.length} 个</span>
+              </div>
+
+              <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch', padding: '0 8px 8px' }}>
+                {loadingPlaylists ? (
+                  <div style={{ display: 'flex', justifyContent: 'center', padding: 30 }}><Loader2 size={22} className="spin-icon" style={{ color: 'var(--accent-dynamic)' }} /></div>
+                ) : visiblePlaylists.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: 30, color: 'var(--text-muted)', fontSize: 12 }}>暂无歌单</div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    {visiblePlaylists.map((pl) => (
+                      <button key={`${platform}_${pl.id}`} onClick={() => openPlaylistDetail(pl)} className={`glass-row ${playlistDetail?.name === pl.name ? 'is-active' : ''}`} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', borderRadius: 12, textAlign: 'left' }}>
+                        <div style={{ width: 44, height: 44, borderRadius: 10, overflow: 'hidden', flexShrink: 0, background: 'rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          {pl.cover ? <img src={isNcm ? pl.cover : music.cover(pl.cover)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <Music2 size={18} color="var(--text-secondary)" />}
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{pl.name}</div>
+                          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>{pl.songCount ?? 0} 首</div>
+                        </div>
+                        <ChevronRight size={15} color="var(--text-muted)" />
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <button onClick={handleLogout} className="glass-button" style={{ margin: 8, padding: '11px', borderRadius: 14, fontSize: 13, fontWeight: 600, color: '#ff9fa6', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, flexShrink: 0 }}>
+                <LogOut size={15} /> 退出{isNcm ? '网易云' : 'QQ'}登录
+              </button>
+            </>
+          ) : (
+            /* 当前平台未登录：显示登录入口 */
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 30, textAlign: 'center' }}>
+              <div style={{ width: 64, height: 64, borderRadius: 18, background: isNcm ? 'linear-gradient(135deg, #e60026, #ff4d6d)' : 'linear-gradient(135deg, var(--accent-dynamic), #00c9a7)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 16, boxShadow: isNcm ? '0 10px 30px rgba(230, 0, 38, 0.32)' : '0 10px 30px rgba(0, 245, 212, 0.32)' }}>
+                {isNcm ? <Cloud size={30} color="#fff" /> : <Music2 size={30} color="#050608" />}
+              </div>
+              <div style={{ fontSize: 16, fontWeight: 760, marginBottom: 6, color: 'var(--text-primary)' }}>登录{isNcm ? '网易云音乐' : 'QQ音乐'}</div>
+              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 20, lineHeight: 1.6 }}>
+                {isNcm ? '扫码登录后可查看网易云歌单' : '登录后可查看QQ音乐歌单'}
+              </div>
+              {onLogin && (
+                <button onClick={onLogin} className="glass-button-accent" style={{ padding: '11px 22px', borderRadius: 14, fontSize: 13, fontWeight: 700, color: '#050608', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                  <LogIn size={16} /> 去登录
+                </button>
+              )}
+            </div>
+          )}
         </div>
 
         {/* 右栏 */}
@@ -291,7 +316,8 @@ export default function Profile({ onBack }) {
 }
 
 // 平台 tab 子组件
-function PlatformTab({ active, onClick, icon, label }) {
+// dim: 未登录时整体淡化，附带"未登录"小圆点提示
+function PlatformTab({ active, onClick, icon, label, dim }) {
   return (
     <button
       onClick={onClick}
@@ -309,9 +335,12 @@ function PlatformTab({ active, onClick, icon, label }) {
         color: active ? 'var(--accent-dynamic)' : 'var(--text-secondary)',
         background: active ? 'rgba(0, 245, 212, .08)' : 'transparent',
         border: active ? '1px solid rgba(0, 245, 212, .25)' : '1px solid transparent',
+        opacity: dim && !active ? 0.55 : 1,
+        position: 'relative',
       }}
     >
       {icon} {label}
+      {dim && <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#f4d28a', flexShrink: 0, boxShadow: '0 0 6px rgba(244,210,138,.6)' }} title="未登录" />}
     </button>
   );
 }

@@ -6,10 +6,11 @@ import Login from './pages/Login';
 
 export default function App() {
   const isLoggedIn = useAuthStore((s) => s.isLoggedIn);
+  const neteaseLoggedIn = useAuthStore((s) => s.neteaseLoggedIn);
   const fetchUserInfo = useAuthStore((s) => s.fetchUserInfo);
 
   // 默认进播放器（不强制登录）
-  // 已登录点头像 → Profile；未登录点头像 → Login
+  // 任一平台已登录 → 头像进 Profile；都未登录 → 头像进 Login
   const [view, setView] = useState('player'); // 'player' | 'profile' | 'login'
 
   useEffect(() => {
@@ -24,15 +25,19 @@ export default function App() {
   // React 不再主动隐藏 splash，避免打断完整的品牌动画。
 
   // 未登录且主动打开登录页时，全屏显示 Login（可返回）
-  if (view === 'login' && !isLoggedIn) {
+  // 任一平台登录后也可主动进 Login 登录第二个平台
+  if (view === 'login') {
     return <Login onBack={() => setView('player')} />;
   }
 
+  // 任一平台登录即可访问 Profile
+  const anyLoggedIn = isLoggedIn || neteaseLoggedIn;
+
   return (
     <div style={{ height: '100%', position: 'relative', background: 'transparent' }}>
-      {view === 'profile' && isLoggedIn
-        ? <Profile onBack={() => setView('player')} />
-        : <Player onProfile={() => setView(isLoggedIn ? 'profile' : 'login')} />}
+      {view === 'profile' && anyLoggedIn
+        ? <Profile onBack={() => setView('player')} onLogin={() => setView('login')} />
+        : <Player onProfile={() => setView(anyLoggedIn ? 'profile' : 'login')} />}
     </div>
   );
 }
