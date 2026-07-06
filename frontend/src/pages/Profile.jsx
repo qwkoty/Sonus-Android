@@ -46,10 +46,10 @@ export default function Profile({ onBack }) {
 
   useEffect(() => {
     if (isLoggedIn) {
-      fetchUserInfo();
+      if (!userInfo) fetchUserInfo();
       loadPlaylists();
     }
-  }, [isLoggedIn, fetchUserInfo, loadPlaylists]);
+  }, [isLoggedIn, userInfo, fetchUserInfo, loadPlaylists]);
 
   const openPlaylistDetail = async (pl) => {
     setLoadingDetail(true);
@@ -103,8 +103,8 @@ export default function Profile({ onBack }) {
     <div style={{ position: 'fixed', inset: 0, background: 'radial-gradient(ellipse at 30% 18%, rgba(0, 245, 212, .08) 0%, rgba(0,0,0,0.48) 55%, rgba(0,0,0,0.85) 100%)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
       {/* 顶部导航 */}
       <div className="glass-panel" style={{ padding: 'calc(10px + env(safe-area-inset-top)) 16px 10px', display: 'flex', alignItems: 'center', gap: 12, borderRadius: 0, borderLeft: 'none', borderRight: 'none', borderTop: 'none', flexShrink: 0 }}>
-        <button onClick={onBack} className="glass-button" style={{ width: 38, height: 38, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', padding: 0, background: 'rgba(255,255,255,0.08)', border: '2px solid rgba(255,255,255,0.12)' }}>
-          <AvatarImg iconSize={18} />
+        <button onClick={onBack} className="glass-button" style={{ width: 38, height: 38, borderRadius: 11, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-primary)' }}>
+          <ArrowLeft size={18} />
         </button>
         <span style={{ fontSize: 16, fontWeight: 760, flex: 1, letterSpacing: '.04em' }}>{playlistDetail ? playlistDetail.name : '我的音乐'}</span>
         <button onClick={() => { fetchUserInfo(); loadPlaylists(); }} className="glass-button" style={{ width: 38, height: 38, borderRadius: 11, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-secondary)' }} title="刷新">
