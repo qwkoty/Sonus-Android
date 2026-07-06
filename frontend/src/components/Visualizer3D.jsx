@@ -56,6 +56,16 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
     if (isPlaying) appliedCoverVersionRef.current = -1;
   }, [isPlaying]);
 
+  // 3D 形态切换时做粒子重组动画
+  const modeRef = useRef(mode);
+  const transitionRef = useRef({ active: false, from: mode, to: mode, progress: 1 });
+  useEffect(() => {
+    if (modeRef.current !== mode) {
+      transitionRef.current = { active: true, from: modeRef.current, to: mode, progress: 0 };
+      modeRef.current = mode;
+    }
+  }, [mode]);
+
   // 手势状态（双指缩放 + 旋转；单指划动旋转）
   const gestureRef = useRef({
     zoom: 1.0,
@@ -132,7 +142,6 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
-    const shape = mode || 'coverflow';
 
     const dpr = window.devicePixelRatio || 1;
     let W = container.offsetWidth;
@@ -175,8 +184,10 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
     const colors = new Float32Array(COUNT * 3);
     const origUV = new Float32Array(COUNT * 2);
     const distFromCenter = new Float32Array(COUNT);
-    const basePositions = new Float32Array(COUNT * 3);
-    const baseNormals = new Float32Array(COUNT * 3);
+    const basePositionsCover = new Float32Array(COUNT * 3);
+    const baseNormalsCover = new Float32Array(COUNT * 3);
+    const basePositionsLiquid = new Float32Array(COUNT * 3);
+    const baseNormalsLiquid = new Float32Array(COUNT * 3);
     const coverLight = new Float32Array(COUNT);
     const bandArr = new Float32Array(COUNT);
     const freqBand = new Uint8Array(COUNT);
@@ -201,33 +212,34 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
           bandArr[idx] = band;
           freqBand[idx] = Math.min(63, Math.floor(band * 63));
 
-          let bx = 0, by = 0, bz = 0, nx = 0, ny = 0, nz = 0;
-          if (shape === 'liquidmetal') {
-            // 液态金属：球面按封面亮度隆起
-            const theta = u * Math.PI * 2;
-            const phi = (v - 0.5) * Math.PI;
-            const r = planeSize * LIQUID_RADIUS_RATIO;
-            bx = r * Math.cos(phi) * Math.cos(theta);
-            by = r * Math.sin(phi);
-            bz = r * Math.cos(phi) * Math.sin(theta);
-            const len = Math.hypot(bx, by, bz) || 1;
-            nx = bx / len; ny = by / len; nz = bz / len;
-          } else {
-            // coverflow（粒子封面）默认形态：轻微穹顶平面
-            bx = x; by = y;
-            bz = -planeSize * DOME_DEPTH_RATIO * (1 - Math.cos(dc * Math.PI / 2));
-            nx = 0; ny = 0; nz = 1;
-          }
-          basePositions[idx * 3] = bx;
-          basePositions[idx * 3 + 1] = by;
-          basePositions[idx * 3 + 2] = bz;
-          baseNormals[idx * 3] = nx;
-          baseNormals[idx * 3 + 1] = ny;
-          baseNormals[idx * 3 + 2] = nz;
+          // coverflow 默认形态：轻微穹顶平面
+          const cbz = -planeSize * DOME_DEPTH_RATIO * (1 - Math.cos(dc * Math.PI / 2));
+          basePositionsCover[idx * 3] = x;
+          basePositionsCover[idx * 3 + 1] = y;
+          basePositionsCover[idx * 3 + 2] = cbz;
+          baseNormalsCover[idx * 3] = 0;
+          baseNormalsCover[idx * 3 + 1] = 0;
+          baseNormalsCover[idx * 3 + 2] = 1;
 
-          positions[idx * 3] = bx;
-          positions[idx * 3 + 1] = by;
-          positions[idx * 3 + 2] = bz;
+          // 液态金属：球面
+          const theta = u * Math.PI * 2;
+          const phi = (v - 0.5) * Math.PI;
+          const r = planeSize * LIQUID_RADIUS_RATIO;
+          const lx = r * Math.cos(phi) * Math.cos(theta);
+          const ly = r * Math.sin(phi);
+          const lz = r * Math.cos(phi) * Math.sin(theta);
+          const len = Math.hypot(lx, ly, lz) || 1;
+          basePositionsLiquid[idx * 3] = lx;
+          basePositionsLiquid[idx * 3 + 1] = ly;
+          basePositionsLiquid[idx * 3 + 2] = lz;
+          baseNormalsLiquid[idx * 3] = lx / len;
+          baseNormalsLiquid[idx * 3 + 1] = ly / len;
+          baseNormalsLiquid[idx * 3 + 2] = lz / len;
+
+          const initial = modeRef.current === 'liquidmetal' ? basePositionsLiquid : basePositionsCover;
+          positions[idx * 3] = initial[idx * 3];
+          positions[idx * 3 + 1] = initial[idx * 3 + 1];
+          positions[idx * 3 + 2] = initial[idx * 3 + 2];
           idx++;
         }
       }
@@ -254,6 +266,7 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
     scene.add(points);
 
     let raf;
+    let lastTime = performance.now();
     const posAttr = geometry.attributes.position;
     const colorAttr = geometry.attributes.color;
 
@@ -318,7 +331,10 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
       const bassPulse = Math.max(0, bassAttack - bassRelease);
       const totalEnergy = (bassAttack + midSmooth * 0.7 + trebleSmooth * 0.4) / 2.1;
 
-      const time = Date.now() * 0.001;
+      const now = performance.now();
+      const dt = Math.min(0.05, (now - lastTime) / 1000);
+      lastTime = now;
+      const time = now * 0.001;
       const zAmp = planeSize * MAX_Z_RATIO;
       const isPlaying = isPlayingRef.current;
       const useCover = isPlaying && hasCoverRef.current;
@@ -331,20 +347,59 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
       const needColorUpdate = !useCover;
       const accentRGB = hexToRGB(accentRef.current || '#4FC3F7');
 
+      // 形态切换：粒子从旧形态插值到新形态
+      const tr = transitionRef.current;
+      let morphT = 1;
+      let targetShape = modeRef.current || 'coverflow';
+      let fromBase = null, toBase = null, toNormals = null;
+      if (tr.active) {
+        tr.progress += dt / 0.85;
+        if (tr.progress >= 1) {
+          tr.progress = 1;
+          tr.active = false;
+        }
+        morphT = 1 - Math.pow(1 - tr.progress, 3);
+        targetShape = tr.to || 'coverflow';
+        fromBase = tr.from === 'liquidmetal' ? basePositionsLiquid : basePositionsCover;
+        toBase = tr.to === 'liquidmetal' ? basePositionsLiquid : basePositionsCover;
+        toNormals = tr.to === 'liquidmetal' ? baseNormalsLiquid : baseNormalsCover;
+      } else {
+        toBase = targetShape === 'liquidmetal' ? basePositionsLiquid : basePositionsCover;
+        toNormals = targetShape === 'liquidmetal' ? baseNormalsLiquid : baseNormalsCover;
+        fromBase = toBase;
+      }
+
       for (let i = 0; i < COUNT; i++) {
         const u = origUV[i * 2];
         const v = origUV[i * 2 + 1];
         const dc = distFromCenter[i];
-        const bx = basePositions[i * 3];
-        const by = basePositions[i * 3 + 1];
-        const bz = basePositions[i * 3 + 2];
-        const nx = baseNormals[i * 3];
-        const ny = baseNormals[i * 3 + 1];
-        const nz = baseNormals[i * 3 + 2];
+
+        let bx, by, bz, nx, ny, nz;
+        if (tr.active) {
+          const fbx = fromBase[i * 3];
+          const fby = fromBase[i * 3 + 1];
+          const fbz = fromBase[i * 3 + 2];
+          const tbx = toBase[i * 3];
+          const tby = toBase[i * 3 + 1];
+          const tbz = toBase[i * 3 + 2];
+          bx = fbx + (tbx - fbx) * morphT;
+          by = fby + (tby - fby) * morphT;
+          bz = fbz + (tbz - fbz) * morphT;
+          nx = toNormals[i * 3];
+          ny = toNormals[i * 3 + 1];
+          nz = toNormals[i * 3 + 2];
+        } else {
+          bx = toBase[i * 3];
+          by = toBase[i * 3 + 1];
+          bz = toBase[i * 3 + 2];
+          nx = toNormals[i * 3];
+          ny = toNormals[i * 3 + 1];
+          nz = toNormals[i * 3 + 2];
+        }
 
         let x = bx, y = by, z = bz;
 
-        if (shape === 'coverflow') {
+        if (targetShape === 'coverflow') {
           // 粒子封面：整个面 3D 飘动，幅度固定、无膨胀
           const waveX = Math.sin(u * 5 * Math.PI + time * 0.8) * Math.cos(v * 3 * Math.PI + time * 0.5) * 0.22;
           const waveY = Math.cos(u * 4 * Math.PI + time * 0.6) * Math.sin(v * 5 * Math.PI + time * 0.7) * 0.22;
@@ -353,7 +408,7 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
           x = bx + waveX * amp;
           y = by + waveY * amp;
           z = bz + waveZ * amp;
-        } else if (shape === 'liquidmetal') {
+        } else if (targetShape === 'liquidmetal') {
           // 液态金属：球体横面中间为低频，向两极（周围）依次增高
           const band = bandArr[i];
           const energy = spectrumSmooth[freqBand[i]];
@@ -362,9 +417,11 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
           const displacement = energy * planeSize * 0.34 * (0.18 + 0.82 * band);
           // 细微液面波纹，越往两极越明显
           const wave = midSmooth * Math.sin(u * 56 + time * 5 + band * 10) * planeSize * 0.028 * band;
+          // 赤道起伏：中间横面有舒缓的横波，向两极递减，让低频区也有律动
+          const equatorWave = (midSmooth * 0.6 + bassAttack * 0.4) * Math.sin(u * 48 + time * 4.5) * planeSize * 0.035 * (1 - band);
           // 鼓点冲击集中在中间横面（低频区）
           const bassBoost = bassPulse * (1 - band) * planeSize * 0.22;
-          const r = baseR + displacement + wave + bassBoost;
+          const r = baseR + displacement + wave + equatorWave + bassBoost;
           x = nx * r;
           y = ny * r;
           z = nz * r;
@@ -375,7 +432,7 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
         posAttr.array[i * 3 + 2] = z;
 
         if (needColorUpdate) {
-          const windGlow = shape === 'coverflow' ? Math.abs(z - bz) / (planeSize * 0.12 + 0.001) * 0.12 : 0;
+          const windGlow = targetShape === 'coverflow' ? Math.abs(z - bz) / (planeSize * 0.12 + 0.001) * 0.12 : 0;
           const intensity = 0.42 + totalEnergy * 1.6 + windGlow;
           const outFactor = 1 - dc * 0.25;
           colorAttr.array[i * 3]     = Math.min(1, accentRGB.r * intensity * outFactor + bassPulse * 0.65);
@@ -485,7 +542,7 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
         renderer.domElement.parentNode.removeChild(renderer.domElement);
       }
     };
-  }, [mode]);
+  }, []);
 
   return (
     <div
