@@ -273,3 +273,88 @@ input[type="range"]::-webkit-slider-thumb {
   z-index: 1;
   background: radial-gradient(ellipse at 50% 50%, transparent 0%, rgba(0,0,0,0.35) 70%, rgba(0,0,0,0.65) 100%);
 }
+
+/* ===== 增强交互动画 ===== */
+
+/* 玻璃按钮：更明显的悬浮与按压 */
+.glass-button {
+  transition: transform .16s cubic-bezier(.16, 1, .3, 1),
+              background .2s ease,
+              border-color .2s ease,
+              box-shadow .2s ease;
+}
+
+.glass-button:hover {
+  transform: translateY(-2px) scale(1.04);
+}
+
+.glass-button:active {
+  transform: translateY(0) scale(0.94);
+  transition-duration: .08s;
+}
+
+/* 封面呼吸 */
+@keyframes coverBreathe {
+  0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 transparent; }
+  50% { transform: scale(1.035); box-shadow: 0 0 26px 2px rgba(var(--accent-rgb), 0.18); }
+}
+
+.cover-playing {
+  animation: scaleIn .35s cubic-bezier(.16, 1, .3, 1) forwards,
+             coverBreathe 3.2s ease-in-out infinite .35s;
+}
+
+/* 进度条与滑块 thumb */
+input[type="range"] {
+  transition: background .2s ease, height .2s ease;
+}
+
+input[type="range"]:hover {
+  background: rgba(255,255,255,0.18);
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  transition: transform .15s cubic-bezier(.16, 1, .3, 1),
+              box-shadow .2s ease;
+}
+
+input[type="range"]:hover::-webkit-slider-thumb,
+input[type="range"]:active::-webkit-slider-thumb {
+  transform: scale(1.35);
+  box-shadow: 0 0 0 1px rgba(255,255,255,0.5), 0 0 16px rgba(var(--accent-rgb), 0.55);
+}
+
+/* 列表行更灵动的 hover */
+.glass-row {
+  transition: transform .18s cubic-bezier(.16, 1, .3, 1),
+              background .18s ease,
+              border-color .18s ease,
+              box-shadow .18s ease;
+}
+
+.glass-row:hover {
+  transform: translateY(-2px) scale(1.01);
+  box-shadow: 0 10px 24px rgba(0,0,0,0.18);
+}
+
+.glass-row:active {
+  transform: translateY(0) scale(0.99);
+  transition-duration: .08s;
+}
+
+/* 浮层面板入场 */
+.glass-panel {
+  transition: transform .25s cubic-bezier(.16, 1, .3, 1),
+              opacity .2s ease,
+              box-shadow .2s ease;
+}
+
+/* 错误提示、轻提示弹入 */
+@keyframes toastIn {
+  from { opacity: 0; transform: translate(-50%, -12px) scale(0.96); }
+  to { opacity: 1; transform: translate(-50%, 0) scale(1); }
+}
+
+.toast-in {
+  animation: toastIn .28s cubic-bezier(.16, 1, .3, 1) both;
+}

@@ -169,7 +169,7 @@ function FloatPanel({ open, onClose, title, width = 360, children }) {
 }
 
 export default function Player({ onProfile }) {
-  const { currentTrack, isPlaying, currentTime, lyricTime, duration, volume, playMode, playlist, togglePlay, next, prev, seek, setVolume, toggleMode, playTrack, lyrics, currentLyric, isLoadingUrl, error, clearError, setError } = usePlayerStore();
+  const { currentTrack, isPlaying, currentTime, duration, volume, playMode, playlist, togglePlay, next, prev, seek, setVolume, toggleMode, playTrack, lyrics, currentLyric, isLoadingUrl, error, clearError, setError } = usePlayerStore();
   const { userInfo, isLoggedIn } = useAuthStore();
   const [sq, setSq] = useState(false); const [qo, setQo] = useState(false); const [viz, setViz] = useState(false);
   const [controlsExpanded, setControlsExpanded] = useState(() => { try { return localStorage.getItem('sonus_controls_expanded') !== 'false'; } catch { return true } });
@@ -219,7 +219,7 @@ export default function Player({ onProfile }) {
       <div style={{ position: 'absolute', inset: 0 }}>
         <FloatingLyrics lyrics={lyrics} isPlaying={isPlaying} />
         {vm === '3d' ? <Suspense key={`${currentTrack?.cover || currentTrack?.id || 'none'}-${v3m}`}><Visualizer3D accent={ac} cover={currentTrack?.cover || ''} mode={v3m} isPlaying={isPlaying} /></Suspense> : <Visualizer isPlaying={isPlaying} mode={vm} accent={ac} />}
-        {lyricPanel && <LyricScroll currentLyric={currentLyric || ''} lyrics={lyrics} currentTime={lyricTime} accent={ac} />}
+        {lyricPanel && <LyricScroll currentLyric={currentLyric || ''} accent={ac} />}
       </div>
 
       {/* 暗角遮罩 */}
@@ -274,7 +274,7 @@ export default function Player({ onProfile }) {
           }}
         >
           <button onClick={() => setControlsExpanded(true)} style={{ width: 40, height: 40, borderRadius: 11, overflow: 'hidden', flexShrink: 0, background: 'rgba(255,255,255,0.06)', border: 'none', padding: 0, cursor: 'pointer' }}>
-            {currentTrack?.cover ? <img key={currentTrack.id} src={currentTrack.cover} alt="" className="cover-fade" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <div style={{ width: '100%', height: '100%', background: 'linear-gradient(135deg, rgba(0,245,212,0.25), rgba(36,66,255,0.18))' }} />}
+            {currentTrack?.cover ? <img key={currentTrack.id} src={currentTrack.cover} alt="" className={`cover-fade ${isPlaying ? 'cover-playing' : ''}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <div style={{ width: '100%', height: '100%', background: 'linear-gradient(135deg, rgba(0,245,212,0.25), rgba(36,66,255,0.18))' }} />}
           </button>
           <button onClick={togglePlay} className={`glass-button-accent${isPlaying ? ' pulsing' : ''}`} style={{ width: 36, height: 36, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: ac, boxShadow: `0 0 16px ${ac}44, inset 0 1px 0 rgba(255,255,255,0.25)` }}>
             {isPlaying ? <Pause size={18} fill="#050608" /> : <Play size={18} fill="#050608" style={{ marginLeft: 2 }} />}
@@ -293,7 +293,7 @@ export default function Player({ onProfile }) {
         >
           {/* 歌曲信息 */}
           <div style={{ width: 40, height: 40, borderRadius: 10, overflow: 'hidden', flexShrink: 0, background: 'rgba(255,255,255,0.06)' }}>
-            {currentTrack?.cover ? <img key={currentTrack.id} src={currentTrack.cover} alt="" className="cover-fade" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <div style={{ width: '100%', height: '100%', background: 'linear-gradient(135deg, rgba(0,245,212,0.25), rgba(36,66,255,0.18))' }} />}
+            {currentTrack?.cover ? <img key={currentTrack.id} src={currentTrack.cover} alt="" className={`cover-fade ${isPlaying ? 'cover-playing' : ''}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <div style={{ width: '100%', height: '100%', background: 'linear-gradient(135deg, rgba(0,245,212,0.25), rgba(36,66,255,0.18))' }} />}
           </div>
           <div style={{ minWidth: 0, display: 'flex', flexDirection: 'column', gap: 1, flex: 1 }}>
             <div style={{ fontSize: 12, fontWeight: 700, color: 'rgba(255,255,255,0.92)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{currentTrack?.title || 'Sonus'}</div>
@@ -323,7 +323,7 @@ export default function Player({ onProfile }) {
 
       {/* 错误提示 */}
       {error && (
-        <div className="glass-panel" style={{ position: 'absolute', top: 'calc(60px + var(--safe-top))', left: '50%', transform: 'translateX(-50%)', zIndex: 300, padding: '9px 18px', borderRadius: 14, fontSize: 12, color: '#ff9fa6', background: 'rgba(120,30,30,0.25)', borderColor: 'rgba(255,100,100,0.35)' }}>
+        <div key={error} className="glass-panel toast-in" style={{ position: 'absolute', top: 'calc(60px + var(--safe-top))', left: '50%', transform: 'translateX(-50%)', zIndex: 300, padding: '9px 18px', borderRadius: 14, fontSize: 12, color: '#ff9fa6', background: 'rgba(120,30,30,0.25)', borderColor: 'rgba(255,100,100,0.35)' }}>
           {error}
         </div>
       )}
