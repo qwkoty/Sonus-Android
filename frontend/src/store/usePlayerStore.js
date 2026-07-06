@@ -200,7 +200,8 @@ export const usePlayerStore = create((set, get) => {
         }
       } else {
         console.warn('[playTrack] no url');
-        set({ isLoadingUrl: false, error: '暂无音源，换一首试试' });
+        const platformLabel = isNcm ? '网易云' : 'QQ音乐';
+        set({ isLoadingUrl: false, error: `${platformLabel}：暂无可用音源，请检查登录态或换一首` });
       }
     },
 

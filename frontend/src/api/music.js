@@ -235,12 +235,56 @@ function getGtk(skey) {
   return hash & 0x7fffffff;
 }
 
+// 解析 QQ 音乐 JSONP 响应 (callback({...}))
+function parseJsonp(text, cbName = 'MusicJsonCallback') {
+  if (!text) return null;
+  const trimmed = text.trim();
+  const prefix = cbName + '(';
+  if (trimmed.startsWith(prefix) && trimmed.endsWith(')')) {
+    try {
+      return JSON.parse(trimmed.slice(prefix.length, -1));
+    } catch (e) {
+      return null;
+    }
+  }
+  // 兜底：直接当 JSON 解析
+  try {
+    return JSON.parse(trimmed);
+  } catch (e) {
+    return null;
+  }
+}
+
 // ==================== 用户信息 ====================
 async function userInfoAPK(uin, cookie = '') {
   const skeyMatch = (cookie || '').match(/(?:^|;\s*)skey=([^;]+)/);
   const pskeyMatch = (cookie || '').match(/(?:^|;\s*)p_skey=([^;]+)/);
   const gtk = getGtk(pskeyMatch ? pskeyMatch[1] : (skeyMatch ? skeyMatch[1] : ''));
   const uinStr = String(uin || extractUinFromCookie(cookie) || '0');
+
+  // 尝试接口 0：c.y.qq.com 公开用户主页接口（不需要登录 Cookie，最稳定）
+  try {
+    const profileUrl = `https://c.y.qq.com/rsc/fcgi-bin/fcg_get_profile_homepage.fcg?cid=205360838&userid=${encodeURIComponent(uinStr)}&reqfrom=1&reqtype=0&_=Date.now()`;
+    const r0 = await CookieReader.httpGet(profileUrl, 'https://y.qq.com');
+    const d0 = parseJsonp(r0?.body, 'MusicJsonCallback');
+    const pd = d0?.data;
+    if (pd && (pd.nick || pd.headpic)) {
+      const avatar = pd?.headpic || pd?.headimg || pd?.avatar || '';
+      const nickname = pd?.nick || pd?.nickname || '';
+      console.log('[userInfo] from fcg_get_profile_homepage:', { nickname, uin: uinStr });
+      return {
+        nickname: nickname || 'QQ音乐用户',
+        avatar,
+        uin: uinStr,
+        vipLevel: pd?.vipLevel || 0,
+        isVip: false,
+        follow: 0,
+        fans: 0,
+      };
+    }
+  } catch (e) {
+    console.warn('[userInfo] fcg_get_profile_homepage failed:', e.message);
+  }
 
   // 尝试接口 1：music.UserInfo.userInfoServer.GetLoginUserInfo（登录态）
   try {

@@ -8,13 +8,40 @@ import { getProxyUrl } from './music';
 const NCM_BASE = 'https://music.163.com';
 
 // 原生 HTTP GET：所有网易云音乐请求都走 music.163.com 域
+// 传入的 cookie 会与 CookieManager 中的 cookie 合并，避免缺失 __csrf 等字段
 async function ncmGet(path, cookie = '') {
   const url = path.startsWith('http') ? path : NCM_BASE + path;
-  const r = cookie
-    ? await CookieReader.httpGet(url, NCM_BASE, cookie)
+  let cookies = cookie || '';
+  try {
+    const cm = await CookieReader.getCookiesForUrl(NCM_BASE);
+    const cmCookie = cm?.cookie || '';
+    if (cmCookie) {
+      // 合并：传入的 cookie 优先，CookieManager 补充缺失的字段
+      cookies = mergeCookies(cmCookie, cookies);
+    }
+  } catch (e) {}
+  const r = cookies
+    ? await CookieReader.httpGet(url, NCM_BASE, cookies)
     : await CookieReader.httpGet(url, NCM_BASE);
   if (!r.ok || !r.body) throw new Error(`HTTP ${r.status}`);
   return JSON.parse(r.body);
+}
+
+// 合并两段 cookie 字符串， latter 中的同名键覆盖前者
+function mergeCookies(base, override) {
+  if (!base && !override) return '';
+  if (!base) return override;
+  if (!override) return base;
+  const map = new Map();
+  for (const pair of base.split(';')) {
+    const idx = pair.indexOf('=');
+    if (idx > 0) map.set(pair.slice(0, idx).trim(), pair.trim());
+  }
+  for (const pair of override.split(';')) {
+    const idx = pair.indexOf('=');
+    if (idx > 0) map.set(pair.slice(0, idx).trim(), pair.trim());
+  }
+  return Array.from(map.values()).join('; ');
 }
 
 // 从 Cookie 字符串中提取 MUSIC_U（网易云登录态主票据）
@@ -174,10 +201,12 @@ async function songUrl(id, cookie) {
     const r3 = await CookieReader.httpGet(outerUrl, NCM_BASE);
     // 跟随 302 后 finalUrl 就是真实 CDN 链接
     const finalUrl = r3?.finalUrl || '';
-    if (finalUrl && !finalUrl.includes('/song/media/outer/url')) {
+    const isAudio = /\.(mp3|m4a|flac|aac|ogg|wav)(\?|$)/i.test(finalUrl);
+    if (finalUrl && isAudio) {
       console.log('[ncm.songUrl] outer fallback finalUrl:', finalUrl);
       return await getProxyUrl(finalUrl);
     }
+    console.warn('[ncm.songUrl] outer fallback invalid finalUrl:', finalUrl);
   } catch (e) {
     console.warn('[ncm.songUrl] outer fallback failed', e);
   }
