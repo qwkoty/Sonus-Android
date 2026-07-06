@@ -36,7 +36,7 @@
 |---|---|---|---|---|---|---|---|
 | 启动屏 Splash | HTML 内嵌启动动画，React 挂载后淡出 | `frontend/index.html` | 无 | ✅ | 否 | - | 最少展示 1.2s |
 | 玻璃态设计语言 | 统一的背景、边框、阴影、模糊效果 | `frontend/src/index.css` | CSS 变量 | ✅ | 否 | - | `.glass-*` 系列类名 |
-| 主播放器页面布局 | 顶部栏、可视化背景、浮窗搜索/调色、可收起底部控制栏、进度条 | `frontend/src/pages/Player.jsx` | 多个组件 | ✅ | 否 | - | 横屏优先 |
+| 主播放器页面布局 | 顶部栏、可视化背景、底部控制胶囊、进度条 | `frontend/src/pages/Player.jsx` | 多个组件 | ✅ | 否 | - | 横屏优先 |
 | 搜索 Sheet | 底部弹出搜索面板，实时搜索并播放 | `frontend/src/pages/Player.jsx` | `music.search` | ✅ | 否 | - | 防抖 350ms |
 | 播放队列 Sheet | 展示当前播放队列，支持点击切歌 | `frontend/src/pages/Player.jsx` | `usePlayerStore` | ✅ | 否 | - | - |
 | 视觉设置 Sheet | 切换可视化模式、调色、开关歌词面板 | `frontend/src/pages/Player.jsx` | 本地状态 | ✅ | 否 | - | 持久化到 localStorage |
@@ -57,7 +57,6 @@
 | 播放队列管理 | 搜索添加、列表播放、去重 | `usePlayerStore.js` | Audio | ✅ | 否 | - | - |
 | 歌词解析与同步 | 解析 LRC 时间轴，随播放进度更新 | `usePlayerStore.js` | 歌词 API | ✅ | 否 | - | `[mm:ss.xx]` 格式 |
 | 中央当前歌词 | 屏幕中央显示当前一句歌词 | `frontend/src/components/LyricScroll.jsx` | 歌词解析 | ✅ | 否 | - | 淡入淡出 |
-| 歌词舞台效果 | 聚光灯、中心光晕、地板反光、浮尘粒子 | `frontend/src/components/LyricStage.jsx` | Web Audio | ✅ | 否 | - | 随音频能量脉动 |
 | 漂浮歌词粒子 | 歌词句子上浮氛围效果 | `frontend/src/components/FloatingLyrics.jsx` | 歌词解析 | ✅ | 否 | - | 播放时随机生成 |
 
 ### 四、可视化
@@ -65,8 +64,8 @@
 | 功能名称 | 功能描述及作用 | 页面位置 | 依赖关系 | 完成状态 | 是否测试 | 是否存在 Bug | 备注 |
 |---|---|---|---|---|---|---|---|
 | 2D 环状频谱 | 径向频谱、中心波形、bass 冲击波 | `frontend/src/components/Visualizer.jsx` | Web Audio | ✅ | 否 | - | ring 模式 |
-| 2D 镜像波形 | 上下镜像频谱带 + 时间域波形 | `frontend/src/components/Visualizer.jsx` | Web Audio | ✅ | 否 | - | wave 模式，已阻止多指默认行为 |
-| 3D 封面粒子画 | 2 万粒子构成封面穹顶，圆形纹理、间距加大，液体绸缎波动 + 鼓皮膨胀 | `frontend/src/components/Visualizer3D.jsx` | Three.js | ✅ | 否 | - | 3d 模式，手势驱动 |
+| 2D 镜像波形 | 上下镜像频谱带 + 时间域波形 | `frontend/src/components/Visualizer.jsx` | Web Audio | ✅ | 否 | - | wave 模式 |
+| 3D 封面粒子画 | 2 万粒子呈现封面，随音频起伏 | `frontend/src/components/Visualizer3D.jsx` | Three.js | ✅ | 否 | - | 3d 模式 |
 | 3D 手势控制 | 单指旋转、双指缩放/旋转 | `frontend/src/components/Visualizer3D.jsx` | 触摸事件 | ✅ | 否 | - | - |
 | 音频待机动画 | 无音频时的呼吸/涟漪动画 | `Visualizer.jsx` / `Visualizer3D.jsx` | 时间驱动 | ✅ | 否 | - | - |
 
@@ -196,5 +195,3 @@
 | 日期 | 版本 | 更新内容 | 更新人 |
 |---|---|---|---|
 | 2026-07-05 | v1.0 | 初始版本，基于 Sonus 项目现状建立 | AI Assistant |
-| 2026-07-05 | v1.1 | Player UI：搜索/调色改为浮窗；底部控制栏可收起/展开；禁用全局文本选择；3D 可视化开启 360° 自转并优化性能 | AI Assistant |
-| 2026-07-05 | v1.2 | 回滚 3D 到原始 2 万粒子并改为封面穹顶 + 液体绸缎动画；修复 wave 模式双指滑动卡顿；新增歌词舞台效果 | AI Assistant |

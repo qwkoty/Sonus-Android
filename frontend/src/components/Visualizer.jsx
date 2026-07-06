@@ -51,15 +51,9 @@ export default function Visualizer({ isPlaying, mode = 'ring', accent = '#4FC3F7
       cx = w / 2;
       cy = h / 2;
       minDim = Math.min(w, h);
-      canvas.style.touchAction = 'none';
     };
     resize();
     window.addEventListener('resize', resize);
-
-    // 阻止 wave 模式下双指/多指手势触发浏览器默认行为（缩放、滚动），避免卡顿
-    const preventTouch = (e) => { if (e.touches.length > 1) e.preventDefault(); };
-    canvas.addEventListener('touchstart', preventTouch, { passive: false });
-    canvas.addEventListener('touchmove', preventTouch, { passive: false });
 
     const palette = () => {
       const [H, S, L] = hexToHsl(accentRef.current);
@@ -460,8 +454,6 @@ export default function Visualizer({ isPlaying, mode = 'ring', accent = '#4FC3F7
     return () => {
       cancelAnimationFrame(rafRef.current);
       window.removeEventListener('resize', resize);
-      canvas.removeEventListener('touchstart', preventTouch);
-      canvas.removeEventListener('touchmove', preventTouch);
     };
   }, [isPlaying, mode]);
 
@@ -474,7 +466,6 @@ export default function Visualizer({ isPlaying, mode = 'ring', accent = '#4FC3F7
         width: '100%',
         height: '100%',
         zIndex: 2,
-        touchAction: 'none',
       }}
     />
   );
