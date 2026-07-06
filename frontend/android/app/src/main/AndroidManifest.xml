@@ -34,6 +34,14 @@
             android:screenOrientation="sensorLandscape"
             android:exported="false" />
 
+        <!-- 网易云音乐登录 WebView Activity -->
+        <activity
+            android:name=".NeteaseLoginWebViewActivity"
+            android:theme="@style/AppTheme.NoActionBarLaunch"
+            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode|navigation|density"
+            android:screenOrientation="sensorLandscape"
+            android:exported="false" />
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"

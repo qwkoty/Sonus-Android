@@ -117,13 +117,17 @@ public class MainActivity extends BridgeActivity {
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
-        if (requestCode == 1001) {
+        if (requestCode == 1001 || requestCode == 1002) {
             PluginHandle handle = getBridge().getPlugin("CookieReader");
             if (handle != null) {
                 Plugin plugin = handle.getInstance();
                 if (plugin instanceof CookieReaderPlugin) {
                     boolean loggedIn = resultCode == RESULT_OK;
-                    ((CookieReaderPlugin) plugin).notifyLoginResult(loggedIn);
+                    if (requestCode == 1001) {
+                        ((CookieReaderPlugin) plugin).notifyLoginResult(loggedIn);
+                    } else {
+                        ((CookieReaderPlugin) plugin).notifyNeteaseLoginResult(loggedIn);
+                    }
                 }
             }
         }

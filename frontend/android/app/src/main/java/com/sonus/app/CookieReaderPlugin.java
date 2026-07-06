@@ -24,7 +24,9 @@ import java.net.URL;
 public class CookieReaderPlugin extends Plugin {
 
     private static final int LOGIN_REQUEST_CODE = 1001;
+    private static final int NETEASE_LOGIN_REQUEST_CODE = 1002;
     private PluginCall pendingLoginCall = null;
+    private PluginCall pendingNeteaseLoginCall = null;
 
     @PluginMethod()
     public void getCookiesForUrl(PluginCall call) {
@@ -251,6 +253,22 @@ public class CookieReaderPlugin extends Plugin {
     }
 
     /**
+     * 打开网易云音乐登录 WebView Activity。
+     * 登录成功后 CookieManager 会持有 music.163.com 的 MUSIC_U 等登录 Cookie。
+     */
+    @PluginMethod()
+    public void openNeteaseLoginWebView(PluginCall call) {
+        try {
+            pendingNeteaseLoginCall = call;
+            Intent intent = new Intent(getContext(), NeteaseLoginWebViewActivity.class);
+            getActivity().startActivityForResult(intent, NETEASE_LOGIN_REQUEST_CODE);
+        } catch (Exception e) {
+            pendingNeteaseLoginCall = null;
+            call.reject("Failed to open netease login webview: " + e.getMessage());
+        }
+    }
+
+    /**
      * 返回本地音频代理服务器端口。
      * 前端拿到端口后，把 QQ 音乐 CDN 播放链接包装成
      * http://localhost:PORT/?url=<encoded stream url>
@@ -272,5 +290,26 @@ public class CookieReaderPlugin extends Plugin {
         if (loggedIn) pendingLoginCall.resolve(ret);
         else pendingLoginCall.reject("User cancelled login");
         pendingLoginCall = null;
+    }
+
+    /**
+     * 网易云登录 WebView 回调：由 MainActivity.onActivityResult(requestCode=1002) 调用。
+     * 登录成功时读取 music.163.com 的 Cookie 一并返回给前端。
+     */
+    public void notifyNeteaseLoginResult(boolean loggedIn) {
+        if (pendingNeteaseLoginCall == null) return;
+        if (loggedIn) {
+            // 读取 music.163.com 的完整 Cookie 返回给前端
+            CookieManager cm = CookieManager.getInstance();
+            cm.flush();
+            String cookie = cm.getCookie("https://music.163.com");
+            JSObject ret = new JSObject();
+            ret.put("loggedIn", true);
+            ret.put("cookie", cookie != null ? cookie : "");
+            pendingNeteaseLoginCall.resolve(ret);
+        } else {
+            pendingNeteaseLoginCall.reject("User cancelled netease login");
+        }
+        pendingNeteaseLoginCall = null;
     }
 }

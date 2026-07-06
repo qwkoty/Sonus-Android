@@ -1,5 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
-import QRCode from 'qrcode';
+import { useState, useEffect, useCallback } from 'react';
 import { Loader2, Music, ArrowLeft, User, ListMusic, LogOut, CheckCircle2, LogIn, RefreshCw, Cloud } from 'lucide-react';
 import { useAuthStore } from '../store/useAuthStore';
 import { CookieReader } from '../plugins/CookieReader';
@@ -20,15 +19,12 @@ export default function Login({ onBack }) {
   const [playlists, setPlaylists] = useState(null);
   const [loadingPlaylists, setLoadingPlaylists] = useState(false);
 
-  // ===== 网易云二维码登录状态 =====
-  // ncmPhase: idle | loading | showing | polling | success | error | expired
+  // ===== 网易云 WebView 登录状态 =====
+  // ncmPhase: idle | opening | polling | success | error
   const [ncmPhase, setNcmPhase] = useState('idle');
-  const [ncmQrUrl, setNcmQrUrl] = useState('');
   const [ncmTip, setNcmTip] = useState('');
   const [ncmPlaylists, setNcmPlaylists] = useState(null);
   const [loadingNcmPlaylists, setLoadingNcmPlaylists] = useState(false);
-  const ncmKeyRef = useRef('');
-  const ncmPollTimerRef = useRef(null);
 
   // ===== QQ 音乐登录流程（原有逻辑，保持不变） =====
   const startWebViewLogin = useCallback(async () => {
@@ -120,80 +116,53 @@ export default function Login({ onBack }) {
     }
   }, [isLoggedIn, fetchUserInfo]);
 
-  // ===== 网易云二维码登录流程 =====
-  const stopNcmPolling = useCallback(() => {
-    if (ncmPollTimerRef.current) {
-      clearInterval(ncmPollTimerRef.current);
-      ncmPollTimerRef.current = null;
+  // ===== 网易云 WebView 登录流程（与 QQ 音乐同思路） =====
+  const startNcmWebViewLogin = useCallback(async () => {
+    setNcmPhase('opening');
+    setNcmTip('正在打开网易云音乐登录页面…');
+    try {
+      // 先检查是否已登录（CookieManager 已有 MUSIC_U）
+      const currentCookies = await CookieReader.getCookiesForUrl('https://music.163.com');
+      if (currentCookies?.cookie && currentCookies.cookie.includes('MUSIC_U')) {
+        await handleNcmCookieLogin(currentCookies.cookie);
+        return;
+      }
+      setNcmPhase('polling');
+      setNcmTip('请在弹出的窗口中登录网易云音乐…');
+      // 打开网易云登录 WebView，登录成功后原生层返回 cookie
+      const res = await CookieReader.openNeteaseLoginWebView();
+      if (res?.loggedIn && res?.cookie) {
+        await handleNcmCookieLogin(res.cookie);
+      } else {
+        throw new Error('未获取到登录态');
+      }
+    } catch (e) {
+      setNcmPhase('error');
+      setNcmTip('登录已取消：' + (e.message || ''));
     }
   }, []);
 
-  const pollNcmQr = useCallback((key) => {
-    stopNcmPolling();
-    ncmPollTimerRef.current = setInterval(async () => {
-      try {
-        const r = await netease.qrCheck(key);
-        const code = Number(r?.code);
-        if (code === 801) {
-          setNcmTip('等待扫码…');
-        } else if (code === 802) {
-          setNcmTip('已扫描，请在手机上确认登录');
-        } else if (code === 803) {
-          stopNcmPolling();
-          // cookie 为空说明 Set-Cookie 捕获失败，提示错误而非误标记登录成功
-          if (!r.cookie) {
-            setNcmPhase('error');
-            setNcmTip('登录态获取失败（cookie 为空），请重试');
-            return;
-          }
-          setNcmTip('登录成功，正在同步账号…');
-          // 登录成功：先用 cookie 拉取账号信息，再写入 store
-          try {
-            const info = await netease.accountInfo(r.cookie);
-            setNeteaseAuth({
-              cookie: r.cookie,
-              uid: info?.uid || '',
-              nickname: info?.nickname || '网易云用户',
-            });
-          } catch (e) {
-            // 拉取用户信息失败也允许登录，后续可重试
-            setNeteaseAuth({ cookie: r.cookie, uid: '', nickname: '网易云用户' });
-          }
-          setNcmPhase('success');
-          setNcmQrUrl('');
-          setNcmTip('');
-        } else if (code === 800) {
-          stopNcmPolling();
-          setNcmPhase('expired');
-          setNcmTip('二维码已过期，请重新生成');
-        }
-      } catch (e) {
-        // 单次轮询失败不中断，等下一轮
-        console.warn('[ncm poll] failed', e?.message || e);
-      }
-    }, 2000);
-  }, [setNeteaseAuth, stopNcmPolling]);
-
-  const startNcmQrLogin = useCallback(async () => {
-    stopNcmPolling();
-    setNcmPhase('loading');
-    setNcmTip('正在生成二维码…');
-    setNcmQrUrl('');
-    try {
-      const key = await netease.qrKey();
-      ncmKeyRef.current = key;
-      const loginUrl = `https://music.163.com/login?codekey=${encodeURIComponent(key)}`;
-      const dataUrl = await QRCode.toDataURL(loginUrl, { margin: 1, width: 320 });
-      setNcmQrUrl(dataUrl);
-      setNcmPhase('showing');
-      setNcmTip('请使用网易云音乐 App 扫码登录');
-      // 开始轮询
-      pollNcmQr(key);
-    } catch (e) {
+  const handleNcmCookieLogin = async (cookieStr) => {
+    if (!cookieStr || !cookieStr.includes('MUSIC_U')) {
       setNcmPhase('error');
-      setNcmTip('生成二维码失败：' + (e?.message || ''));
+      setNcmTip('登录态不完整（缺少 MUSIC_U），请重试');
+      return;
     }
-  }, [pollNcmQr, stopNcmPolling]);
+    setNcmTip('登录成功，正在同步账号…');
+    try {
+      const info = await netease.accountInfo(cookieStr);
+      setNeteaseAuth({
+        cookie: cookieStr,
+        uid: info?.uid || '',
+        nickname: info?.nickname || '网易云用户',
+      });
+    } catch (e) {
+      // 拉取用户信息失败也允许登录，后续可重试
+      setNeteaseAuth({ cookie: cookieStr, uid: '', nickname: '网易云用户' });
+    }
+    setNcmPhase('success');
+    setNcmTip('');
+  };
 
   const handleLoadNcmPlaylists = async () => {
     if (ncmPlaylists) return;
@@ -210,18 +179,11 @@ export default function Login({ onBack }) {
   };
 
   const handleNcmLogout = () => {
-    stopNcmPolling();
     neteaseLogout();
     setNcmPhase('idle');
-    setNcmQrUrl('');
     setNcmTip('');
     setNcmPlaylists(null);
   };
-
-  // 卸载时清理定时器
-  useEffect(() => {
-    return () => stopNcmPolling();
-  }, [stopNcmPolling]);
 
   // 网易云登录后自动拉取用户信息
   useEffect(() => {
@@ -272,7 +234,7 @@ export default function Login({ onBack }) {
           onLogout={handleLogout}
         />
 
-        {/* 网易云音乐卡片 */}
+        {/* 网易云音乐卡片（WebView 登录） */}
         <NeteaseCard
           loggedIn={neteaseLoggedIn}
           userInfo={neteaseUserInfo}
@@ -281,9 +243,8 @@ export default function Login({ onBack }) {
           playlists={ncmPlaylists}
           loadingPlaylists={loadingNcmPlaylists}
           phase={ncmPhase}
-          qrUrl={ncmQrUrl}
           tip={ncmTip}
-          onStartLogin={startNcmQrLogin}
+          onStartLogin={startNcmWebViewLogin}
           onLoadPlaylists={handleLoadNcmPlaylists}
           onLogout={handleNcmLogout}
         />
@@ -388,8 +349,8 @@ function QQWebViewLoginView({ phase, tip, onStartLogin, onCheckStatus }) {
   );
 }
 
-// ===== 网易云音乐卡片 =====
-function NeteaseCard({ loggedIn, userInfo, nickname, uid, playlists, loadingPlaylists, phase, qrUrl, tip, onStartLogin, onLoadPlaylists, onLogout }) {
+// ===== 网易云音乐卡片（WebView 登录，与 QQ 音乐同思路） =====
+function NeteaseCard({ loggedIn, userInfo, nickname, uid, playlists, loadingPlaylists, phase, tip, onStartLogin, onLoadPlaylists, onLogout }) {
   return (
     <div className="glass-panel-strong" style={{ position: 'relative', padding: 22, borderRadius: 24, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16, alignSelf: 'flex-start' }}>
@@ -402,7 +363,7 @@ function NeteaseCard({ loggedIn, userInfo, nickname, uid, playlists, loadingPlay
       {loggedIn ? (
         <NeteaseAccountView userInfo={userInfo} nickname={nickname} uid={uid} playlists={playlists} loadingPlaylists={loadingPlaylists} onLoadPlaylists={onLoadPlaylists} onLogout={onLogout} />
       ) : (
-        <NeteaseQrLoginView phase={phase} qrUrl={qrUrl} tip={tip} onStartLogin={onStartLogin} />
+        <NeteaseWebViewLoginView phase={phase} tip={tip} onStartLogin={onStartLogin} />
       )}
     </div>
   );
@@ -453,56 +414,23 @@ function NeteaseAccountView({ userInfo, nickname, uid, playlists, loadingPlaylis
   );
 }
 
-function NeteaseQrLoginView({ phase, qrUrl, tip, onStartLogin }) {
-  const isPolling = phase === 'showing' || phase === 'loading';
+function NeteaseWebViewLoginView({ phase, tip, onStartLogin }) {
+  const isBusy = phase === 'opening' || phase === 'polling';
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14, width: '100%' }}>
       <div style={{ width: 60, height: 60, borderRadius: 18, background: 'linear-gradient(135deg, #e60026, #ff4d6d)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 10px 34px rgba(230, 0, 38, 0.32)' }}>
-        <Cloud size={26} color="#fff" />
+        <LogIn size={26} color="#fff" />
       </div>
 
       <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--text-primary)', textAlign: 'center' }}>登录 网易云音乐</div>
+      <div style={{ fontSize: 12, color: 'var(--text-secondary)', textAlign: 'center', lineHeight: 1.6 }}>打开网易云音乐官方页面，扫码或输入密码登录<br />登录后自动同步，无需手动操作</div>
 
-      {/* 二维码展示区 */}
-      {qrUrl ? (
-        <div style={{ position: 'relative', padding: 10, background: '#fff', borderRadius: 14, boxShadow: '0 8px 24px rgba(0,0,0,0.32)' }}>
-          <img src={qrUrl} alt="网易云登录二维码" style={{ display: 'block', width: 200, height: 200, borderRadius: 8 }} />
-          {phase === 'expired' && (
-            <div style={{ position: 'absolute', inset: 10, borderRadius: 8, background: 'rgba(0,0,0,0.72)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-              <RefreshCw size={22} color="#fff" />
-              <span style={{ color: '#fff', fontSize: 12 }}>二维码已失效</span>
-            </div>
-          )}
-        </div>
-      ) : (
-        <div style={{ width: 220, height: 220, borderRadius: 14, background: 'rgba(255,255,255,0.04)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px dashed rgba(255,255,255,0.12)' }}>
-          {phase === 'loading' ? <Loader2 size={28} className="spin-icon" style={{ color: 'var(--accent-dynamic)' }} /> : <Cloud size={42} color="var(--text-muted)" style={{ opacity: 0.5 }} />}
-        </div>
-      )}
-
-      <div style={{ fontSize: 12, color: 'var(--text-secondary)', textAlign: 'center', lineHeight: 1.6 }}>
-        {phase === 'showing' || phase === 'loading'
-          ? '使用网易云音乐 App 扫码登录'
-          : phase === 'expired'
-            ? '二维码已过期，点击下方按钮重新生成'
-            : '点击下方按钮生成登录二维码'}
-      </div>
-
-      <button
-        onClick={onStartLogin}
-        disabled={isPolling}
-        className="glass-button-accent"
-        style={{ width: '100%', padding: '13px 20px', borderRadius: 14, fontSize: 14, fontWeight: 700, color: '#050608', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, opacity: isPolling ? 0.6 : 1 }}
-      >
-        {phase === 'loading'
-          ? <><Loader2 size={18} className="spin-icon" /> 生成中…</>
-          : phase === 'showing'
-            ? <><Loader2 size={18} className="spin-icon" /> 等待扫码…</>
-            : <><RefreshCw size={16} /> {phase === 'expired' ? '重新生成二维码' : '生成登录二维码'}</>}
+      <button onClick={onStartLogin} disabled={isBusy} className="glass-button-accent" style={{ width: '100%', padding: '13px 20px', borderRadius: 14, fontSize: 14, fontWeight: 700, color: '#050608', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, opacity: isBusy ? 0.6 : 1 }}>
+        {phase === 'opening' ? <><Loader2 size={18} className="spin-icon" /> 正在打开…</> : phase === 'polling' ? <><Loader2 size={18} className="spin-icon" /> 等待登录…</> : <><LogIn size={18} /> 打开网易云音乐登录</>}
       </button>
 
       {tip && (
-        <div style={{ fontSize: 12, fontWeight: 600, textAlign: 'center', color: phase === 'success' ? '#7ee2a8' : phase === 'error' || phase === 'expired' ? '#ff9fa6' : 'var(--text-secondary)', maxWidth: 300, lineHeight: 1.5 }}>{tip}</div>
+        <div style={{ fontSize: 12, fontWeight: 600, textAlign: 'center', color: phase === 'success' ? '#7ee2a8' : phase === 'error' ? '#ff9fa6' : 'var(--text-secondary)', maxWidth: 300, lineHeight: 1.5 }}>{tip}</div>
       )}
     </div>
   );
