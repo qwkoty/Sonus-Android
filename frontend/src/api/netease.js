@@ -163,56 +163,43 @@ async function playlist(id, cookie) {
 
 // ==================== 播放链接 ====================
 // 返回本地代理包装后的 URL；空 URL 返回 ''
-// 多接口尝试：
-//   1) /api/song/enhance/player/url (登录态高音质)
-//   2) /api/song/url?id=... (网页接口)
-//   3) /song/media/outer/url?id=... (免登录 302 跳转，最稳定)
+// 主策略：免登录 outer URL（302 跳转到真实 CDN，最稳定，不需要 POST/加密）
+// 备选：登录态 /api/song/enhance/player/url（GET 方式，部分歌曲可用）
 async function songUrl(id, cookie) {
   const rawId = String(id).replace(/^ncm_/, '');
 
-  // 尝试 1：登录态高音质接口
-  const brCandidates = [320000, 128000, 96000];
-  for (const br of brCandidates) {
-    try {
-      const d = await ncmGet(`/api/song/enhance/player/url?id=${encodeURIComponent(rawId)}&br=${br}`, cookie);
-      if (Number(d?.code) !== 200) continue;
-      const data = d?.data || [];
-      const item = data.find((it) => it && it.url) || data[0];
-      const rawUrl = item?.url || '';
-      if (!rawUrl) continue;
-      return await getProxyUrl(rawUrl);
-    } catch (e) {
-      // 继续尝试下一档音质
-    }
-  }
-
-  // 尝试 2：网页接口
-  try {
-    const d2 = await ncmGet(`/api/song/url?id=${encodeURIComponent(rawId)}&br=128000`, cookie);
-    const data2 = d2?.data || [];
-    const item2 = data2.find((it) => it && it.url) || data2[0];
-    const rawUrl2 = item2?.url || '';
-    if (rawUrl2) return await getProxyUrl(rawUrl2);
-  } catch (e) {}
-
-  // 尝试 3：免登录 outer URL，302 跳转到真实 CDN
+  // 主策略：outer URL，302 跳转到真实 CDN
   // 用 noRedirect=true 避免下载整个 mp3 二进制流
   try {
     const outerUrl = `${NCM_BASE}/song/media/outer/url?id=${rawId}`;
-    const r3 = await CookieReader.httpGet(outerUrl, NCM_BASE, '', true);
-    const location = r3?.location || '';
-    console.log('[ncm.songUrl] outer status:', r3?.status, 'location:', location);
+    const r = await CookieReader.httpGet(outerUrl, NCM_BASE, '', true);
+    const location = r?.location || '';
+    console.log('[ncm.songUrl] outer status:', r?.status, 'location:', location);
     if (location && (location.includes('126.net') || /\.(mp3|m4a|flac|aac|ogg|wav)(\?|$)/i.test(location))) {
       return await getProxyUrl(location);
     }
     // 某些版本不返回 Location，尝试 finalUrl
-    const finalUrl = r3?.finalUrl || '';
+    const finalUrl = r?.finalUrl || '';
     if (finalUrl && finalUrl !== outerUrl && (finalUrl.includes('126.net') || /\.(mp3|m4a|flac|aac|ogg|wav)(\?|$)/i.test(finalUrl))) {
       return await getProxyUrl(finalUrl);
     }
-    console.warn('[ncm.songUrl] outer invalid location:', location, 'finalUrl:', finalUrl);
+    console.warn('[ncm.songUrl] outer invalid, location:', location, 'finalUrl:', finalUrl);
   } catch (e) {
-    console.warn('[ncm.songUrl] outer fallback failed', e);
+    console.warn('[ncm.songUrl] outer failed', e);
+  }
+
+  // 备选：登录态接口（GET 方式，部分歌曲可用）
+  if (cookie) {
+    for (const br of [128000, 320000]) {
+      try {
+        const d = await ncmGet(`/api/song/enhance/player/url?id=${encodeURIComponent(rawId)}&br=${br}`, cookie);
+        if (Number(d?.code) !== 200) continue;
+        const data = d?.data || [];
+        const item = data.find((it) => it && it.url) || data[0];
+        const rawUrl = item?.url || '';
+        if (rawUrl) return await getProxyUrl(rawUrl);
+      } catch (e) {}
+    }
   }
 
   return '';
