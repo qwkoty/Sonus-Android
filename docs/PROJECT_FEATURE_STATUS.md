@@ -67,7 +67,7 @@
 | 2D 环状频谱 | 径向频谱、中心波形、bass 冲击波 | `frontend/src/components/Visualizer.jsx` | Web Audio | ✅ | 否 | - | ring 模式 |
 | 2D 镜像波形 | 上下镜像频谱带 + 时间域波形 | `frontend/src/components/Visualizer.jsx` | Web Audio | ✅ | 否 | - | wave 模式，已阻止多指默认行为 |
 | 3D 封面粒子画 | 2 万粒子构成封面穹顶，圆形纹理、间距加大，液体绸缎波动 + 鼓皮膨胀 | `frontend/src/components/Visualizer3D.jsx` | Three.js | ✅ | 否 | - | 3d 模式，手势驱动 |
-| 3D 手势控制 | 单指旋转、双指缩放/旋转 | `frontend/src/components/Visualizer3D.jsx` | 触摸事件 | ✅ | 否 | - | - |
+| 3D 手势控制 | 单指 360° 偏航+俯仰、双指缩放/扭转、滚轮/鼠标缩放、自动旋转空闲恢复 | `frontend/src/components/Visualizer3D.jsx` | 触摸/鼠标事件 | ✅ | 否 | - | coverflow/liquidmetal 均支持 |
 | 音频待机动画 | 无音频时的呼吸/涟漪动画 | `Visualizer.jsx` / `Visualizer3D.jsx` | 时间驱动 | ✅ | 否 | - | - |
 
 ### 五、搜索与音源
@@ -198,3 +198,4 @@
 | 2026-07-05 | v1.0 | 初始版本，基于 Sonus 项目现状建立 | AI Assistant |
 | 2026-07-05 | v1.1 | Player UI：搜索/调色改为浮窗；底部控制栏可收起/展开；禁用全局文本选择；3D 可视化开启 360° 自转并优化性能 | AI Assistant |
 | 2026-07-05 | v1.2 | 回滚 3D 到原始 2 万粒子并改为封面穹顶 + 液体绸缎动画；修复 wave 模式双指滑动卡顿；新增歌词舞台效果 | AI Assistant |
+| 2026-07-08 | v1.3 | 3D 可视化增加 360° 旋转：单指/鼠标拖拽支持偏航+俯仰（俯仰限 ±85°），双指捏合缩放+扭转，滚轮缩放；自动旋转改为交互后空闲 2.5s 恢复 | AI Assistant |

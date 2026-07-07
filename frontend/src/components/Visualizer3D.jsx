@@ -5,6 +5,10 @@ import { getProxyUrl } from '../api/music';
 
 const GRID = 142;             // 142x142 = 20164 ≈ 2 万粒子
 const FOV = 55;
+const AUTO_ROTATE_SPEED = 0.35;   // 自动偏航角速度 rad/s（≈20°/s，约 18s 转一圈）
+const AUTO_RESUME_MS = 2500;      // 停止交互后多久恢复自动旋转（ms）
+const PITCH_LIMIT = 1.48;         // 俯仰角限制 ≈ ±85°，避免上下翻转
+const ROTATE_SENSITIVITY = 0.006; // 滑动旋转灵敏度 rad/px
 
 function hexToRGB(hex) {
   const c = hex.replace('#', '');
@@ -66,23 +70,25 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
     }
   }, [mode]);
 
-  // 手势状态（双指缩放 + 旋转；单指划动实现 360° 旋转）
+  // 手势状态（360° 旋转：单指滑动 = 偏航(yaw)+俯仰(pitch)；双指捏合缩放+扭转；滚轮缩放）
   const gestureRef = useRef({
     zoom: 1.0,
-    rotation: 0,
     targetZoom: 1.0,
-    targetRotation: 0,
-    rotX: -0.12,
-    targetRotX: -0.12,
+    rotationY: 0.0,            // 偏航（绕 Y 轴，水平方向，可 360°）
+    targetRotationY: 0.0,
+    rotationX: -0.12,          // 俯仰（绕 X 轴，垂直方向，初始轻微下俯保持原有观感）
+    targetRotationX: -0.12,
     pinching: false,
     startDist: 0,
     startAngle: 0,
     startZoom: 1.0,
-    startRot: 0,
-    startRotX: -0.12,
+    startRotY: 0,
     dragging: false,
     startX: 0,
     startY: 0,
+    startRotX: 0,
+    autoRotate: true,
+    lastInteractTime: 0,
   });
 
   // 加载封面并采样为 ImageData
@@ -472,15 +478,21 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
       posAttr.needsUpdate = true;
       if (needColorUpdate) colorAttr.needsUpdate = true;
 
-      // 手势驱动 360° 旋转：平滑插值到目标角度
+      // 360° 旋转控制
       const g = gestureRef.current;
+      // 交互结束后短暂保持用户当前视角，空闲超过阈值再恢复匀速偏航旋转
+      const idle = (performance.now() - g.lastInteractTime) > AUTO_RESUME_MS;
+      if (g.autoRotate && !g.dragging && !g.pinching && idle) {
+        g.targetRotationY += dt * AUTO_ROTATE_SPEED;
+      }
       g.zoom += (g.targetZoom - g.zoom) * 0.18;
-      g.rotation += (g.targetRotation - g.rotation) * 0.18;
-      g.rotX += (g.targetRotX - g.rotX) * 0.18;
+      g.rotationY += (g.targetRotationY - g.rotationY) * 0.18;
+      g.rotationX += (g.targetRotationX - g.rotationX) * 0.18;
       const clampedZoom = Math.max(0.4, Math.min(3.0, g.zoom));
       camera.position.z = cameraZ / clampedZoom;
-      points.rotation.y = g.rotation;
-      points.rotation.x = g.rotX;
+      // 单指/鼠标滑动即可绕任意方向 360° 旋转：偏航(水平) + 俯仰(垂直)
+      points.rotation.y = g.rotationY;
+      points.rotation.x = g.rotationX;
       points.rotation.z = 0;
       camera.position.x = 0;
       camera.position.y = 0;
@@ -502,57 +514,89 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
     const dom = renderer.domElement;
     const dist = (t1, t2) => Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
     const angle = (t1, t2) => Math.atan2(t2.clientY - t1.clientY, t2.clientX - t1.clientX);
-    const ROTATE_SENSITIVITY = 0.006;
     const onTouchStart = (e) => {
       const g = gestureRef.current;
+      g.lastInteractTime = performance.now();
       if (e.touches.length === 1) {
         g.dragging = true;
         g.startX = e.touches[0].clientX;
         g.startY = e.touches[0].clientY;
-        g.startRot = g.targetRotation;
-        g.startRotX = g.targetRotX;
+        g.startRotX = g.targetRotationX;
+        g.startRotY = g.targetRotationY;
       } else if (e.touches.length === 2) {
         g.pinching = true;
         g.dragging = false;
         g.startDist = dist(e.touches[0], e.touches[1]);
         g.startAngle = angle(e.touches[0], e.touches[1]);
         g.startZoom = g.targetZoom;
-        g.startRot = g.targetRotation;
-        g.startRotX = g.targetRotX;
+        g.startRotY = g.targetRotationY;
       }
     };
     const onTouchMove = (e) => {
       const g = gestureRef.current;
+      g.lastInteractTime = performance.now();
       if (g.pinching && e.touches.length === 2) {
         e.preventDefault();
         const d = dist(e.touches[0], e.touches[1]);
         const a = angle(e.touches[0], e.touches[1]);
         const scale = d / Math.max(1, g.startDist);
         g.targetZoom = Math.max(0.4, Math.min(3.0, g.startZoom * scale));
-        g.targetRotation = g.startRot + (a - g.startAngle);
+        g.targetRotationY = g.startRotY + (a - g.startAngle);
       } else if (g.dragging && e.touches.length === 1) {
         e.preventDefault();
         const dx = e.touches[0].clientX - g.startX;
         const dy = e.touches[0].clientY - g.startY;
-        g.targetRotation = g.startRot + dx * ROTATE_SENSITIVITY;
-        // 上下滑动控制 X 轴旋转，限制范围避免翻转过度
-        g.targetRotX = Math.max(-Math.PI * 0.45, Math.min(Math.PI * 0.45, g.startRotX - dy * ROTATE_SENSITIVITY));
+        // 水平滑动 → 偏航（360°）；垂直滑动 → 俯仰（限制在 ±85° 防翻转）
+        g.targetRotationY = g.startRotY + dx * ROTATE_SENSITIVITY;
+        g.targetRotationX = Math.max(-PITCH_LIMIT, Math.min(PITCH_LIMIT, g.startRotX + dy * ROTATE_SENSITIVITY));
       }
     };
     const onTouchEnd = (e) => {
       const g = gestureRef.current;
       if (e.touches.length < 2) g.pinching = false;
       if (e.touches.length < 1) g.dragging = false;
+      g.lastInteractTime = performance.now();
     };
     const onWheel = (e) => {
       const g = gestureRef.current;
+      g.lastInteractTime = performance.now();
       g.targetZoom = Math.max(0.4, Math.min(3.0, g.targetZoom * (e.deltaY > 0 ? 0.92 : 1.08)));
     };
+    // 桌面端鼠标拖拽（便于开发预览，行为同单指滑动）
+    let mouseDown = false;
+    const onMouseDown = (e) => {
+      const g = gestureRef.current;
+      g.lastInteractTime = performance.now();
+      mouseDown = true;
+      g.dragging = true;
+      g.startX = e.clientX;
+      g.startY = e.clientY;
+      g.startRotX = g.targetRotationX;
+      g.startRotY = g.targetRotationY;
+    };
+    const onMouseMove = (e) => {
+      if (!mouseDown || !gestureRef.current.dragging) return;
+      const g = gestureRef.current;
+      g.lastInteractTime = performance.now();
+      const dx = e.clientX - g.startX;
+      const dy = e.clientY - g.startY;
+      g.targetRotationY = g.startRotY + dx * ROTATE_SENSITIVITY;
+      g.targetRotationX = Math.max(-PITCH_LIMIT, Math.min(PITCH_LIMIT, g.startRotX + dy * ROTATE_SENSITIVITY));
+    };
+    const onMouseUp = () => {
+      mouseDown = false;
+      gestureRef.current.dragging = false;
+      gestureRef.current.lastInteractTime = performance.now();
+    };
     dom.style.touchAction = 'none';
+    dom.style.cursor = 'grab';
     dom.addEventListener('touchstart', onTouchStart, { passive: false });
     dom.addEventListener('touchmove', onTouchMove, { passive: false });
     dom.addEventListener('touchend', onTouchEnd);
     dom.addEventListener('wheel', onWheel, { passive: true });
+    dom.addEventListener('mousedown', onMouseDown);
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', onMouseUp);
 
     const handleResize = () => {
       computeLayout();
@@ -570,6 +614,9 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
       dom.removeEventListener('touchmove', onTouchMove);
       dom.removeEventListener('touchend', onTouchEnd);
       dom.removeEventListener('wheel', onWheel);
+      dom.removeEventListener('mousedown', onMouseDown);
+      window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('mouseup', onMouseUp);
       renderer.dispose();
       geometry.dispose();
       material.dispose();
