@@ -32,6 +32,9 @@
             android:theme="@style/AppTheme.NoActionBarLaunch"
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode|navigation|density"
             android:screenOrientation="sensorLandscape"
+            android:launchMode="singleTop"
+            android:excludeFromRecents="true"
+            android:alwaysRetainTaskState="true"
             android:exported="false" />
 
         <provider

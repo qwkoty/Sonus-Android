@@ -8,6 +8,9 @@ import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
 
+import java.util.HashMap;
+import java.util.Map;
+
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
@@ -207,13 +210,23 @@ public class CookieReaderPlugin extends Plugin {
     @PluginMethod()
     public void openLoginWebView(PluginCall call) {
         try {
-            pendingLoginCall = call;
             Intent intent = new Intent(getContext(), LoginWebViewActivity.class);
             getActivity().startActivityForResult(intent, LOGIN_REQUEST_CODE);
+            // 非阻塞：打开 WebView 后立刻返回，避免切后台导致 Activity 被回收时触发"取消登录"
+            call.resolve(new JSObject());
         } catch (Exception e) {
-            pendingLoginCall = null;
             call.reject("Failed to open login webview: " + e.getMessage());
         }
+    }
+
+    /**
+     * 向前端广播 QQ 音乐登录成功事件。
+     * LoginWebViewActivity 在检测到完整登录态后调用此方法。
+     */
+    public void notifyLoginSuccess() {
+        Map<String, Object> data = new HashMap<>();
+        data.put("success", true);
+        notifyListeners("qqLoginSuccess", new JSObject(data), true);
     }
 
     /**

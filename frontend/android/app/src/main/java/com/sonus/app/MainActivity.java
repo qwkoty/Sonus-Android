@@ -123,7 +123,10 @@ public class MainActivity extends BridgeActivity {
                 Plugin plugin = handle.getInstance();
                 if (plugin instanceof CookieReaderPlugin) {
                     boolean loggedIn = resultCode == RESULT_OK;
-                    ((CookieReaderPlugin) plugin).notifyLoginResult(loggedIn);
+                    // 登录成功后广播事件给前端，失败时不再 reject（前端已改为非阻塞轮询）
+                    if (loggedIn) {
+                        ((CookieReaderPlugin) plugin).notifyLoginSuccess();
+                    }
                 }
             }
         }

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Loader2, Music, ArrowLeft, User, ListMusic, LogOut, CheckCircle2, LogIn } from 'lucide-react';
 import { useAuthStore } from '../store/useAuthStore';
 import { CookieReader } from '../plugins/CookieReader';
@@ -13,6 +13,30 @@ export default function Login({ onBack }) {
   const [playlists, setPlaylists] = useState(null);
   const [loadingPlaylists, setLoadingPlaylists] = useState(false);
 
+  // 非阻塞轮询：登录 WebView 切后台后仍可持续检测
+  const pollRef = useRef(null);
+  const stopPolling = useCallback(() => {
+    if (pollRef.current) {
+      clearInterval(pollRef.current);
+      pollRef.current = null;
+    }
+  }, []);
+
+  const startPolling = useCallback(() => {
+    stopPolling();
+    pollRef.current = setInterval(async () => {
+      try {
+        const cookies = await CookieReader.getCookiesForUrl('https://y.qq.com');
+        if (cookies.loggedIn && cookies.cookie && cookies.uin) {
+          stopPolling();
+          await handleCookieLogin(cookies);
+        }
+      } catch (e) {
+        // 轮询中忽略单点错误
+      }
+    }, 1200);
+  }, [stopPolling]);
+
   const startWebViewLogin = useCallback(async () => {
     setWebviewPhase('opening');
     setWebviewTip('正在打开 QQ 音乐登录页面…');
@@ -22,33 +46,54 @@ export default function Login({ onBack }) {
         await handleCookieLogin(currentCookies);
         return;
       }
-      setWebviewPhase('polling');
-      setWebviewTip('请在弹出的窗口中登录 QQ 音乐…');
       await CookieReader.openLoginWebView();
-      setWebviewTip('登录成功，正在同步账号信息…');
-      let cookies = await CookieReader.getCookiesForUrl('https://y.qq.com');
-      for (let i = 0; i < 3 && (!cookies.qqmusic_key); i++) {
-        await new Promise(r => setTimeout(r, 800));
-        cookies = await CookieReader.getCookiesForUrl('https://y.qq.com');
-      }
-      await handleCookieLogin(cookies);
+      setWebviewPhase('polling');
+      setWebviewTip('请在弹出的窗口中登录 QQ 音乐（可切到 QQ/相机扫码）…');
+      startPolling();
     } catch (e) {
       setWebviewPhase('error');
-      setWebviewTip('登录已取消：' + (e.message || ''));
+      setWebviewTip('打开登录窗口失败：' + (e.message || ''));
     }
-  }, []);
+  }, [startPolling]);
 
   const extractCookieAndLogin = async () => {
     setWebviewPhase('polling');
     setWebviewTip('正在读取登录信息…');
     try {
       const cookies = await CookieReader.getCookiesForUrl('https://y.qq.com');
-      await handleCookieLogin(cookies);
+      if (cookies.loggedIn && cookies.cookie && cookies.uin) {
+        stopPolling();
+        await handleCookieLogin(cookies);
+      } else {
+        setWebviewTip('尚未检测到登录信息，请在 WebView 中完成登录');
+      }
     } catch (e) {
       setWebviewPhase('error');
       setWebviewTip('读取登录信息失败：' + (e.message || ''));
     }
   };
+
+  // 监听原生登录成功事件（切回 APP 时触发）
+  useEffect(() => {
+    const cleanup = CookieReader.onLoginSuccess(() => {
+      stopPolling();
+      extractCookieAndLogin();
+    });
+    return cleanup;
+  }, [stopPolling, extractCookieAndLogin]);
+
+  // 页面重新可见时自动检查一次（切回 APP）
+  useEffect(() => {
+    if (webviewPhase !== 'polling') return;
+    const onVisible = () => {
+      if (!document.hidden) extractCookieAndLogin();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, [webviewPhase, extractCookieAndLogin]);
+
+  // 组件卸载时停止轮询
+  useEffect(() => () => stopPolling(), [stopPolling]);
 
   const handleCookieLogin = async (cookies) => {
     if (!cookies.cookie || !cookies.uin) {

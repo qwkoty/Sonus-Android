@@ -1,5 +1,5 @@
 // CookieReader — Capacitor 原生插件桥接
-import { registerPlugin } from '@capacitor/core';
+import { registerPlugin, PluginListenerHandle } from '@capacitor/core';
 
 export interface CookieReaderResult {
   cookie: string; uin: string; qqmusic_key: string; login_type: string; loggedIn: boolean;
@@ -14,6 +14,7 @@ export interface CookieReaderPlugin {
   syncStreamCookies(options: { url?: string }): Promise<void>;
   openLoginWebView(): Promise<{ loggedIn: boolean }>;
   getProxyPort(): Promise<{ port: number; available: boolean }>;
+  addListener(eventName: 'qqLoginSuccess', listener: (data: { success: boolean }) => void): Promise<PluginListenerHandle>;
 }
 
 const Native = registerPlugin<CookieReaderPlugin>('CookieReader');
@@ -55,6 +56,12 @@ export const CookieReader = {
   openLoginWebView: async () => {
     if (!IS_CAP()) throw new Error('Not in Capacitor');
     return Native.openLoginWebView();
+  },
+  onLoginSuccess: (callback: () => void): (() => void) => {
+    if (!IS_CAP()) return () => {};
+    let handle: PluginListenerHandle | null = null;
+    Native.addListener('qqLoginSuccess', () => callback()).then(h => { handle = h; });
+    return () => { if (handle) { handle.remove(); } };
   },
   // 获取本地音频代理服务器端口；非原生环境返回 0
   getProxyPort: async (): Promise<{ port: number; available: boolean }> => {
