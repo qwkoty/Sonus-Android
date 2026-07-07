@@ -67,7 +67,8 @@
 | 2D 环状频谱 | 径向频谱、中心波形、bass 冲击波 | `frontend/src/components/Visualizer.jsx` | Web Audio | ✅ | 否 | - | ring 模式 |
 | 2D 镜像波形 | 上下镜像频谱带 + 时间域波形 | `frontend/src/components/Visualizer.jsx` | Web Audio | ✅ | 否 | - | wave 模式，已阻止多指默认行为 |
 | 3D 封面粒子画 | 2 万粒子构成封面穹顶，圆形纹理、间距加大，液体绸缎波动 + 鼓皮膨胀 | `frontend/src/components/Visualizer3D.jsx` | Three.js | ✅ | 否 | - | 3d 模式，手势驱动 |
-| 3D 手势控制 | 单指 360° 偏航+俯仰、双指缩放/扭转、滚轮/鼠标缩放、自动旋转空闲恢复 | `frontend/src/components/Visualizer3D.jsx` | 触摸/鼠标事件 | ✅ | 否 | - | coverflow/liquidmetal 均支持 |
+| 3D 手势控制 | 单指 360° 偏航+俯仰、双指缩放/扭转、滚轮/鼠标缩放、自动旋转空闲恢复 | `frontend/src/components/Visualizer3D.jsx` | 触摸/鼠标事件 | ✅ | 否 | - | coverflow/liquidmetal/singularity 均支持；默认关闭自动旋转 |
+| 3D 共振星核 | 星核(斐波那契球)/专辑浮雕/歌词汉字三形态 + 鼓点爆发物理(弹簧回弹) + 三形态权重 morph | `frontend/src/components/Visualizer3D.jsx` | Three.js + Web Audio | ✅ | 否 | - | singularity 模式，约 3.2 万粒子 |
 | 音频待机动画 | 无音频时的呼吸/涟漪动画 | `Visualizer.jsx` / `Visualizer3D.jsx` | 时间驱动 | ✅ | 否 | - | - |
 
 ### 五、搜索与音源
@@ -120,7 +121,7 @@
 
 | 功能名称 | 功能描述及作用 | 页面位置 | 依赖关系 | 完成状态 | 是否测试 | 是否存在 Bug | 备注 |
 |---|---|---|---|---|---|---|---|
-| 后台播放与 MediaSession | 应用切后台持续播放、锁屏控制 | 待设计 | Android Service | ❌ | 否 | - | 需要原生服务 |
+| 后台播放与 MediaSession | 应用切后台持续播放、锁屏控制 | `MusicPlaybackService` + `MediaControlPlugin` | Android Service | ✅ | 否 | - | 前台服务保活 WebView + MediaSession 通知/锁屏控制 |
 | 歌曲收藏/喜欢 | 标记喜欢歌曲 | 待设计 | 用户登录 | ❌ | 否 | - | - |
 | 本地缓存/离线播放 | 缓存音频与封面，离线可听 | 待设计 | 存储空间 | ❌ | 否 | - | - |
 | 历史播放记录 | 记录并展示最近播放 | 待设计 | 本地/后端存储 | ❌ | 否 | - | - |

@@ -19,7 +19,8 @@ const VIZ_MODES = [
 
 const VIZ_3D_MODES = [
   { key: 'coverflow', label: '粒子封面' },
-  { key: 'liquidmetal', label: '液态金属' }
+  { key: 'liquidmetal', label: '液态金属' },
+  { key: 'singularity', label: '共振星核' }
 ];
 
 const PRESETS = [
@@ -175,7 +176,7 @@ export default function Player({ onProfile }) {
   const [controlsExpanded, setControlsExpanded] = useState(() => { try { return localStorage.getItem('sonus_controls_expanded') !== 'false'; } catch { return true } });
   const [query, setQuery] = useState(''); const [results, setResults] = useState([]); const [searching, setSearching] = useState(false); const st = useRef(null);
   const [vm, setVm] = useState(() => { try { return localStorage.getItem('sonus_viz_mode') || 'ring' } catch { return 'ring' } });
-  const [v3m, setV3m] = useState(() => { try { const v = localStorage.getItem('sonus_3d_mode'); const valid = ['coverflow','liquidmetal']; return valid.includes(v) ? v : 'liquidmetal'; } catch { return 'liquidmetal' } });
+  const [v3m, setV3m] = useState(() => { try { const v = localStorage.getItem('sonus_3d_mode'); const valid = ['coverflow','liquidmetal','singularity']; return valid.includes(v) ? v : 'liquidmetal'; } catch { return 'liquidmetal' } });
   const [ac, setAc] = useState(() => { try { return localStorage.getItem('sonus_accent') || '#00F5D4' } catch { return '#00F5D4' } });
   const [lyricPanel, setLyricPanel] = useState(() => { try { return localStorage.getItem('sonus_lyric_panel') !== 'false' } catch { return true } });
   const [vizTab, setVizTab] = useState('调色');

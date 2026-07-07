@@ -2,13 +2,22 @@ import { useEffect, useRef, memo } from 'react';
 import * as THREE from 'three';
 import { getSpectrumBars } from '../audio/engine';
 import { getProxyUrl } from '../api/music';
+import { usePlayerStore } from '../store/usePlayerStore';
 
-const GRID = 142;             // 142x142 = 20164 ≈ 2 万粒子
+const GRID = 180;             // 180x180 = 32400 粒子（统一用于全部 3D 形态）
 const FOV = 55;
 const AUTO_ROTATE_SPEED = 0.35;   // 自动偏航角速度 rad/s（≈20°/s，约 18s 转一圈）
 const AUTO_RESUME_MS = 2500;      // 停止交互后多久恢复自动旋转（ms）
 const PITCH_LIMIT = 1.48;         // 俯仰角限制 ≈ ±85°，避免上下翻转
 const ROTATE_SENSITIVITY = 0.006; // 滑动旋转灵敏度 rad/px
+
+// —— 共振星核（singularity）参数 ——
+const SINGULARITY_DPR_CAP = 2;    // 高 dpi 渲染上限，保帧
+const BEAT_THRESHOLD = 0.16;      // 低频能量一阶导超此值触发爆发
+const BEAT_COOLDOWN = 0.11;       // 两次爆发最小间隔（s）
+const SPRING_K = 0.05;            // 朝原点的弹簧回拉系数（爆发回弹）
+const DAMPING = 0.88;             // 速度阻尼
+const EXPLODE_GAIN = 1.1;         // 爆发冲量增益（× bass）
 
 function hexToRGB(hex) {
   const c = hex.replace('#', '');
@@ -38,9 +47,8 @@ function createParticleTexture() {
   return tex;
 }
 
-// 3D 封面粒子画：2 万粒子构成可切换的动画形态
-// 电影镜头：用户双指捏合缩放 + 双指划拉旋转（手势驱动），关闭自动旋转
-// 动画预设：coverflow（粒子封面） / liquidmetal（液态金属）
+// 3D 粒子可视化：coverflow（粒子封面）/ liquidmetal（液态金属）/ singularity（共振星核）
+// 手势驱动：单指/鼠标拖拽 = 偏航(360°)+俯仰(±85°)；双指捏合缩放+扭转；滚轮缩放
 function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPlaying = false, onReady }) {
   const containerRef = useRef(null);
   const accentRef = useRef(accent);
@@ -50,6 +58,14 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
   const hasCoverRef = useRef(false);
   const coverVersionRef = useRef(0);
   const appliedCoverVersionRef = useRef(-1);
+  // 共振星核跨渲染状态（必须置于组件顶层，遵守 hooks 规则）
+  const albumBuiltRef = useRef(-1);
+  const lyricAnyRef = useRef(0);
+  const lastLyricRef = useRef('__init__');
+  const formWeightsRef = useRef({ core: 1, album: 0, lyric: 0 });
+  const prevBassRef = useRef(0);
+  const lastBeatRef = useRef(0);
+  const beatPulseRef = useRef(0);
   const onReadyRef = useRef(onReady);
   useEffect(() => { onReadyRef.current = onReady; }, [onReady]);
   useEffect(() => { accentRef.current = accent; }, [accent]);
@@ -71,6 +87,7 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
   }, [mode]);
 
   // 手势状态（360° 旋转：单指滑动 = 偏航(yaw)+俯仰(pitch)；双指捏合缩放+扭转；滚轮缩放）
+  // 默认关闭自动旋转（用户要求「永远不转」），仅保留手动拖拽
   const gestureRef = useRef({
     zoom: 1.0,
     targetZoom: 1.0,
@@ -87,7 +104,7 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
     startX: 0,
     startY: 0,
     startRotX: 0,
-    autoRotate: true,
+    autoRotate: false,
     lastInteractTime: 0,
   });
 
@@ -153,7 +170,7 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
     const container = containerRef.current;
     if (!container) return;
 
-    const dpr = window.devicePixelRatio || 1;
+    const dpr = Math.min(window.devicePixelRatio || 1, SINGULARITY_DPR_CAP);
     let W = container.offsetWidth;
     let H = container.offsetHeight;
 
@@ -198,6 +215,13 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
     const baseNormalsCover = new Float32Array(COUNT * 3);
     const basePositionsLiquid = new Float32Array(COUNT * 3);
     const baseNormalsLiquid = new Float32Array(COUNT * 3);
+    // 共振星核三形态基础坐标
+    const basePositionsCore = new Float32Array(COUNT * 3);   // 星核（斐波那契球壳）
+    const basePositionsAlbum = new Float32Array(COUNT * 3);  // 专辑浮雕（亮度→Z 纵深）
+    const basePositionsLyric = new Float32Array(COUNT * 3);  // 歌词汉字点云
+    const coverColors = new Float32Array(COUNT * 3);         // 封面 RGB（专辑形态着色用）
+    const explodeVel = new Float32Array(COUNT * 3);          // 爆发速度
+    const explodePos = new Float32Array(COUNT * 3);          // 爆发偏移（弹簧回弹）
     const coverLight = new Float32Array(COUNT);
     const bandArr = new Float32Array(COUNT);
     const freqBand = new Uint8Array(COUNT);
@@ -207,6 +231,7 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
       let idx = 0;
       const half = planeSize;
       const step = (planeSize * 2) / (GRID - 1);
+      const golden = Math.PI * (3 - Math.sqrt(5)); // 斐波那契球
       for (let gy = 0; gy < GRID; gy++) {
         for (let gx = 0; gx < GRID; gx++) {
           const x = -half + gx * step;
@@ -247,7 +272,28 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
           baseNormalsLiquid[idx * 3 + 1] = ly / len;
           baseNormalsLiquid[idx * 3 + 2] = lz / len;
 
-          const initial = modeRef.current === 'liquidmetal' ? basePositionsLiquid : basePositionsCover;
+          // 共振星核：斐波那契球壳（几何棱面感）
+          const yy = 1 - (idx / (COUNT - 1)) * 2;
+          const rr = Math.sqrt(Math.max(0, 1 - yy * yy));
+          const th = golden * idx;
+          const cr = planeSize * LIQUID_RADIUS_RATIO * 1.35;
+          const cxv = Math.cos(th) * rr;
+          const czv = Math.sin(th) * rr;
+          basePositionsCore[idx * 3] = cxv * cr;
+          basePositionsCore[idx * 3 + 1] = yy * cr;
+          basePositionsCore[idx * 3 + 2] = czv * cr;
+
+          // 初始化专辑浮雕/歌词点云为星核位置（后续按封面/歌词重建）
+          basePositionsAlbum[idx * 3] = basePositionsCore[idx * 3];
+          basePositionsAlbum[idx * 3 + 1] = basePositionsCore[idx * 3 + 1];
+          basePositionsAlbum[idx * 3 + 2] = basePositionsCore[idx * 3 + 2];
+          basePositionsLyric[idx * 3] = basePositionsCore[idx * 3];
+          basePositionsLyric[idx * 3 + 1] = basePositionsCore[idx * 3 + 1];
+          basePositionsLyric[idx * 3 + 2] = basePositionsCore[idx * 3 + 2];
+
+          const initial = modeRef.current === 'liquidmetal' ? basePositionsLiquid
+            : modeRef.current === 'singularity' ? basePositionsCore
+              : basePositionsCover;
           positions[idx * 3] = initial[idx * 3];
           positions[idx * 3 + 1] = initial[idx * 3 + 1];
           positions[idx * 3 + 2] = initial[idx * 3 + 2];
@@ -257,12 +303,86 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
     };
     buildBase();
 
+    // 按当前封面重建「专辑浮雕」基础坐标（亮度→Z 纵深）
+    const rebuildAlbumBase = () => {
+      const d = imageDataRef.current;
+      const accentRGB = hexToRGB(accentRef.current || '#4FC3F7');
+      for (let i = 0; i < COUNT; i++) {
+        const u = origUV[i * 2];
+        const v = origUV[i * 2 + 1];
+        let bright = 0.5;
+        if (d) {
+          const px = Math.min(GRID - 1, Math.max(0, Math.floor(u * GRID)));
+          const py = Math.min(GRID - 1, Math.max(0, Math.floor(v * GRID)));
+          const o = (py * GRID + px) * 4;
+          const r = d[o] / 255, g = d[o + 1] / 255, b = d[o + 2] / 255;
+          bright = 0.299 * r + 0.587 * g + 0.114 * b;
+          coverColors[i * 3] = r; coverColors[i * 3 + 1] = g; coverColors[i * 3 + 2] = b;
+        } else {
+          coverColors[i * 3] = accentRGB.r; coverColors[i * 3 + 1] = accentRGB.g; coverColors[i * 3 + 2] = accentRGB.b;
+        }
+        basePositionsAlbum[i * 3] = -planeSize + u * 2 * planeSize;
+        basePositionsAlbum[i * 3 + 1] = planeSize - v * 2 * planeSize;
+        basePositionsAlbum[i * 3 + 2] = (bright - 0.5) * planeSize * 0.55;
+      }
+    };
+
+    // 按当前歌词重建「歌词汉字」点云（文字笔画像素→粒子坐标）
+    const rebuildLyricBase = (text) => {
+      let any = 0;
+      const c = document.createElement('canvas');
+      c.width = GRID; c.height = GRID;
+      const cx = c.getContext('2d');
+      cx.clearRect(0, 0, GRID, GRID);
+      if (text && text.trim()) {
+        cx.fillStyle = '#fff';
+        cx.textAlign = 'center';
+        cx.textBaseline = 'middle';
+        let fs = Math.floor(GRID * 0.34);
+        cx.font = `bold ${fs}px "PingFang SC","Microsoft YaHei",sans-serif`;
+        while (fs > 10 && cx.measureText(text).width > GRID * 0.96) {
+          fs -= 2;
+          cx.font = `bold ${fs}px "PingFang SC","Microsoft YaHei",sans-serif`;
+        }
+        cx.fillText(text, GRID / 2, GRID / 2);
+        const data = cx.getImageData(0, 0, GRID, GRID).data;
+        const pts = [];
+        for (let py = 0; py < GRID; py++) {
+          for (let px = 0; px < GRID; px++) {
+            if (data[(py * GRID + px) * 4 + 3] > 128) pts.push([px, py]);
+          }
+        }
+        const N = pts.length;
+        for (let i = 0; i < COUNT; i++) {
+          if (N > 0) {
+            const p = pts[i % N];
+            const u = p[0] / GRID, v = p[1] / GRID;
+            basePositionsLyric[i * 3] = -planeSize + u * 2 * planeSize;
+            basePositionsLyric[i * 3 + 1] = planeSize - v * 2 * planeSize;
+            basePositionsLyric[i * 3 + 2] = planeSize * 0.04 + (i % 5) * 0.002;
+            any = 1;
+          } else {
+            basePositionsLyric[i * 3] = basePositionsCore[i * 3];
+            basePositionsLyric[i * 3 + 1] = basePositionsCore[i * 3 + 1];
+            basePositionsLyric[i * 3 + 2] = basePositionsCore[i * 3 + 2];
+          }
+        }
+      } else {
+        for (let i = 0; i < COUNT; i++) {
+          basePositionsLyric[i * 3] = basePositionsCore[i * 3];
+          basePositionsLyric[i * 3 + 1] = basePositionsCore[i * 3 + 1];
+          basePositionsLyric[i * 3 + 2] = basePositionsCore[i * 3 + 2];
+        }
+      }
+      lyricAnyRef.current = any;
+    };
+
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
     geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
 
     const material = new THREE.PointsMaterial({
-      size: planeSize * 2 / GRID * 1.35,   // 粒子稍大，封面更清晰可见
+      size: planeSize * 2 / GRID * 1.2,   // 粒子稍大，封面更清晰可见
       map: createParticleTexture(),
       vertexColors: true,
       transparent: true,
@@ -307,6 +427,13 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
       return true;
     };
 
+    // 取某形态的基础坐标集（coverflow / liquidmetal / singularity 星核）
+    const baseFor = (m) => {
+      if (m === 'liquidmetal') return { pos: basePositionsLiquid, nrm: baseNormalsLiquid };
+      if (m === 'singularity') return { pos: basePositionsCore, nrm: null };
+      return { pos: basePositionsCover, nrm: baseNormalsCover };
+    };
+
     let firstFrame = true;
     let bassAttack = 0;
     let bassRelease = 0;
@@ -322,7 +449,7 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
         bass /= 8;
         for (let i = 8; i < 32; i++) mid += data[i];
         mid /= 24;
-        for (let i = 32; i < 64; i++) treble += data[i];
+        for (let i = 0; i < 32; i++) treble += data[i];
         treble /= 32;
       } else {
         const t = Date.now() * 0.001;
@@ -354,6 +481,54 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
         if (applyCoverColors()) appliedCoverVersionRef.current = coverVersionRef.current;
       }
 
+      const isSingularity = modeRef.current === 'singularity';
+
+      // 封面变化 → 重建专辑浮雕
+      if (albumBuiltRef.current !== coverVersionRef.current) {
+        rebuildAlbumBase();
+        albumBuiltRef.current = coverVersionRef.current;
+      }
+      // 歌词变化 → 重建歌词点云
+      const curLyric = usePlayerStore.getState().currentLyric || '';
+      if (curLyric !== lastLyricRef.current) {
+        lastLyricRef.current = curLyric;
+        rebuildLyricBase(curLyric);
+      }
+
+      // 节拍检测：低频能量一阶导超阈值 → 触发爆发
+      const nowS = now * 0.001;
+      const dBas = bass - prevBassRef.current;
+      prevBassRef.current = bass;
+      if (dBas > BEAT_THRESHOLD && (nowS - lastBeatRef.current) > BEAT_COOLDOWN) {
+        lastBeatRef.current = nowS;
+        const imp = Math.min(1, bass) * EXPLODE_GAIN * planeSize * 0.12;
+        for (let i = 0; i < COUNT; i++) {
+          const px = positions[i * 3], py = positions[i * 3 + 1], pz = positions[i * 3 + 2];
+          const len = Math.hypot(px, py, pz) || 1;
+          explodeVel[i * 3] += (px / len) * imp;
+          explodeVel[i * 3 + 1] += (py / len) * imp;
+          explodeVel[i * 3 + 2] += (pz / len) * imp;
+        }
+        beatPulseRef.current = 1;
+      }
+      beatPulseRef.current *= 0.90;
+
+      // 共振星核形态权重（core ↔ album ↔ lyric 平滑过渡）
+      let wC = 1, wA = 0, wL = 0;
+      if (isSingularity) {
+        const hasLyricNow = lyricAnyRef.current && isPlaying;
+        let tCore = 0, tAlbum = 0, tLyric = 0;
+        if (hasLyricNow) tLyric = 1;
+        else if (hasCoverRef.current && bassPulse > 0.12) tAlbum = 1;
+        else tCore = 1;
+        const fw = formWeightsRef.current;
+        fw.core += (tCore - fw.core) * 0.04;
+        fw.album += (tAlbum - fw.album) * 0.04;
+        fw.lyric += (tLyric - fw.lyric) * 0.04;
+        const sum = fw.core + fw.album + fw.lyric || 1;
+        wC = fw.core / sum; wA = fw.album / sum; wL = fw.lyric / sum;
+      }
+
       // 未播放/暂停时强制回到主题色
       const needColorUpdate = !useCover;
       const accentRGB = hexToRGB(accentRef.current || '#4FC3F7');
@@ -371,13 +546,23 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
         }
         morphT = 1 - Math.pow(1 - tr.progress, 3);
         targetShape = tr.to || 'coverflow';
-        fromBase = tr.from === 'liquidmetal' ? basePositionsLiquid : basePositionsCover;
-        toBase = tr.to === 'liquidmetal' ? basePositionsLiquid : basePositionsCover;
-        toNormals = tr.to === 'liquidmetal' ? baseNormalsLiquid : baseNormalsCover;
+        fromBase = baseFor(tr.from).pos;
+        toBase = baseFor(tr.to).pos;
+        toNormals = (tr.to === 'liquidmetal') ? baseNormalsLiquid : baseNormalsCover;
       } else {
-        toBase = targetShape === 'liquidmetal' ? basePositionsLiquid : basePositionsCover;
-        toNormals = targetShape === 'liquidmetal' ? baseNormalsLiquid : baseNormalsCover;
+        toBase = baseFor(targetShape).pos;
+        toNormals = (targetShape === 'liquidmetal') ? baseNormalsLiquid : baseNormalsCover;
         fromBase = toBase;
+      }
+
+      // 爆发偏移积分（弹簧回弹）
+      for (let i = 0; i < COUNT; i++) {
+        for (let k = 0; k < 3; k++) {
+          const o = i * 3 + k;
+          explodeVel[o] += (0 - explodePos[o]) * SPRING_K;
+          explodeVel[o] *= DAMPING;
+          explodePos[o] += explodeVel[o];
+        }
       }
 
       for (let i = 0; i < COUNT; i++) {
@@ -386,7 +571,23 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
         const dc = distFromCenter[i];
 
         let bx, by, bz, nx, ny, nz;
-        if (tr.active) {
+        if (isSingularity) {
+          // 三形态加权混合
+          let sx = basePositionsCore[i * 3] * wC + basePositionsAlbum[i * 3] * wA + basePositionsLyric[i * 3] * wL;
+          let sy = basePositionsCore[i * 3 + 1] * wC + basePositionsAlbum[i * 3 + 1] * wA + basePositionsLyric[i * 3 + 1] * wL;
+          let sz = basePositionsCore[i * 3 + 2] * wC + basePositionsAlbum[i * 3 + 2] * wA + basePositionsLyric[i * 3 + 2] * wL;
+          if (tr.active) {
+            // 跨模式进入星核时，从源形态基础坐标平滑过渡到星核加权坐标
+            const fb = baseFor(tr.from).pos;
+            const mt = morphT;
+            sx = fb[i * 3] * (1 - mt) + sx * mt;
+            sy = fb[i * 3 + 1] * (1 - mt) + sy * mt;
+            sz = fb[i * 3 + 2] * (1 - mt) + sz * mt;
+          }
+          const rl = Math.hypot(sx, sy, sz) || 1;
+          bx = sx; by = sy; bz = sz;
+          nx = sx / rl; ny = sy / rl; nz = sz / rl;
+        } else if (tr.active) {
           const fbx = fromBase[i * 3];
           const fby = fromBase[i * 3 + 1];
           const fbz = fromBase[i * 3 + 2];
@@ -410,11 +611,19 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
 
         let x = bx, y = by, z = bz;
 
-        // 8 个粒子一组，共享相位和基础律动，避免零碎跳动
-        const group = Math.floor(i / 8);
-        const groupPhase = group * 0.85;
-
-        if (targetShape === 'coverflow') {
+        if (isSingularity) {
+          // 星核表面随频谱起伏（低频推整体、高频增加细碎抖动）
+          const ripple = (midSmooth * 0.8 + bassAttack * 0.6) * Math.sin(u * 40 + time * 4 + i * 0.5) * planeSize * 0.012
+            + (trebleSmooth * 0.5) * Math.sin(v * 52 + time * 6) * planeSize * 0.006;
+          const audioAmp = 0.5 + totalEnergy * 1.1;
+          x = bx + nx * (ripple + (bassAttack * 0.5 + midSmooth * 0.3) * planeSize * 0.04 * audioAmp);
+          y = by + ny * (ripple + (bassAttack * 0.5 + midSmooth * 0.3) * planeSize * 0.04 * audioAmp);
+          z = bz + nz * (ripple + (bassAttack * 0.5 + midSmooth * 0.3) * planeSize * 0.04 * audioAmp);
+          // 叠加爆发偏移（弹簧回弹）
+          x += explodePos[i * 3];
+          y += explodePos[i * 3 + 1];
+          z += explodePos[i * 3 + 2];
+        } else if (targetShape === 'coverflow') {
           // 粒子封面：整个面 3D 飘动，幅度随整体能量起伏，连续细腻
           const audioAmp = 0.45 + totalEnergy * 1.3;
           const waveX = Math.sin(u * 5 * Math.PI + time * 0.8) * Math.cos(v * 3 * Math.PI + time * 0.5) * 0.22;
@@ -447,14 +656,14 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
           const baseR = planeSize * LIQUID_RADIUS_RATIO * (0.82 + (coverLight[i] || 0.5) * 0.36);
 
           // 中间横面波纹，越往中间越明显
-          const wave = (midSmooth * 0.9 + bassAttack * 0.6) * Math.sin(u * 56 + time * 5 + groupPhase) * planeSize * 0.008 * activeFactor;
+          const wave = (midSmooth * 0.9 + bassAttack * 0.6) * Math.sin(u * 56 + time * 5 + i * 0.5) * planeSize * 0.008 * activeFactor;
           // 赤道起伏：中间有舒缓横波，向边缘衰减
-          const equatorWave = (midSmooth * 0.8 + bassAttack * 0.6) * Math.sin(u * 48 + time * 4.5 + groupPhase) * planeSize * 0.011 * activeFactor;
+          const equatorWave = (midSmooth * 0.8 + bassAttack * 0.6) * Math.sin(u * 48 + time * 4.5 + i * 0.5) * planeSize * 0.011 * activeFactor;
           // 鼓点冲击集中在中间横面
           const bassBoost = bassPulse * planeSize * 0.09 * activeFactor;
 
           // 两端独立的舒缓起伏动画，不跟节奏但让整体更合群
-          const idleWave = idleFactor * Math.sin(v * 20 + time * 1.8 + groupPhase * 0.4) * Math.cos(u * 14 + time * 1.3) * planeSize * 0.06;
+          const idleWave = idleFactor * Math.sin(v * 20 + time * 1.8 + i * 0.1) * Math.cos(u * 14 + time * 1.3) * planeSize * 0.06;
 
           const r = baseR + displacement + wave + equatorWave + bassBoost + idleWave;
           x = nx * r;
@@ -467,12 +676,25 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
         posAttr.array[i * 3 + 2] = z;
 
         if (needColorUpdate) {
-          const windGlow = targetShape === 'coverflow' ? Math.abs(z - bz) / (planeSize * 0.12 + 0.001) * 0.12 : 0;
-          const intensity = 0.42 + totalEnergy * 1.6 + windGlow;
-          const outFactor = 1 - dc * 0.25;
-          colorAttr.array[i * 3]     = Math.min(1, accentRGB.r * intensity * outFactor + bassPulse * 0.65);
-          colorAttr.array[i * 3 + 1] = Math.min(1, accentRGB.g * intensity * outFactor + bassPulse * 0.65);
-          colorAttr.array[i * 3 + 2] = Math.min(1, accentRGB.b * intensity * outFactor + bassPulse * 0.65 + windGlow * 0.35);
+          if (isSingularity) {
+            // 专辑形态掺入封面色，其余用主题色；高频提亮、鼓点脉冲
+            const cr = coverColors[i * 3], cg = coverColors[i * 3 + 1], cb = coverColors[i * 3 + 2];
+            const accentMix = 1 - wA * 0.75;
+            const r = accentRGB.r * accentMix + cr * wA * 0.75;
+            const g = accentRGB.g * accentMix + cg * wA * 0.75;
+            const b = accentRGB.b * accentMix + cb * wA * 0.75;
+            const intensity = 0.5 + totalEnergy * 1.4 + trebleSmooth * 0.6 + beatPulseRef.current * 0.7;
+            colorAttr.array[i * 3]     = Math.min(1, r * intensity + beatPulseRef.current * 0.5);
+            colorAttr.array[i * 3 + 1] = Math.min(1, g * intensity + beatPulseRef.current * 0.5);
+            colorAttr.array[i * 3 + 2] = Math.min(1, b * intensity + trebleSmooth * 0.4 + beatPulseRef.current * 0.5);
+          } else {
+            const windGlow = targetShape === 'coverflow' ? Math.abs(z - bz) / (planeSize * 0.12 + 0.001) * 0.12 : 0;
+            const intensity = 0.42 + totalEnergy * 1.6 + windGlow;
+            const outFactor = 1 - dc * 0.25;
+            colorAttr.array[i * 3]     = Math.min(1, accentRGB.r * intensity * outFactor + bassPulse * 0.65);
+            colorAttr.array[i * 3 + 1] = Math.min(1, accentRGB.g * intensity * outFactor + bassPulse * 0.65);
+            colorAttr.array[i * 3 + 2] = Math.min(1, accentRGB.b * intensity * outFactor + bassPulse * 0.65 + windGlow * 0.35);
+          }
         }
       }
       posAttr.needsUpdate = true;
@@ -480,7 +702,7 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
 
       // 360° 旋转控制
       const g = gestureRef.current;
-      // 交互结束后短暂保持用户当前视角，空闲超过阈值再恢复匀速偏航旋转
+      // 交互结束后短暂保持用户当前视角，空闲超过阈值再恢复匀速偏航旋转（默认关闭）
       const idle = (performance.now() - g.lastInteractTime) > AUTO_RESUME_MS;
       if (g.autoRotate && !g.dragging && !g.pinching && idle) {
         g.targetRotationY += dt * AUTO_ROTATE_SPEED;
@@ -489,7 +711,10 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
       g.rotationY += (g.targetRotationY - g.rotationY) * 0.18;
       g.rotationX += (g.targetRotationX - g.rotationX) * 0.18;
       const clampedZoom = Math.max(0.4, Math.min(3.0, g.zoom));
-      camera.position.z = cameraZ / clampedZoom;
+      camera.position.z = cameraZ / clampedZoom * (1 - beatPulseRef.current * 0.05);
+      // 鼓点短促 punch-in（FOV 微缩）
+      camera.fov = FOV - beatPulseRef.current * 6;
+      camera.updateProjectionMatrix();
       // 单指/鼠标滑动即可绕任意方向 360° 旋转：偏航(水平) + 俯仰(垂直)
       points.rotation.y = g.rotationY;
       points.rotation.x = g.rotationX;
@@ -601,8 +826,9 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
     const handleResize = () => {
       computeLayout();
       buildBase();
+      rebuildAlbumBase();
       posAttr.needsUpdate = true;
-      material.size = planeSize * 2 / GRID * 1.35;
+      material.size = planeSize * 2 / GRID * 1.2;
       renderer.setSize(W, H);
     };
     window.addEventListener('resize', handleResize);
