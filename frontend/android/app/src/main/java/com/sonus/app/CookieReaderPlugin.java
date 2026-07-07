@@ -8,9 +8,6 @@ import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
 
-import java.util.HashMap;
-import java.util.Map;
-
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
@@ -224,9 +221,9 @@ public class CookieReaderPlugin extends Plugin {
      * LoginWebViewActivity 在检测到完整登录态后调用此方法。
      */
     public void notifyLoginSuccess() {
-        Map<String, Object> data = new HashMap<>();
+        JSObject data = new JSObject();
         data.put("success", true);
-        notifyListeners("qqLoginSuccess", new JSObject(data), true);
+        notifyListeners("qqLoginSuccess", data, true);
     }
 
     /**
