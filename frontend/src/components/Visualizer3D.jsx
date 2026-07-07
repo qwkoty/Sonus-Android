@@ -415,31 +415,33 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
           y = by + waveY * amp;
           z = bz + waveZ * amp;
         } else if (targetShape === 'liquidmetal') {
-          // 液态金属：球体横面中间为高频+鼓点，向两极（周围）依次减弱
-          const band = bandArr[i];
+          // 液态金属：球体中间横面为高频，向两极依次降低；两端（两极）可静止
+          const band = bandArr[i]; // 0=赤道(最中间), 1=两极(两端)
+
+          // 中间活跃区：约 72% 范围跟随节奏，超出后快速衰减到 0（两端静止）
+          const activeRange = 0.72;
+          const activeFactor = band < activeRange ? Math.pow(1 - band / activeRange, 0.55) : 0;
+
           // 64 个频谱条压缩为 8 个粗频段，8 个粒子共享一个频段能量
+          // 中间对应高频 coarseBand=7，向两极依次降低
           const coarseBand = Math.min(7, Math.floor(freqBand[i] / 8));
           let energy = 0;
           for (let k = coarseBand * 8; k < (coarseBand + 1) * 8 && k < 64; k++) energy += spectrumSmooth[k];
           energy /= 8;
 
-          // 全局呼吸：所有粒子都随整体能量缩放，保证一眼看去全都在动
-          const globalBreath = totalEnergy * (0.75 + 0.25 * Math.sin(time * 3 + groupPhase));
-          // 基础律动：所有粒子都会随 bass/mid/treble 整体起伏，不会静止
-          const basePulse = (bassAttack * 0.55 + midSmooth * 0.4 + trebleSmooth * 0.25) * (0.55 + 0.45 * Math.sin(time * 3.5 + groupPhase));
-          const totalLocalEnergy = energy + basePulse + globalBreath;
+          // 中间区域整体律动，向边缘按 activeFactor 衰减，两极不动
+          const localPulse = (energy * 1.15 + bassAttack * 0.7 + midSmooth * 0.5) * activeFactor;
+          const displacement = localPulse * planeSize * 0.45;
 
           const baseR = planeSize * LIQUID_RADIUS_RATIO * (0.82 + (coverLight[i] || 0.5) * 0.36);
-          // 中间横面（band≈0）对应高频，振幅最大；向两极 band≈1 对应低频，振幅依次减小
-          const centerBoost = 0.18 + 0.82 * (1 - band);
-          const displacement = totalLocalEnergy * planeSize * 0.40 * centerBoost;
 
-          // 全局液面波纹，中间更明显，边缘也能看到律动
-          const wave = (midSmooth * 0.9 + bassAttack * 0.55) * Math.sin(u * 56 + time * 5 + band * 10 + groupPhase) * planeSize * 0.035 * (1 - band);
-          // 赤道起伏：中间横面有舒缓的横波，向两极递减，让高频区也有律动
-          const equatorWave = (midSmooth * 0.75 + bassAttack * 0.55) * Math.sin(u * 48 + time * 4.5 + groupPhase) * planeSize * 0.05 * (1 - band);
-          // 鼓点冲击集中在中间横面（红圈区域）
-          const bassBoost = bassPulse * (1 - band) * planeSize * 0.42;
+          // 中间横面波纹，越往中间越明显
+          const wave = (midSmooth * 0.9 + bassAttack * 0.6) * Math.sin(u * 56 + time * 5 + groupPhase) * planeSize * 0.04 * activeFactor;
+          // 赤道起伏：中间有舒缓横波，向边缘衰减
+          const equatorWave = (midSmooth * 0.8 + bassAttack * 0.6) * Math.sin(u * 48 + time * 4.5 + groupPhase) * planeSize * 0.055 * activeFactor;
+          // 鼓点冲击集中在中间横面
+          const bassBoost = bassPulse * planeSize * 0.45 * activeFactor;
+
           const r = baseR + displacement + wave + equatorWave + bassBoost;
           x = nx * r;
           y = ny * r;
