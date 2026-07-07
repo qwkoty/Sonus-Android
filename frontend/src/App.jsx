@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import { useAuthStore } from './store/useAuthStore';
-import { CookieReader } from './plugins/CookieReader';
 import Player from './pages/Player';
 import Profile from './pages/Profile';
 import Login from './pages/Login';
@@ -8,32 +7,12 @@ import Login from './pages/Login';
 export default function App() {
   const isLoggedIn = useAuthStore((s) => s.isLoggedIn);
   const fetchUserInfo = useAuthStore((s) => s.fetchUserInfo);
-  const setAuth = useAuthStore((s) => s.setAuth);
 
   // 默认进播放器（不强制登录）
   const [view, setView] = useState('player'); // 'player' | 'profile' | 'login'
 
-  // 冷启动：从原生 CookieManager 恢复 QQ 音乐登录态（比 localStorage 更可靠）
-  useEffect(() => {
-    const restoreFromCookies = async () => {
-      try {
-        if (!isLoggedIn) {
-          const qq = await CookieReader.getCookiesForUrl('https://y.qq.com');
-          if (qq?.loggedIn && qq.uin) {
-            setAuth({
-              cookie: qq.cookie,
-              uin: qq.uin,
-              key: qq.qqmusic_key || '',
-              nickname: 'QQ音乐用户',
-            });
-          }
-        }
-      } catch (e) {
-        console.warn('[App restoreFromCookies] failed', e);
-      }
-    };
-    restoreFromCookies();
-  }, []);
+  // 登录态由 useAuthStore 通过 localStorage 持久化并自动恢复
+  // 不再从 CookieManager 冷启动恢复，避免阻塞或状态异常影响播放
 
   // isLoggedIn 变化时拉取用户信息
   useEffect(() => {
