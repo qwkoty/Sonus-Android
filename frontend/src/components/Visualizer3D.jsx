@@ -79,6 +79,12 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
   const prevBassRef = useRef(0);
   const lastBeatRef = useRef(0);
   const beatPulseRef = useRef(0);
+  // ====== 待机动画专用状态 ======
+  const idleWindRef = useRef({ phase: 0, lastGust: 0, gustDir: 1, gustAmp: 0 });
+  const idleHotspotsRef = useRef(null);        // 液态金属：对流热点 [{cx,cy,period,phase}]
+  const idleDropletRef = useRef({ idx: -1, phase: 0, life: 0 }); // 液态金属：液滴粒子
+  const idleTwinkleRef = useRef(null);         // 星河：闪烁亮度数组 Float32Array(COUNT)
+  const idleMeteorRef = useRef({ active: false, idx: -1, prog: 0, sx: 0, sy: 0, ex: 0, ey: 0, nextT: 3 + Math.random() * 7 });
   const onReadyRef = useRef(onReady);
   useEffect(() => { onReadyRef.current = onReady; }, [onReady]);
   useEffect(() => { accentRef.current = accent; }, [accent]);
@@ -429,10 +435,123 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
         for (let i = 0; i < 32; i++) treble += data[i];
         treble /= 32;
       } else {
-        const t = Date.now() * 0.001;
-        bass = 0.20 + Math.sin(t * 0.60) * 0.10 + Math.sin(t * 1.25) * 0.06;
-        mid = 0.14 + Math.sin(t * 0.90 + 1) * 0.07;
-        treble = 0.10 + Math.sin(t * 1.20 + 2) * 0.05;
+        // ====== 三种模式各自独立的特色待机动画 ======
+        const t = time; // 复用 animate 已计算的 time
+        const modeIdle = modeRef.current;
+
+        // --- 懒初始化待机状态数组 ---
+        if (!idleTwinkleRef.current) idleTwinkleRef.current = new Float32Array(COUNT);
+        if (!idleHotspotsRef.current) {
+          // 5 个对流热点（球面坐标）
+          const hs = [];
+          for (let h = 0; h < 5; h++) {
+            const theta = (h / 5) * Math.PI * 2 + Math.random() * 0.8;
+            const phi = (Math.random() - 0.5) * Math.PI * 1.4;
+            hs.push({ cx: Math.cos(phi) * Math.cos(theta), cy: Math.sin(phi), cz: Math.cos(phi) * Math.sin(theta),
+              period: 3 + Math.random() * 4, phase: Math.random() * Math.PI * 2, amp: 0.6 + Math.random() * 0.6 });
+          }
+          idleHotspotsRef.current = hs;
+        }
+
+        if (modeIdle === 'coverflow') {
+          // ═══ coverflow 待机：绸缎飘风 ═══
+          const wind = idleWindRef.current;
+
+          // 阵风：每 6~9 秒一次，振幅缓起缓落
+          const sinceGust = t - wind.lastGust;
+          const gustCycle = 7.5; // 平均阵风周期
+          if (sinceGust > gustCycle + Math.random() * 2) {
+            wind.lastGust = t;
+            wind.gustDir = Math.random() > 0.5 ? 1 : -1;
+          }
+          // 包络线：smoothstep 缓起缓落的阵风强度
+          const gustProg = sinceGust / gustCycle;
+          const gustEnv = gustProg < 0.25 ? gustProg / 0.25 : (gustProg < 0.75 ? 1 : 1 - (gustProg - 0.75) / 0.25);
+          wind.gustAmp = gustEnv * gustEnv * (0.35 + 0.25 * Math.sin(sinceGust * 2.5));
+
+          bass = 0.12 + Math.sin(t * 0.45) * 0.06 + wind.gustAmp * 0.15;
+          mid   = 0.08 + Math.sin(t * 0.70 + 0.8) * 0.04 + Math.sin(t * 1.6) * 0.03 * wind.gustAmp;
+          treble= 0.05 + Math.sin(t * 1.1 + 1.5) * 0.02 + wind.gustAmp * 0.08;
+
+        } else if (modeIdle === 'liquidmetal') {
+          // ═══ liquidmetal 待机：熔岩对流 ═══
+          const hotspots = idleHotspotsRef.current;
+          const droplet = idleDropletRef.current;
+
+          // 液滴事件：随机选择一个粒子短暂凸起后缩回
+          droplet.life -= dt;
+          if (droplet.life <= 0 && Math.random() < 0.008) { // ~每 2s 触发一次
+            droplet.idx = Math.floor(Math.random() * COUNT);
+            droplet.phase = 0;
+            droplet.life = 1.5; // 持续 1.5 秒
+          }
+
+          let maxHot = 0;
+          for (let h = 0; h < hotspots.length; h++) {
+            const sp = hotspots[h];
+            const pulse = Math.sin(t / sp.period * Math.PI * 2 + sp.phase);
+            const v = (pulse * 0.5 + 0.5) * sp.amp;
+            if (v > maxHot) maxHot = v;
+          }
+
+          // 整体呼吸脉动（8s 周期）
+          const breathe = 0.85 + Math.sin(t * Math.PI / 4) * 0.15;
+
+          bass = 0.08 + maxHot * 0.18 + breathe * 0.06;
+          mid   = 0.06 + maxHot * 0.12 + Math.sin(t * 0.55) * 0.03 * breathe;
+          treble= 0.04 + Math.sin(t * 0.9 + 1) * 0.025;
+
+        } else {
+          // ═══ galaxy 待机：深空星尘 ═══
+          const twinkle = idleTwinkleRef.current;
+          const meteor = idleMeteorRef.current;
+
+          // 星星闪烁：每帧随机选 ~0.3% 粒子做亮度脉冲
+          for (let ti = 0; ti < COUNT * 0.003 + 1; ti++) {
+            const ri = Math.floor(Math.random() * COUNT);
+            if (galaxyBulge[ri]) continue; // 核球不闪烁
+            twinkle[ri] = 1.0; // 触发亮度
+          }
+          // 衰减所有闪烁值（指数衰减）
+          for (let di = 0; di < COUNT; di++) {
+            if (twinkle[di] > 0.01) twinkle[di] *= 0.94;
+            else twinkle[di] = 0;
+          }
+
+          // 流星事件
+          if (!meteor.active && t > meteor.nextT) {
+            meteor.active = true;
+            meteor.idx = -1;
+            // 从外圈随机选一个粒子作为起点
+            for (let mi = 0; mi < 20; mi++) {
+              const ci = Math.floor(Math.random() * COUNT);
+              if (galaxyR[ci] / Rmax > 0.65 && !galaxyBulge[ci]) {
+                meteor.idx = ci; break;
+              }
+            }
+            if (meteor.idx >= 0) {
+              meteor.sx = basePositionsGalaxy[meteor.idx * 3];
+              meteor.sy = basePositionsGalaxy[meteor.idx * 3 + 1];
+              // 切向方向飞出
+              const tangX = -galaxyUY[meteor.idx];
+              const tangY = galaxyUX[meteor.idx];
+              const flyDist = planeSize * 0.5;
+              meteor.ex = meteor.sx + tangX * flyDist;
+              meteor.ey = meteor.sy + tangY * flyDist;
+              meteor.prog = 0;
+            }
+            meteor.nextT = t + 10 + Math.random() * 8; // 下次流星
+          }
+          if (meteor.active) {
+            meteor.prog += dt * 0.7; // 流星速度
+            if (meteor.prog >= 1) meteor.active = false;
+          }
+
+          // 极慢的整体能量（星系几乎是静止的）
+          bass   = 0.06 + Math.sin(t * 0.12) * 0.03;   // 16s 周期的核心心跳
+          mid    = 0.04 + Math.sin(t * 0.09 + 0.5) * 0.02;
+          treble = 0.025;
+        }
       }
       if (bass > bassAttack) bassAttack += (bass - bassAttack) * 0.55;
       else bassAttack += (bass - bassAttack) * 0.28;
@@ -569,8 +688,14 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
         let x = bx, y = by, z = bz;
 
         if (isGalaxy) {
-          // 星河内部缓慢公转（盘面内旋转成漩涡感，非镜头自转）
-          const ang = time * 0.12;
+          // ═══ galaxy 待机：深空星尘 — 差速旋转 + 核心心跳 + 流星 ═══
+          const rN = Math.min(1, galaxyR[i] / Rmax);
+
+          // 差速旋转：内圈快(0.08 rad/s) → 外圈慢(0.02 rad/s)，模拟真实星系
+          const diffOmega = hasData ? 0.12 : 0.08; // 有音频时稍快
+          const innerOmega = diffOmega;
+          const outerOmega = diffOmega * 0.22;
+          const ang = time * (innerOmega + (outerOmega - innerOmega) * rN);
           const ca = Math.cos(ang), sa = Math.sin(ang);
           const rx = x * ca - y * sa;
           const ry = x * sa + y * ca;
@@ -578,49 +703,104 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
           // 频谱细碎抖动增强流动感
           const jitter = trebleSmooth * 0.5 * Math.sin(u * 50 + time * 5 + i * 0.3) * planeSize * 0.004;
           x += nx * jitter; y += ny * jitter; z += nz * jitter;
+
+          // 核心心跳：核球粒子做 12s 周期的极慢膨胀/收缩（待机时更明显）
+          if (galaxyBulge[i] && !hasData) {
+            const heartPhase = Math.sin(time * Math.PI / 6); // 12s 周期
+            const breathe = 1 + heartPhase * 0.05; // ±5% 半径
+            x *= breathe; y *= breathe; z *= breathe;
+          }
+
+          // 流星：选中的粒子做高速切向位移
+          const meteor = idleMeteorRef.current;
+          if (!hasData && meteor.active && meteor.idx === i) {
+            const mp = meteor.prog;
+            // 缓入缓出的流星轨迹
+            const easeP = mp < 0.15 ? mp / 0.15 : (mp > 0.85 ? (1 - mp) / 0.15 : 1);
+            x = meteor.sx + (meteor.ex - meteor.sx) * mp;
+            y = meteor.sy + (meteor.ey - meteor.sy) * mp;
+          }
         } else if (targetShape === 'coverflow') {
-          // 粒子封面：整个面 3D 飘动，幅度随整体能量起伏，连续细腻
-          const audioAmp = 0.45 + totalEnergy * 1.3;
-          const waveX = Math.sin(u * 5 * Math.PI + time * 0.8) * Math.cos(v * 3 * Math.PI + time * 0.5) * 0.22;
-          const waveY = Math.cos(u * 4 * Math.PI + time * 0.6) * Math.sin(v * 5 * Math.PI + time * 0.7) * 0.22;
-          const waveZ = Math.sin((u + v) * 6 * Math.PI + time * 0.9) * 0.28 + Math.sin(dc * 8 - time * 1.2) * 0.08;
+          // ═══ coverflow 待机：绸缎飘风 ═══
+          const audioAmp = hasData ? (0.45 + totalEnergy * 1.3) : (0.35 + bass * 1.8);
+          const wind = idleWindRef.current;
+          const t2 = time;
+
+          // 主褶皱层：多频率叠加模拟布料自然折叠（Perlin-like）
+          const fold1 = Math.sin(u * 4 * Math.PI + t2 * 0.55) * Math.cos(v * 2.5 * Math.PI + t2 * 0.35) * 0.18;
+          const fold2 = Math.sin((u - v) * 3 * Math.PI + t2 * 0.75) * Math.sin(v * 6 * Math.PI - t2 * 0.45) * 0.14;
+          // 细纹层：高频微扰模拟织物纹理
+          const micro = Math.sin(u * 28 + t2 * 2.5) * Math.cos(v * 22 + t2 * 1.8) * 0.04;
+          // 阵风扫过：方向性波浪，从一侧吹向另一侧
+          const gustX = wind.gustAmp * Math.sin(v * 3 * Math.PI + u * 8 * Math.PI * wind.gustDir - t2 * 3) * 0.35;
+          const gustY = wind.gustAmp * Math.cos(u * 3 * Math.PI + v * 6 * Math.PI * wind.gustDir - t2 * 2.5) * 0.30;
+
+          const waveX = fold1 + gustX;
+          const waveY = fold2 + gustY;
+          const waveZ = micro + Math.sin((u + v) * 6 * Math.PI + t2 * 0.9) * 0.20 + Math.sin(dc * 8 - t2 * 1.1) * 0.06
+                      + (!hasData ? wind.gustAmp * Math.sin(dc * 12 - t2 * 4) * 0.15 : 0);
           const amp = zAmp * audioAmp;
           x = bx + waveX * amp;
           y = by + waveY * amp;
           z = bz + waveZ * amp;
         } else if (targetShape === 'liquidmetal') {
-          // 液态金属：球体中间横面为高频+节奏律动，向两极依次降低；两端做舒缓起伏
+          // ═══ liquidmetal 待机：熔岩对流 ═══
           const band = bandArr[i]; // 0=赤道(最中间), 1=两极(两端)
 
-          // 中间活跃区：约 72% 范围跟随节奏，超出后快速衰减
           const activeRange = 0.72;
           const activeFactor = band < activeRange ? Math.pow(1 - band / activeRange, 0.55) : 0;
           const idleFactor = 1 - activeFactor;
 
-          // 64 个频谱条压缩为 8 个粗频段，8 个粒子共享一个频段能量
-          // 中间对应高频 coarseBand=7，向两极依次降低
           const coarseBand = Math.min(7, Math.floor(freqBand[i] / 8));
           let energy = 0;
           for (let k = coarseBand * 8; k < (coarseBand + 1) * 8 && k < 64; k++) energy += spectrumSmooth[k];
           energy /= 8;
 
-          // 中间区域整体律动，向边缘按 activeFactor 衰减
           const localPulse = (energy * 1.15 + bassAttack * 0.7 + midSmooth * 0.5) * activeFactor;
           const displacement = localPulse * planeSize * 0.09;
 
-          const baseR = planeSize * LIQUID_RADIUS_RATIO * (0.82 + (coverLight[i] || 0.5) * 0.36);
+          // 整体呼吸脉动（待机时更明显）
+          const breathe = hasData ? 1.0 : (0.97 + Math.sin(time * Math.PI / 4) * 0.03);
 
-          // 中间横面波纹，越往中间越明显
+          const baseR = planeSize * LIQUID_RADIUS_RATIO * (0.82 + (coverLight[i] || 0.5) * 0.36) * breathe;
+
+          // 对流热点：球面上多个热源产生向外推的脉冲
+          let hotDisp = 0;
+          if (!hasData || idleHotspotsRef.current) {
+            const hotspots = idleHotspotsRef.current || [];
+            for (let h = 0; h < hotspots.length; h++) {
+              const sp = hotspots[h];
+              // 粒子到热点的球面距离
+              const dot = nx * sp.cx + ny * sp.cy + nz * sp.cz;
+              const heatDist = Math.acos(Math.max(-1, Math.min(1, dot))); // 0=同点, π=对跖
+              const heatFalloff = Math.exp(-heatDist * heatDist * 3); // 高斯衰减
+              const pulse = (Math.sin(time / sp.period * Math.PI * 2 + sp.phase) * 0.5 + 0.5) * sp.amp;
+              hotDisp += pulse * heatFalloff * planeSize * (hasData ? 0.03 : 0.07);
+            }
+          }
+
+          // 液滴事件：单个粒子短暂凸起
+          let dropletDisp = 0;
+          if (!hasData && idleDropletRef.current.idx === i) {
+            const dp = idleDropletRef.current.phase;
+            // 快速升起 → 停留 → 缓慢缩回
+            const dropletShape = dp < 0.25 ? dp / 0.25 : (dp < 0.7 ? 1 : 1 - (dp - 0.7) / 0.3);
+            dropletDisp = dropletShape * dropletShape * planeSize * 0.12;
+            idleDropletRef.current.phase += dt / 1.5; // 1.5s 周期
+          }
+
+          // 表面张力波：多波长沿法向振动，相位差营造流动感
           const wave = (midSmooth * 0.9 + bassAttack * 0.6) * Math.sin(u * 56 + time * 5 + i * 0.5) * planeSize * 0.008 * activeFactor;
-          // 赤道起伏：中间有舒缓横波，向边缘衰减
           const equatorWave = (midSmooth * 0.8 + bassAttack * 0.6) * Math.sin(u * 48 + time * 4.5 + i * 0.5) * planeSize * 0.011 * activeFactor;
-          // 鼓点冲击集中在中间横面
           const bassBoost = bassPulse * planeSize * 0.09 * activeFactor;
 
-          // 两端独立的舒缓起伏动画，不跟节奏但让整体更合群
+          // 两端舒缓起伏（原有逻辑保留）
           const idleWave = idleFactor * Math.sin(v * 20 + time * 1.8 + i * 0.1) * Math.cos(u * 14 + time * 1.3) * planeSize * 0.06;
 
-          const r = baseR + displacement + wave + equatorWave + bassBoost + idleWave;
+          // 金属光泽漂移：高光区缓慢移动（通过微小的额外位移实现）
+          const shimmer = !hasData ? Math.sin(time * 0.15 + u * 10 + v * 7) * Math.cos(time * 0.11 - u * 5) * planeSize * 0.004 : 0;
+
+          const r = baseR + displacement + wave + equatorWave + bassBoost + idleWave + hotDisp + dropletDisp + shimmer;
           x = nx * r;
           y = ny * r;
           z = nz * r;
@@ -639,19 +819,51 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
           let r = cr * coreMix + ar * (1 - coreMix);
           let g = cg * coreMix + ag * (1 - coreMix);
           let b = cb * coreMix + ab * (1 - coreMix);
+
+          // 星云漂移：外圈颜色在封面平均色与 accent 之间极慢往复（30s 周期）
+          if (!hasData && rN > 0.5) {
+            const nebulaPhase = Math.sin(time * Math.PI / 15) * 0.5 + 0.5; // 30s
+            r = r * (1 - nebulaPhase * 0.15) + ar * nebulaPhase * 0.15;
+            g = g * (1 - nebulaPhase * 0.15) + ag * nebulaPhase * 0.15;
+            b = b * (1 - nebulaPhase * 0.15) + ab * nebulaPhase * 0.15;
+          }
+
           const band = Math.min(63, Math.floor(rN * 63));
           const localE = spectrumSmooth[band];
           const intensity = 0.42 + bassAttack * 1.1 + localE * 1.6 + beatPulseRef.current * 0.9 + galaxyBulge[i] * bassAttack * 0.6;
-          colorAttr.array[i * 3]     = Math.min(1, r * intensity);
-          colorAttr.array[i * 3 + 1] = Math.min(1, g * intensity);
-          colorAttr.array[i * 3 + 2] = Math.min(1, b * intensity);
+
+          // 星星闪烁叠加（待机时更明显）
+          let twinkleBoost = 0;
+          if (idleTwinkleRef.current) {
+            twinkleBoost = idleTwinkleRef.current[i] * (!hasData ? 1.2 : 0.5);
+          }
+          // 流星粒子额外增亮
+          if (!hasData && idleMeteorRef.current.active && idleMeteorRef.current.idx === i) {
+            twinkleBoost += 2.0; // 流星很亮
+          }
+
+          colorAttr.array[i * 3]     = Math.min(1, r * intensity + twinkleBoost);
+          colorAttr.array[i * 3 + 1] = Math.min(1, g * intensity + twinkleBoost);
+          colorAttr.array[i * 3 + 2] = Math.min(1, b * intensity + twinkleBoost);
         } else if (!useCover) {
           const windGlow = targetShape === 'coverflow' ? Math.abs(z - bz) / (planeSize * 0.12 + 0.001) * 0.12 : 0;
           const intensity = 0.42 + totalEnergy * 1.6 + windGlow;
+
+          // coverflow 待机色彩漂移：accent 色在 HSL 空间做 ±15° 往复漂移（极光感）
+          let ar_mod = accentRGB.r, ag_mod = accentRGB.g, ab_mod = accentRGB.b;
+          if (targetShape === 'coverflow' && !hasData) {
+            const driftPhase = Math.sin(time * 0.08); // ~78s 完整周期
+            // 简化色相偏移：在蓝→青→紫之间微调
+            const shift = driftPhase * 0.12;
+            ar_mod = Math.min(1, accentRGB.r + shift * 0.3);
+            ag_mod = Math.min(1, accentRGB.g - shift * 0.05 + Math.abs(driftPhase) * 0.15);
+            ab_mod = Math.max(0.3, accentRGB.b - shift * 0.2);
+          }
+
           const outFactor = 1 - dc * 0.25;
-          colorAttr.array[i * 3]     = Math.min(1, accentRGB.r * intensity * outFactor + bassPulse * 0.65);
-          colorAttr.array[i * 3 + 1] = Math.min(1, accentRGB.g * intensity * outFactor + bassPulse * 0.65);
-          colorAttr.array[i * 3 + 2] = Math.min(1, accentRGB.b * intensity * outFactor + bassPulse * 0.65 + windGlow * 0.35);
+          colorAttr.array[i * 3]     = Math.min(1, ar_mod * intensity * outFactor + bassPulse * 0.65);
+          colorAttr.array[i * 3 + 1] = Math.min(1, ag_mod * intensity * outFactor + bassPulse * 0.65);
+          colorAttr.array[i * 3 + 2] = Math.min(1, ab_mod * intensity * outFactor + bassPulse * 0.65 + windGlow * 0.35);
         }
       }
       posAttr.needsUpdate = true;
