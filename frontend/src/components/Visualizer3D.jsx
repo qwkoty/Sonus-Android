@@ -422,18 +422,24 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
           let energy = 0;
           for (let k = coarseBand * 8; k < (coarseBand + 1) * 8 && k < 64; k++) energy += spectrumSmooth[k];
           energy /= 8;
-          // 基础律动：所有粒子都会随整体节奏起伏，不会静止
-          const basePulse = (bassAttack * 0.35 + midSmooth * 0.25 + trebleSmooth * 0.15) * (0.6 + 0.4 * Math.sin(time * 4 + groupPhase));
-          const totalLocalEnergy = energy + basePulse;
+
+          // 全局呼吸：所有粒子都随整体能量缩放，保证一眼看去全都在动
+          const globalBreath = totalEnergy * (0.75 + 0.25 * Math.sin(time * 3 + groupPhase));
+          // 基础律动：所有粒子都会随 bass/mid/treble 整体起伏，不会静止
+          const basePulse = (bassAttack * 0.55 + midSmooth * 0.4 + trebleSmooth * 0.25) * (0.55 + 0.45 * Math.sin(time * 3.5 + groupPhase));
+          const totalLocalEnergy = energy + basePulse + globalBreath;
+
           const baseR = planeSize * LIQUID_RADIUS_RATIO * (0.82 + (coverLight[i] || 0.5) * 0.36);
           // 中间横面（band≈0）对应高频，振幅最大；向两极 band≈1 对应低频，振幅依次减小
-          const displacement = totalLocalEnergy * planeSize * 0.34 * (0.18 + 0.82 * (1 - band));
-          // 细微液面波纹，越往中间越明显
-          const wave = midSmooth * Math.sin(u * 56 + time * 5 + band * 10 + groupPhase) * planeSize * 0.028 * (1 - band);
+          const centerBoost = 0.18 + 0.82 * (1 - band);
+          const displacement = totalLocalEnergy * planeSize * 0.40 * centerBoost;
+
+          // 全局液面波纹，中间更明显，边缘也能看到律动
+          const wave = (midSmooth * 0.9 + bassAttack * 0.55) * Math.sin(u * 56 + time * 5 + band * 10 + groupPhase) * planeSize * 0.035 * (1 - band);
           // 赤道起伏：中间横面有舒缓的横波，向两极递减，让高频区也有律动
-          const equatorWave = (midSmooth * 0.6 + bassAttack * 0.4) * Math.sin(u * 48 + time * 4.5 + groupPhase) * planeSize * 0.035 * (1 - band);
+          const equatorWave = (midSmooth * 0.75 + bassAttack * 0.55) * Math.sin(u * 48 + time * 4.5 + groupPhase) * planeSize * 0.05 * (1 - band);
           // 鼓点冲击集中在中间横面（红圈区域）
-          const bassBoost = bassPulse * (1 - band) * planeSize * 0.32;
+          const bassBoost = bassPulse * (1 - band) * planeSize * 0.42;
           const r = baseR + displacement + wave + equatorWave + bassBoost;
           x = nx * r;
           y = ny * r;
