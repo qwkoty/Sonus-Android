@@ -444,7 +444,7 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
           const bassBoost = bassPulse * planeSize * 0.45 * activeFactor;
 
           // 两端独立的舒缓起伏动画，不跟节奏但让整体更合群
-          const idleWave = idleFactor * Math.sin(v * 20 + time * 1.8 + groupPhase * 0.4) * Math.cos(u * 14 + time * 1.3) * planeSize * 0.035;
+          const idleWave = idleFactor * Math.sin(v * 20 + time * 1.8 + groupPhase * 0.4) * Math.cos(u * 14 + time * 1.3) * planeSize * 0.0175;
 
           const r = baseR + displacement + wave + equatorWave + bassBoost + idleWave;
           x = nx * r;
