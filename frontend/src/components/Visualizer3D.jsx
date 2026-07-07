@@ -405,11 +405,11 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
         const groupPhase = group * 0.85;
 
         if (targetShape === 'coverflow') {
-          // 粒子封面：整个面 3D 飘动，幅度随整体能量起伏，保证所有粒子都动
+          // 粒子封面：整个面 3D 飘动，幅度随整体能量起伏，连续细腻
           const audioAmp = 0.45 + totalEnergy * 1.3;
-          const waveX = Math.sin(u * 5 * Math.PI + time * 0.8 + groupPhase) * Math.cos(v * 3 * Math.PI + time * 0.5) * 0.22;
-          const waveY = Math.cos(u * 4 * Math.PI + time * 0.6 + groupPhase) * Math.sin(v * 5 * Math.PI + time * 0.7) * 0.22;
-          const waveZ = Math.sin((u + v) * 6 * Math.PI + time * 0.9 + groupPhase) * 0.28 + Math.sin(dc * 8 - time * 1.2) * 0.08;
+          const waveX = Math.sin(u * 5 * Math.PI + time * 0.8) * Math.cos(v * 3 * Math.PI + time * 0.5) * 0.22;
+          const waveY = Math.cos(u * 4 * Math.PI + time * 0.6) * Math.sin(v * 5 * Math.PI + time * 0.7) * 0.22;
+          const waveZ = Math.sin((u + v) * 6 * Math.PI + time * 0.9) * 0.28 + Math.sin(dc * 8 - time * 1.2) * 0.08;
           const amp = zAmp * audioAmp;
           x = bx + waveX * amp;
           y = by + waveY * amp;
