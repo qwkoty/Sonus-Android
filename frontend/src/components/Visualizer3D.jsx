@@ -470,9 +470,9 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
       posAttr.needsUpdate = true;
       if (needColorUpdate) colorAttr.needsUpdate = true;
 
-      // 360° 自动旋转：无手势交互 1.5s 后缓慢旋转，交互时暂停
+      // 360° 自动旋转：只要没有手势交互就持续匀速旋转
       const g = gestureRef.current;
-      if (g.autoRotate && !g.dragging && !g.pinching && now - g.lastInteractTime > 1500) {
+      if (g.autoRotate && !g.dragging && !g.pinching) {
         g.targetRotation += dt * 0.35;
       }
       g.zoom += (g.targetZoom - g.zoom) * 0.18;
