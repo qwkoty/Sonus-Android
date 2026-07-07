@@ -400,26 +400,38 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
 
         let x = bx, y = by, z = bz;
 
+        // 8 个粒子一组，共享相位和基础律动，避免零碎跳动
+        const group = Math.floor(i / 8);
+        const groupPhase = group * 0.85;
+
         if (targetShape === 'coverflow') {
-          // 粒子封面：整个面 3D 飘动，幅度固定、无膨胀
-          const waveX = Math.sin(u * 5 * Math.PI + time * 0.8) * Math.cos(v * 3 * Math.PI + time * 0.5) * 0.22;
-          const waveY = Math.cos(u * 4 * Math.PI + time * 0.6) * Math.sin(v * 5 * Math.PI + time * 0.7) * 0.22;
-          const waveZ = Math.sin((u + v) * 6 * Math.PI + time * 0.9) * 0.28 + Math.sin(dc * 8 - time * 1.2) * 0.08;
-          const amp = zAmp; // 固定幅度，不随音频能量变化
+          // 粒子封面：整个面 3D 飘动，幅度随整体能量起伏，保证所有粒子都动
+          const audioAmp = 0.45 + totalEnergy * 1.3;
+          const waveX = Math.sin(u * 5 * Math.PI + time * 0.8 + groupPhase) * Math.cos(v * 3 * Math.PI + time * 0.5) * 0.22;
+          const waveY = Math.cos(u * 4 * Math.PI + time * 0.6 + groupPhase) * Math.sin(v * 5 * Math.PI + time * 0.7) * 0.22;
+          const waveZ = Math.sin((u + v) * 6 * Math.PI + time * 0.9 + groupPhase) * 0.28 + Math.sin(dc * 8 - time * 1.2) * 0.08;
+          const amp = zAmp * audioAmp;
           x = bx + waveX * amp;
           y = by + waveY * amp;
           z = bz + waveZ * amp;
         } else if (targetShape === 'liquidmetal') {
           // 液态金属：球体横面中间为高频+鼓点，向两极（周围）依次减弱
           const band = bandArr[i];
-          const energy = spectrumSmooth[freqBand[i]];
+          // 64 个频谱条压缩为 8 个粗频段，8 个粒子共享一个频段能量
+          const coarseBand = Math.min(7, Math.floor(freqBand[i] / 8));
+          let energy = 0;
+          for (let k = coarseBand * 8; k < (coarseBand + 1) * 8 && k < 64; k++) energy += spectrumSmooth[k];
+          energy /= 8;
+          // 基础律动：所有粒子都会随整体节奏起伏，不会静止
+          const basePulse = (bassAttack * 0.35 + midSmooth * 0.25 + trebleSmooth * 0.15) * (0.6 + 0.4 * Math.sin(time * 4 + groupPhase));
+          const totalLocalEnergy = energy + basePulse;
           const baseR = planeSize * LIQUID_RADIUS_RATIO * (0.82 + (coverLight[i] || 0.5) * 0.36);
           // 中间横面（band≈0）对应高频，振幅最大；向两极 band≈1 对应低频，振幅依次减小
-          const displacement = energy * planeSize * 0.34 * (0.18 + 0.82 * (1 - band));
+          const displacement = totalLocalEnergy * planeSize * 0.34 * (0.18 + 0.82 * (1 - band));
           // 细微液面波纹，越往中间越明显
-          const wave = midSmooth * Math.sin(u * 56 + time * 5 + band * 10) * planeSize * 0.028 * (1 - band);
+          const wave = midSmooth * Math.sin(u * 56 + time * 5 + band * 10 + groupPhase) * planeSize * 0.028 * (1 - band);
           // 赤道起伏：中间横面有舒缓的横波，向两极递减，让高频区也有律动
-          const equatorWave = (midSmooth * 0.6 + bassAttack * 0.4) * Math.sin(u * 48 + time * 4.5) * planeSize * 0.035 * (1 - band);
+          const equatorWave = (midSmooth * 0.6 + bassAttack * 0.4) * Math.sin(u * 48 + time * 4.5 + groupPhase) * planeSize * 0.035 * (1 - band);
           // 鼓点冲击集中在中间横面（红圈区域）
           const bassBoost = bassPulse * (1 - band) * planeSize * 0.32;
           const r = baseR + displacement + wave + equatorWave + bassBoost;
