@@ -1,24 +1,23 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
   <defs>
-    <linearGradient id="g1" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#00F5D4"/>
-      <stop offset="50%" stop-color="#2442ff"/>
-      <stop offset="100%" stop-color="#f4d28a"/>
+    <radialGradient id="bg" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#0a0a12"/>
+      <stop offset="100%" stop-color="#000"/>
+    </radialGradient>
+    <linearGradient id="wave" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#4488ff"/>
+      <stop offset="50%" stop-color="#8866ff"/>
+      <stop offset="100%" stop-color="#dd66ff"/>
     </linearGradient>
-    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
-      <feGaussianBlur stdDeviation="18" result="b"/>
-      <feMerge>
-        <feMergeNode in="b"/>
-        <feMergeNode in="SourceGraphic"/>
-      </feMerge>
-    </filter>
+    <linearGradient id="textGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="70%" stop-color="#e8e0ff"/>
+      <stop offset="100%" stop-color="#d0b0ff"/>
+    </linearGradient>
   </defs>
-  <rect width="1024" height="1024" rx="224" fill="#050608"/>
-  <g fill="none" stroke="url(#g1)" stroke-width="10" stroke-linecap="round" filter="url(#glow)">
-    <path d="M512 120 Q 680 120 760 260 Q 840 400 760 540 Q 680 680 512 680 Q 344 680 264 540 Q 184 400 264 260 Q 344 120 512 120" opacity="0.9"/>
-    <path d="M512 170 Q 640 170 700 290 Q 760 410 700 530 Q 640 650 512 650 Q 384 650 324 530 Q 264 410 324 290 Q 384 170 512 170" opacity="0.7" stroke-width="7"/>
-    <path d="M512 220 Q 600 220 640 320 Q 680 420 640 520 Q 600 620 512 620 Q 424 620 384 520 Q 344 420 384 320 Q 424 220 512 220" opacity="0.5" stroke-width="5"/>
-    <path d="M512 270 Q 560 270 580 350 Q 600 430 580 510 Q 560 590 512 590 Q 464 590 444 510 Q 424 430 444 350 Q 464 270 512 270" opacity="0.35" stroke-width="3"/>
-  </g>
-  <text x="512" y="590" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-weight="820" font-size="380" fill="#fff" letter-spacing="-0.04em" filter="url(#glow)">SN</text>
+  <rect width="512" height="512" rx="96" fill="url(#bg)"/>
+  <circle cx="256" cy="256" r="220" fill="none" stroke="url(#wave)" stroke-width="6" opacity="0.7"/>
+  <circle cx="256" cy="256" r="200" fill="none" stroke="url(#wave)" stroke-width="4" opacity="0.5"/>
+  <circle cx="256" cy="256" r="180" fill="none" stroke="url(#wave)" stroke-width="3" opacity="0.35"/>
+  <text x="256" y="310" text-anchor="middle" font-family="Arial,sans-serif" font-weight="bold" font-size="180" fill="url(#textGrad)">SN</text>
 </svg>
