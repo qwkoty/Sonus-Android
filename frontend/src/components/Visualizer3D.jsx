@@ -415,12 +415,13 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
           y = by + waveY * amp;
           z = bz + waveZ * amp;
         } else if (targetShape === 'liquidmetal') {
-          // 液态金属：球体中间横面为高频，向两极依次降低；两端（两极）可静止
+          // 液态金属：球体中间横面为高频+节奏律动，向两极依次降低；两端做舒缓起伏
           const band = bandArr[i]; // 0=赤道(最中间), 1=两极(两端)
 
-          // 中间活跃区：约 72% 范围跟随节奏，超出后快速衰减到 0（两端静止）
+          // 中间活跃区：约 72% 范围跟随节奏，超出后快速衰减
           const activeRange = 0.72;
           const activeFactor = band < activeRange ? Math.pow(1 - band / activeRange, 0.55) : 0;
+          const idleFactor = 1 - activeFactor;
 
           // 64 个频谱条压缩为 8 个粗频段，8 个粒子共享一个频段能量
           // 中间对应高频 coarseBand=7，向两极依次降低
@@ -429,7 +430,7 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
           for (let k = coarseBand * 8; k < (coarseBand + 1) * 8 && k < 64; k++) energy += spectrumSmooth[k];
           energy /= 8;
 
-          // 中间区域整体律动，向边缘按 activeFactor 衰减，两极不动
+          // 中间区域整体律动，向边缘按 activeFactor 衰减
           const localPulse = (energy * 1.15 + bassAttack * 0.7 + midSmooth * 0.5) * activeFactor;
           const displacement = localPulse * planeSize * 0.45;
 
@@ -442,7 +443,10 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
           // 鼓点冲击集中在中间横面
           const bassBoost = bassPulse * planeSize * 0.45 * activeFactor;
 
-          const r = baseR + displacement + wave + equatorWave + bassBoost;
+          // 两端独立的舒缓起伏动画，不跟节奏但让整体更合群
+          const idleWave = idleFactor * Math.sin(v * 20 + time * 1.8 + groupPhase * 0.4) * Math.cos(u * 14 + time * 1.3) * planeSize * 0.035;
+
+          const r = baseR + displacement + wave + equatorWave + bassBoost + idleWave;
           x = nx * r;
           y = ny * r;
           z = nz * r;
