@@ -79,6 +79,8 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
     startRot: 0,
     dragging: false,
     startX: 0,
+    autoRotate: true,
+    lastInteractTime: 0,
   });
 
   // 加载封面并采样为 ImageData
@@ -432,16 +434,16 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
 
           // 中间区域整体律动，向边缘按 activeFactor 衰减
           const localPulse = (energy * 1.15 + bassAttack * 0.7 + midSmooth * 0.5) * activeFactor;
-          const displacement = localPulse * planeSize * 0.1125;
+          const displacement = localPulse * planeSize * 0.09;
 
           const baseR = planeSize * LIQUID_RADIUS_RATIO * (0.82 + (coverLight[i] || 0.5) * 0.36);
 
           // 中间横面波纹，越往中间越明显
-          const wave = (midSmooth * 0.9 + bassAttack * 0.6) * Math.sin(u * 56 + time * 5 + groupPhase) * planeSize * 0.01 * activeFactor;
+          const wave = (midSmooth * 0.9 + bassAttack * 0.6) * Math.sin(u * 56 + time * 5 + groupPhase) * planeSize * 0.008 * activeFactor;
           // 赤道起伏：中间有舒缓横波，向边缘衰减
-          const equatorWave = (midSmooth * 0.8 + bassAttack * 0.6) * Math.sin(u * 48 + time * 4.5 + groupPhase) * planeSize * 0.01375 * activeFactor;
+          const equatorWave = (midSmooth * 0.8 + bassAttack * 0.6) * Math.sin(u * 48 + time * 4.5 + groupPhase) * planeSize * 0.011 * activeFactor;
           // 鼓点冲击集中在中间横面
-          const bassBoost = bassPulse * planeSize * 0.1125 * activeFactor;
+          const bassBoost = bassPulse * planeSize * 0.09 * activeFactor;
 
           // 两端独立的舒缓起伏动画，不跟节奏但让整体更合群
           const idleWave = idleFactor * Math.sin(v * 20 + time * 1.8 + groupPhase * 0.4) * Math.cos(u * 14 + time * 1.3) * planeSize * 0.06;
@@ -468,8 +470,11 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
       posAttr.needsUpdate = true;
       if (needColorUpdate) colorAttr.needsUpdate = true;
 
-      // 电影镜头：仅手势驱动，关闭自动旋转
+      // 360° 自动旋转：无手势交互 1.5s 后缓慢旋转，交互时暂停
       const g = gestureRef.current;
+      if (g.autoRotate && !g.dragging && !g.pinching && now - g.lastInteractTime > 1500) {
+        g.targetRotation += dt * 0.35;
+      }
       g.zoom += (g.targetZoom - g.zoom) * 0.18;
       g.rotation += (g.targetRotation - g.rotation) * 0.18;
       const clampedZoom = Math.max(0.4, Math.min(3.0, g.zoom));
@@ -500,6 +505,7 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
     const ROTATE_SENSITIVITY = 0.006;
     const onTouchStart = (e) => {
       const g = gestureRef.current;
+      g.lastInteractTime = performance.now();
       if (e.touches.length === 1) {
         g.dragging = true;
         g.startX = e.touches[0].clientX;
@@ -515,6 +521,7 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
     };
     const onTouchMove = (e) => {
       const g = gestureRef.current;
+      g.lastInteractTime = performance.now();
       if (g.pinching && e.touches.length === 2) {
         e.preventDefault();
         const d = dist(e.touches[0], e.touches[1]);
@@ -532,9 +539,11 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
       const g = gestureRef.current;
       if (e.touches.length < 2) g.pinching = false;
       if (e.touches.length < 1) g.dragging = false;
+      g.lastInteractTime = performance.now();
     };
     const onWheel = (e) => {
       const g = gestureRef.current;
+      g.lastInteractTime = performance.now();
       g.targetZoom = Math.max(0.4, Math.min(3.0, g.targetZoom * (e.deltaY > 0 ? 0.92 : 1.08)));
     };
     dom.style.touchAction = 'none';
