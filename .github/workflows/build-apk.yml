@@ -1,0 +1,97 @@
+name: Build Android APK
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: 'platforms;android-36 build-tools;36.0.0'
+
+      - name: Install frontend deps
+        working-directory: frontend
+        run: npm install --no-audit --no-fund
+
+      - name: Build web assets
+        working-directory: frontend
+        run: npm run build
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Sync Capacitor
+        working-directory: frontend
+        run: npx cap sync android
+
+      - name: Decode release keystore
+        run: |
+          mkdir -p frontend/android/app
+          base64 -d .github/sonus.keystore.b64 > frontend/android/app/sonus-release.keystore
+          echo "Keystore decoded: $(ls -la frontend/android/app/sonus-release.keystore)"
+
+      - name: Build release APK
+        working-directory: frontend/android
+        env:
+          SONUS_KEYSTORE_PATH: sonus-release.keystore
+          SONUS_KEYSTORE_PASS: sonus123456
+          SONUS_KEY_ALIAS: sonus
+          SONUS_KEY_PASS: sonus123456
+        run: ./gradlew assembleRelease --no-daemon -PversionCode=${{ github.run_number }} -PversionName=1.0.${{ github.run_number }}
+
+      - name: Rename APK
+        id: apk
+        run: |
+          mkdir -p /tmp/apk-out
+          # 查找 release APK（可能名为 app-release.apk 或 app-release-unsigned.apk）
+          SRC=$(find frontend/android/app/build/outputs/apk/release -name "*.apk" | head -1)
+          echo "Found APK: $SRC"
+          DEST="sonus-v1.0.${{ github.run_number }}.apk"
+          cp "$SRC" "/tmp/apk-out/$DEST"
+          echo "path=/tmp/apk-out/$DEST" >> "$GITHUB_OUTPUT"
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sonus-apk-${{ github.run_number }}
+          path: ${{ steps.apk.outputs.path }}
+          retention-days: 30
+
+      - name: Create Release with APK
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v1.0.${{ github.run_number }}
+          name: Sonus v1.0.${{ github.run_number }}
+          body: |
+            自动构建的 release APK（固定签名，可覆盖安装，登录态会保留）。
+
+            构建来源: ${{ github.sha }}
+            触发: ${{ github.event_name }}
+            versionCode: ${{ github.run_number }}
+          files: ${{ steps.apk.outputs.path }}
+          make_latest: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

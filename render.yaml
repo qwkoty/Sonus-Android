@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: sonus
+    runtime: node
+    plan: free
+    buildCommand: npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: "22.14.0"
+      - key: FRONTEND_URL
+        value: https://sonus.onrender.com

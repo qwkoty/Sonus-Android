@@ -1,0 +1,75 @@
+apply plugin: 'com.android.application'
+
+// 读取签名信息（由 CI 注入；本地缺失时回退到 debug 签名）
+def sonusKeystorePath = System.getenv('SONUS_KEYSTORE_PATH') ?: ''
+def sonusKeystorePass = System.getenv('SONUS_KEYSTORE_PASS') ?: 'sonus123456'
+def sonusKeyAlias = System.getenv('SONUS_KEY_ALIAS') ?: 'sonus'
+def sonusKeyPass = System.getenv('SONUS_KEY_PASS') ?: 'sonus123456'
+def hasReleaseKeystore = sonusKeystorePath != '' && file(sonusKeystorePath).exists()
+
+android {
+    namespace = "com.sonus.app"
+    compileSdk = rootProject.ext.compileSdkVersion
+    defaultConfig {
+        applicationId "com.sonus.app"
+        minSdkVersion rootProject.ext.minSdkVersion
+        targetSdkVersion rootProject.ext.targetSdkVersion
+        // versionCode / versionName 由 CI 通过 -P 注入，默认值用于本地
+        versionCode (project.findProperty('versionCode') ? project.findProperty('versionCode') as int : 1)
+        versionName (project.findProperty('versionName') ?: '1.0')
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        aaptOptions {
+            ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
+        }
+    }
+    signingConfigs {
+        release {
+            if (hasReleaseKeystore) {
+                storeFile file(sonusKeystorePath)
+                storePassword sonusKeystorePass
+                keyAlias sonusKeyAlias
+                keyPassword sonusKeyPass
+            }
+        }
+    }
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            if (hasReleaseKeystore) {
+                signingConfig signingConfigs.release
+            }
+        }
+    }
+}
+
+repositories {
+    flatDir{
+        dirs '../capacitor-cordova-android-plugins/src/main/libs', 'libs'
+    }
+}
+
+dependencies {
+    implementation fileTree(include: ['*.jar'], dir: 'libs')
+    implementation "androidx.appcompat:appcompat:$androidxAppCompatVersion"
+    implementation "androidx.coordinatorlayout:coordinatorlayout:$androidxCoordinatorLayoutVersion"
+    implementation "androidx.core:core-splashscreen:$coreSplashScreenVersion"
+    implementation project(':capacitor-android')
+    // NanoHTTPD：用于本地音频代理服务器，解决 WebView Audio 跨域播放被 QQ 音乐 CDN 403 的问题
+    implementation 'org.nanohttpd:nanohttpd:2.3.1'
+    testImplementation "junit:junit:$junitVersion"
+    androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
+    androidTestImplementation "androidx.test.espresso:espresso-core:$androidxEspressoCoreVersion"
+    implementation project(':capacitor-cordova-android-plugins')
+}
+
+apply from: 'capacitor.build.gradle'
+
+try {
+    def servicesJSON = file('google-services.json')
+    if (servicesJSON.text) {
+        apply plugin: 'com.google.gms.google-services'
+    }
+} catch(Exception e) {
+    logger.info("google-services.json not found, google-services plugin not applied. Push Notifications won't work")
+}
