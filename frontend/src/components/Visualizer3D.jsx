@@ -66,21 +66,23 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
     }
   }, [mode]);
 
-  // 手势状态（双指缩放 + 旋转；单指划动旋转）
+  // 手势状态（双指缩放 + 旋转；单指划动实现 360° 旋转）
   const gestureRef = useRef({
     zoom: 1.0,
     rotation: 0,
     targetZoom: 1.0,
     targetRotation: 0,
+    rotX: -0.12,
+    targetRotX: -0.12,
     pinching: false,
     startDist: 0,
     startAngle: 0,
     startZoom: 1.0,
     startRot: 0,
+    startRotX: -0.12,
     dragging: false,
     startX: 0,
-    autoRotate: true,
-    lastInteractTime: 0,
+    startY: 0,
   });
 
   // 加载封面并采样为 ImageData
@@ -470,17 +472,15 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
       posAttr.needsUpdate = true;
       if (needColorUpdate) colorAttr.needsUpdate = true;
 
-      // 360° 自动旋转：只要没有手势交互就持续匀速旋转
+      // 手势驱动 360° 旋转：平滑插值到目标角度
       const g = gestureRef.current;
-      if (g.autoRotate && !g.dragging && !g.pinching) {
-        g.targetRotation += dt * 0.35;
-      }
       g.zoom += (g.targetZoom - g.zoom) * 0.18;
       g.rotation += (g.targetRotation - g.rotation) * 0.18;
+      g.rotX += (g.targetRotX - g.rotX) * 0.18;
       const clampedZoom = Math.max(0.4, Math.min(3.0, g.zoom));
       camera.position.z = cameraZ / clampedZoom;
       points.rotation.y = g.rotation;
-      points.rotation.x = -0.12;
+      points.rotation.x = g.rotX;
       points.rotation.z = 0;
       camera.position.x = 0;
       camera.position.y = 0;
@@ -505,11 +505,12 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
     const ROTATE_SENSITIVITY = 0.006;
     const onTouchStart = (e) => {
       const g = gestureRef.current;
-      g.lastInteractTime = performance.now();
       if (e.touches.length === 1) {
         g.dragging = true;
         g.startX = e.touches[0].clientX;
+        g.startY = e.touches[0].clientY;
         g.startRot = g.targetRotation;
+        g.startRotX = g.targetRotX;
       } else if (e.touches.length === 2) {
         g.pinching = true;
         g.dragging = false;
@@ -517,11 +518,11 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
         g.startAngle = angle(e.touches[0], e.touches[1]);
         g.startZoom = g.targetZoom;
         g.startRot = g.targetRotation;
+        g.startRotX = g.targetRotX;
       }
     };
     const onTouchMove = (e) => {
       const g = gestureRef.current;
-      g.lastInteractTime = performance.now();
       if (g.pinching && e.touches.length === 2) {
         e.preventDefault();
         const d = dist(e.touches[0], e.touches[1]);
@@ -532,18 +533,19 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
       } else if (g.dragging && e.touches.length === 1) {
         e.preventDefault();
         const dx = e.touches[0].clientX - g.startX;
+        const dy = e.touches[0].clientY - g.startY;
         g.targetRotation = g.startRot + dx * ROTATE_SENSITIVITY;
+        // 上下滑动控制 X 轴旋转，限制范围避免翻转过度
+        g.targetRotX = Math.max(-Math.PI * 0.45, Math.min(Math.PI * 0.45, g.startRotX - dy * ROTATE_SENSITIVITY));
       }
     };
     const onTouchEnd = (e) => {
       const g = gestureRef.current;
       if (e.touches.length < 2) g.pinching = false;
       if (e.touches.length < 1) g.dragging = false;
-      g.lastInteractTime = performance.now();
     };
     const onWheel = (e) => {
       const g = gestureRef.current;
-      g.lastInteractTime = performance.now();
       g.targetZoom = Math.max(0.4, Math.min(3.0, g.targetZoom * (e.deltaY > 0 ? 0.92 : 1.08)));
     };
     dom.style.touchAction = 'none';
