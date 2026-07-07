@@ -26,6 +26,13 @@
 
         </activity>
 
+        <!-- 前台媒体播放服务：保持后台播放并在通知栏/锁屏提供媒体控制 -->
+        <service
+            android:name=".MusicPlaybackService"
+            android:enabled="true"
+            android:exported="false"
+            android:foregroundServiceType="mediaPlayback" />
+
         <!-- QQ 音乐登录 WebView Activity -->
         <activity
             android:name=".LoginWebViewActivity"

@@ -30,6 +30,7 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onCreate(Bundle savedInstanceState) {
         registerPlugin(CookieReaderPlugin.class);
+        registerPlugin(MediaControlPlugin.class);
         super.onCreate(savedInstanceState);
 
         // 启动本地音频代理服务器（端口 0 = 让系统随机分配可用端口）

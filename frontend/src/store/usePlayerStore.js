@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { music } from '../api/music';
 import { useAuthStore } from './useAuthStore';
 import { getAudio, initAudioSystem } from '../audio/engine';
+import { MediaControl } from '../plugins/MediaControl';
 
 function parseLyric(lrcText) {
   if (!lrcText) return [];
@@ -48,6 +49,10 @@ export const usePlayerStore = create((set, get) => {
       if (isFinite(d) && d > 0) set({ duration: d });
     }
     set({ currentTime: time, currentLyric: getCurrentLyric(lyrics, time) });
+    if (MediaControl.isAvailable()) {
+      const { isPlaying, duration } = get();
+      MediaControl.updatePlaybackState({ isPlaying, position: time, duration });
+    }
   });
 
   // 歌词高亮需要比 timeupdate 更平滑的时间，用 RAF 单独更新 lyricTime
@@ -60,6 +65,14 @@ export const usePlayerStore = create((set, get) => {
     lyricRaf = requestAnimationFrame(updateLyricTime);
   };
   lyricRaf = requestAnimationFrame(updateLyricTime);
+
+  // 原生通知栏/锁屏控制事件
+  MediaControl.onMediaControlEvent((action) => {
+    const { togglePlay, next, prev } = get();
+    if (action === 'togglePlay') togglePlay();
+    else if (action === 'next') next();
+    else if (action === 'prev') prev();
+  });
 
   audio.addEventListener('loadedmetadata', () => {
     let d = audio.duration;
@@ -97,6 +110,7 @@ export const usePlayerStore = create((set, get) => {
     const err = audio.error;
     console.error('Audio error', err?.code, err?.message, audio.src);
     set({ isPlaying: false, isLoadingUrl: false, error: `音源加载失败 (${err?.code || '?'})，自动切换下一首` });
+    if (MediaControl.isAvailable()) MediaControl.release();
     setTimeout(() => {
       const { playMode, currentTrack } = get();
       if (currentTrack && playMode !== 'single') get().next();
@@ -145,6 +159,16 @@ export const usePlayerStore = create((set, get) => {
         set({ playlist: [...playlist, track] });
       }
 
+      if (MediaControl.isAvailable()) {
+        MediaControl.initMediaSession({
+          title: track.title || '',
+          artist: track.artist || '',
+          album: track.album || '',
+          coverUrl: track.cover || '',
+        });
+        MediaControl.updatePlaybackState({ isPlaying: false, position: 0, duration: track?.duration || 0 });
+      }
+
       const { cookie, uin, key } = authCreds();
 
       let url = track.url || '';
@@ -173,9 +197,17 @@ export const usePlayerStore = create((set, get) => {
           await audio.play();
           console.log('[playTrack] play started');
           set({ isPlaying: true, isLoadingUrl: false, currentTrack: { ...track, url } });
+          if (MediaControl.isAvailable()) {
+            const { currentTime, duration } = get();
+            MediaControl.updatePlaybackState({ isPlaying: true, position: currentTime, duration });
+          }
         } catch (err) {
           console.error('[playTrack] play() failed', err);
           set({ isPlaying: false, isLoadingUrl: false, error: '播放失败，可能是版权限制或网络问题' });
+          if (MediaControl.isAvailable()) {
+            const { currentTime, duration } = get();
+            MediaControl.updatePlaybackState({ isPlaying: false, position: currentTime, duration });
+          }
         }
       } else {
         console.warn('[playTrack] no url');
@@ -189,14 +221,33 @@ export const usePlayerStore = create((set, get) => {
     togglePlay: () => {
       initAudioSystem();
       const { audio, isPlaying, currentTrack } = get();
-      if (!currentTrack) return;
+      if (!currentTrack) {
+        if (MediaControl.isAvailable()) MediaControl.release();
+        return;
+      }
       if (isPlaying) {
         audio.pause();
         set({ isPlaying: false });
+        if (MediaControl.isAvailable()) {
+          const { currentTime, duration } = get();
+          MediaControl.updatePlaybackState({ isPlaying: false, position: currentTime, duration });
+        }
       } else {
         const hasSrc = audio.src && audio.src !== '' && !audio.src.endsWith('/');
         if (hasSrc) {
-          audio.play().then(() => set({ isPlaying: true })).catch(() => set({ isPlaying: false }));
+          audio.play().then(() => {
+            set({ isPlaying: true });
+            if (MediaControl.isAvailable()) {
+              const { currentTime, duration } = get();
+              MediaControl.updatePlaybackState({ isPlaying: true, position: currentTime, duration });
+            }
+          }).catch(() => {
+            set({ isPlaying: false });
+            if (MediaControl.isAvailable()) {
+              const { currentTime, duration } = get();
+              MediaControl.updatePlaybackState({ isPlaying: false, position: currentTime, duration });
+            }
+          });
         } else {
           get().playTrack(currentTrack);
         }
@@ -206,6 +257,10 @@ export const usePlayerStore = create((set, get) => {
     pause: () => {
       get().audio.pause();
       set({ isPlaying: false });
+      if (MediaControl.isAvailable()) {
+        const { currentTime, duration } = get();
+        MediaControl.updatePlaybackState({ isPlaying: false, position: currentTime, duration });
+      }
     },
 
     next: () => {

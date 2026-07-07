@@ -55,6 +55,8 @@ dependencies {
     implementation "androidx.coordinatorlayout:coordinatorlayout:$androidxCoordinatorLayoutVersion"
     implementation "androidx.core:core-splashscreen:$coreSplashScreenVersion"
     implementation project(':capacitor-android')
+    // androidx.media：MediaSession + MediaStyle 通知，用于状态栏媒体控制
+    implementation "androidx.media:media:$androidxMediaVersion"
     // NanoHTTPD：用于本地音频代理服务器，解决 WebView Audio 跨域播放被 QQ 音乐 CDN 403 的问题
     implementation 'org.nanohttpd:nanohttpd:2.3.1'
     testImplementation "junit:junit:$junitVersion"
