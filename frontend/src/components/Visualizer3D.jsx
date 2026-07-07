@@ -2,22 +2,37 @@ import { useEffect, useRef, memo } from 'react';
 import * as THREE from 'three';
 import { getSpectrumBars } from '../audio/engine';
 import { getProxyUrl } from '../api/music';
-import { usePlayerStore } from '../store/usePlayerStore';
 
 const GRID = 180;             // 180x180 = 32400 粒子（统一用于全部 3D 形态）
 const FOV = 55;
-const AUTO_ROTATE_SPEED = 0.35;   // 自动偏航角速度 rad/s（≈20°/s，约 18s 转一圈）
+const AUTO_ROTATE_SPEED = 0.35;   // 自动偏航角速度 rad/s（≈20°/s）— 默认关闭
 const AUTO_RESUME_MS = 2500;      // 停止交互后多久恢复自动旋转（ms）
 const PITCH_LIMIT = 1.48;         // 俯仰角限制 ≈ ±85°，避免上下翻转
 const ROTATE_SENSITIVITY = 0.006; // 滑动旋转灵敏度 rad/px
 
-// —— 共振星核（singularity）参数 ——
-const SINGULARITY_DPR_CAP = 2;    // 高 dpi 渲染上限，保帧
-const BEAT_THRESHOLD = 0.16;      // 低频能量一阶导超此值触发爆发
-const BEAT_COOLDOWN = 0.11;       // 两次爆发最小间隔（s）
-const SPRING_K = 0.05;            // 朝原点的弹簧回拉系数（爆发回弹）
+// —— 星河漩涡（galaxy）参数 ——
+const GALAXY_DPR_CAP = 2;         // 高 dpi 渲染上限，保帧
+const GALAXY_ARMS = 3;            // 旋臂数
+const GALAXY_TWIST = 3.4;         // 旋臂总扭转（弧度）
+const GALAXY_BULGE_FRAC = 0.24;   // 中心核球粒子占比
+const GALAXY_R_MAX_RATIO = 0.96;  // 星系盘半径相对画面
+const RIPPLE_FREQ = 14;           // 径向涟漪空间频率
+const RIPPLE_SPEED = 3.0;         // 涟漪向外传播速度
+const BEAT_THRESHOLD = 0.16;      // 低频能量一阶导超此值触发冲击波
+const BEAT_COOLDOWN = 0.11;       // 两次冲击波最小间隔（s）
+const SPRING_K = 0.05;            // 冲击波回弹弹簧系数
 const DAMPING = 0.88;             // 速度阻尼
-const EXPLODE_GAIN = 1.1;         // 爆发冲量增益（× bass）
+const SHOCK_GAIN = 0.9;           // 鼓点冲击波冲量增益（× bass）
+
+// 稳定伪随机（保证星系形态每次重建一致）
+function mulberry32(a) {
+  return function () {
+    a |= 0; a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
 
 function hexToRGB(hex) {
   const c = hex.replace('#', '');
@@ -47,7 +62,7 @@ function createParticleTexture() {
   return tex;
 }
 
-// 3D 粒子可视化：coverflow（粒子封面）/ liquidmetal（液态金属）/ singularity（共振星核）
+// 3D 粒子可视化：coverflow（粒子封面）/ liquidmetal（液态金属）/ galaxy（星河漩涡）
 // 手势驱动：单指/鼠标拖拽 = 偏航(360°)+俯仰(±85°)；双指捏合缩放+扭转；滚轮缩放
 function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPlaying = false, onReady }) {
   const containerRef = useRef(null);
@@ -58,11 +73,9 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
   const hasCoverRef = useRef(false);
   const coverVersionRef = useRef(0);
   const appliedCoverVersionRef = useRef(-1);
-  // 共振星核跨渲染状态（必须置于组件顶层，遵守 hooks 规则）
+  const coverAvgRef = useRef({ r: 0.3, g: 0.5, b: 0.95 }); // 封面平均色（星河外圈着色用）
+  // 星河漩涡跨渲染状态（必须置于组件顶层，遵守 hooks 规则）
   const albumBuiltRef = useRef(-1);
-  const lyricAnyRef = useRef(0);
-  const lastLyricRef = useRef('__init__');
-  const formWeightsRef = useRef({ core: 1, album: 0, lyric: 0 });
   const prevBassRef = useRef(0);
   const lastBeatRef = useRef(0);
   const beatPulseRef = useRef(0);
@@ -170,7 +183,7 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
     const container = containerRef.current;
     if (!container) return;
 
-    const dpr = Math.min(window.devicePixelRatio || 1, SINGULARITY_DPR_CAP);
+    const dpr = Math.min(window.devicePixelRatio || 1, GALAXY_DPR_CAP);
     let W = container.offsetWidth;
     let H = container.offsetHeight;
 
@@ -215,23 +228,25 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
     const baseNormalsCover = new Float32Array(COUNT * 3);
     const basePositionsLiquid = new Float32Array(COUNT * 3);
     const baseNormalsLiquid = new Float32Array(COUNT * 3);
-    // 共振星核三形态基础坐标
-    const basePositionsCore = new Float32Array(COUNT * 3);   // 星核（斐波那契球壳）
-    const basePositionsAlbum = new Float32Array(COUNT * 3);  // 专辑浮雕（亮度→Z 纵深）
-    const basePositionsLyric = new Float32Array(COUNT * 3);  // 歌词汉字点云
-    const coverColors = new Float32Array(COUNT * 3);         // 封面 RGB（专辑形态着色用）
-    const explodeVel = new Float32Array(COUNT * 3);          // 爆发速度
-    const explodePos = new Float32Array(COUNT * 3);          // 爆发偏移（弹簧回弹）
+    const basePositionsGalaxy = new Float32Array(COUNT * 3); // 星河漩涡基础坐标
+    const galaxyR = new Float32Array(COUNT);                 // 每粒子半径
+    const galaxyUX = new Float32Array(COUNT);                // 径向单位向量 X
+    const galaxyUY = new Float32Array(COUNT);                // 径向单位向量 Y
+    const galaxyBulge = new Float32Array(COUNT);             // 1=核球粒子
+    const coverColors = new Float32Array(COUNT * 3);         // 封面 RGB（取平均色用）
+    const explodeVel = new Float32Array(COUNT * 3);          // 冲击波速度
+    const explodePos = new Float32Array(COUNT * 3);          // 冲击波偏移（弹簧回弹）
     const coverLight = new Float32Array(COUNT);
     const bandArr = new Float32Array(COUNT);
     const freqBand = new Uint8Array(COUNT);
     const spectrumSmooth = new Float32Array(64);
 
     const buildBase = () => {
+      const Rmax = planeSize * GALAXY_R_MAX_RATIO;
+      const grng = mulberry32(0x9e3779b9); // 稳定种子 → 星系形态固定
       let idx = 0;
       const half = planeSize;
       const step = (planeSize * 2) / (GRID - 1);
-      const golden = Math.PI * (3 - Math.sqrt(5)); // 斐波那契球
       for (let gy = 0; gy < GRID; gy++) {
         for (let gx = 0; gx < GRID; gx++) {
           const x = -half + gx * step;
@@ -272,27 +287,40 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
           baseNormalsLiquid[idx * 3 + 1] = ly / len;
           baseNormalsLiquid[idx * 3 + 2] = lz / len;
 
-          // 共振星核：斐波那契球壳（几何棱面感）
-          const yy = 1 - (idx / (COUNT - 1)) * 2;
-          const rr = Math.sqrt(Math.max(0, 1 - yy * yy));
-          const th = golden * idx;
-          const cr = planeSize * LIQUID_RADIUS_RATIO * 1.35;
-          const cxv = Math.cos(th) * rr;
-          const czv = Math.sin(th) * rr;
-          basePositionsCore[idx * 3] = cxv * cr;
-          basePositionsCore[idx * 3 + 1] = yy * cr;
-          basePositionsCore[idx * 3 + 2] = czv * cr;
-
-          // 初始化专辑浮雕/歌词点云为星核位置（后续按封面/歌词重建）
-          basePositionsAlbum[idx * 3] = basePositionsCore[idx * 3];
-          basePositionsAlbum[idx * 3 + 1] = basePositionsCore[idx * 3 + 1];
-          basePositionsAlbum[idx * 3 + 2] = basePositionsCore[idx * 3 + 2];
-          basePositionsLyric[idx * 3] = basePositionsCore[idx * 3];
-          basePositionsLyric[idx * 3 + 1] = basePositionsCore[idx * 3 + 1];
-          basePositionsLyric[idx * 3 + 2] = basePositionsCore[idx * 3 + 2];
+          // 星河漩涡：对数螺旋星系盘 + 中心核球
+          const arm = Math.floor(grng() * GALAXY_ARMS);
+          const isBulge = grng() < GALAXY_BULGE_FRAC;
+          let gx2, gy2, gz2, rr, th;
+          if (isBulge) {
+            // 中心核球：略呈球状的密集亮核
+            rr = Math.pow(grng(), 0.5) * Rmax * 0.26;
+            const phi2 = grng() * Math.PI * 2;
+            const ct = grng() * 2 - 1;
+            const st = Math.sqrt(Math.max(0, 1 - ct * ct));
+            th = phi2;
+            gx2 = rr * st * Math.cos(phi2);
+            gy2 = rr * st * Math.sin(phi2);
+            gz2 = rr * ct * 0.55;
+          } else {
+            // 旋臂：半径越外扭转越多；越靠中心散布越宽
+            rr = Rmax * Math.pow(grng(), 0.82);
+            const twist = (rr / Rmax) * GALAXY_TWIST;
+            const scatter = (grng() - 0.5) * (0.62 * (1 - 0.45 * rr / Rmax));
+            th = arm * (Math.PI * 2 / GALAXY_ARMS) + twist + scatter;
+            gx2 = Math.cos(th) * rr;
+            gy2 = Math.sin(th) * rr;
+            gz2 = (grng() - 0.5) * planeSize * 0.045 * (1 - 0.4 * rr / Rmax);
+          }
+          basePositionsGalaxy[idx * 3] = gx2;
+          basePositionsGalaxy[idx * 3 + 1] = gy2;
+          basePositionsGalaxy[idx * 3 + 2] = gz2;
+          galaxyR[idx] = rr;
+          galaxyUX[idx] = Math.cos(th);
+          galaxyUY[idx] = Math.sin(th);
+          galaxyBulge[idx] = isBulge ? 1 : 0;
 
           const initial = modeRef.current === 'liquidmetal' ? basePositionsLiquid
-            : modeRef.current === 'singularity' ? basePositionsCore
+            : modeRef.current === 'galaxy' ? basePositionsGalaxy
               : basePositionsCover;
           positions[idx * 3] = initial[idx * 3];
           positions[idx * 3 + 1] = initial[idx * 3 + 1];
@@ -303,78 +331,27 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
     };
     buildBase();
 
-    // 按当前封面重建「专辑浮雕」基础坐标（亮度→Z 纵深）
+    // 按当前封面采样颜色，并求平均色（星河外圈着色用）
     const rebuildAlbumBase = () => {
       const d = imageDataRef.current;
       const accentRGB = hexToRGB(accentRef.current || '#4FC3F7');
+      let sr = 0, sg = 0, sb = 0, sn = 0;
       for (let i = 0; i < COUNT; i++) {
         const u = origUV[i * 2];
         const v = origUV[i * 2 + 1];
-        let bright = 0.5;
+        let r = accentRGB.r, g = accentRGB.g, b = accentRGB.b;
         if (d) {
           const px = Math.min(GRID - 1, Math.max(0, Math.floor(u * GRID)));
           const py = Math.min(GRID - 1, Math.max(0, Math.floor(v * GRID)));
           const o = (py * GRID + px) * 4;
-          const r = d[o] / 255, g = d[o + 1] / 255, b = d[o + 2] / 255;
-          bright = 0.299 * r + 0.587 * g + 0.114 * b;
-          coverColors[i * 3] = r; coverColors[i * 3 + 1] = g; coverColors[i * 3 + 2] = b;
-        } else {
-          coverColors[i * 3] = accentRGB.r; coverColors[i * 3 + 1] = accentRGB.g; coverColors[i * 3 + 2] = accentRGB.b;
+          r = d[o] / 255; g = d[o + 1] / 255; b = d[o + 2] / 255;
         }
-        basePositionsAlbum[i * 3] = -planeSize + u * 2 * planeSize;
-        basePositionsAlbum[i * 3 + 1] = planeSize - v * 2 * planeSize;
-        basePositionsAlbum[i * 3 + 2] = (bright - 0.5) * planeSize * 0.55;
+        coverColors[i * 3] = r; coverColors[i * 3 + 1] = g; coverColors[i * 3 + 2] = b;
+        // 加权平均（按亮度加权，避免被大块暗部拉偏）
+        const w = 0.2 + 0.8 * (0.299 * r + 0.587 * g + 0.114 * b);
+        sr += r * w; sg += g * w; sb += b * w; sn += w;
       }
-    };
-
-    // 按当前歌词重建「歌词汉字」点云（文字笔画像素→粒子坐标）
-    const rebuildLyricBase = (text) => {
-      let any = 0;
-      const c = document.createElement('canvas');
-      c.width = GRID; c.height = GRID;
-      const cx = c.getContext('2d');
-      cx.clearRect(0, 0, GRID, GRID);
-      if (text && text.trim()) {
-        cx.fillStyle = '#fff';
-        cx.textAlign = 'center';
-        cx.textBaseline = 'middle';
-        let fs = Math.floor(GRID * 0.34);
-        cx.font = `bold ${fs}px "PingFang SC","Microsoft YaHei",sans-serif`;
-        while (fs > 10 && cx.measureText(text).width > GRID * 0.96) {
-          fs -= 2;
-          cx.font = `bold ${fs}px "PingFang SC","Microsoft YaHei",sans-serif`;
-        }
-        cx.fillText(text, GRID / 2, GRID / 2);
-        const data = cx.getImageData(0, 0, GRID, GRID).data;
-        const pts = [];
-        for (let py = 0; py < GRID; py++) {
-          for (let px = 0; px < GRID; px++) {
-            if (data[(py * GRID + px) * 4 + 3] > 128) pts.push([px, py]);
-          }
-        }
-        const N = pts.length;
-        for (let i = 0; i < COUNT; i++) {
-          if (N > 0) {
-            const p = pts[i % N];
-            const u = p[0] / GRID, v = p[1] / GRID;
-            basePositionsLyric[i * 3] = -planeSize + u * 2 * planeSize;
-            basePositionsLyric[i * 3 + 1] = planeSize - v * 2 * planeSize;
-            basePositionsLyric[i * 3 + 2] = planeSize * 0.04 + (i % 5) * 0.002;
-            any = 1;
-          } else {
-            basePositionsLyric[i * 3] = basePositionsCore[i * 3];
-            basePositionsLyric[i * 3 + 1] = basePositionsCore[i * 3 + 1];
-            basePositionsLyric[i * 3 + 2] = basePositionsCore[i * 3 + 2];
-          }
-        }
-      } else {
-        for (let i = 0; i < COUNT; i++) {
-          basePositionsLyric[i * 3] = basePositionsCore[i * 3];
-          basePositionsLyric[i * 3 + 1] = basePositionsCore[i * 3 + 1];
-          basePositionsLyric[i * 3 + 2] = basePositionsCore[i * 3 + 2];
-        }
-      }
-      lyricAnyRef.current = any;
+      if (sn > 0) coverAvgRef.current = { r: sr / sn, g: sg / sn, b: sb / sn };
     };
 
     const geometry = new THREE.BufferGeometry();
@@ -382,7 +359,7 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
     geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
 
     const material = new THREE.PointsMaterial({
-      size: planeSize * 2 / GRID * 1.2,   // 粒子稍大，封面更清晰可见
+      size: planeSize * 2 / GRID * 1.2,   // 粒子稍大，星系更清晰可见
       map: createParticleTexture(),
       vertexColors: true,
       transparent: true,
@@ -427,10 +404,10 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
       return true;
     };
 
-    // 取某形态的基础坐标集（coverflow / liquidmetal / singularity 星核）
+    // 取某形态的基础坐标集（coverflow / liquidmetal / galaxy 星河）
     const baseFor = (m) => {
       if (m === 'liquidmetal') return { pos: basePositionsLiquid, nrm: baseNormalsLiquid };
-      if (m === 'singularity') return { pos: basePositionsCore, nrm: null };
+      if (m === 'galaxy') return { pos: basePositionsGalaxy, nrm: null };
       return { pos: basePositionsCover, nrm: baseNormalsCover };
     };
 
@@ -476,62 +453,35 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
       const zAmp = planeSize * MAX_Z_RATIO;
       const isPlaying = isPlayingRef.current;
       const useCover = isPlaying && hasCoverRef.current;
+      const isGalaxy = modeRef.current === 'galaxy';
 
       if (useCover && appliedCoverVersionRef.current !== coverVersionRef.current) {
         if (applyCoverColors()) appliedCoverVersionRef.current = coverVersionRef.current;
       }
 
-      const isSingularity = modeRef.current === 'singularity';
-
-      // 封面变化 → 重建专辑浮雕
+      // 封面变化 → 重建封面平均色
       if (albumBuiltRef.current !== coverVersionRef.current) {
         rebuildAlbumBase();
         albumBuiltRef.current = coverVersionRef.current;
       }
-      // 歌词变化 → 重建歌词点云
-      const curLyric = usePlayerStore.getState().currentLyric || '';
-      if (curLyric !== lastLyricRef.current) {
-        lastLyricRef.current = curLyric;
-        rebuildLyricBase(curLyric);
-      }
 
-      // 节拍检测：低频能量一阶导超阈值 → 触发爆发
+      // 节拍检测：低频能量一阶导超阈值 → 触发径向冲击波
       const nowS = now * 0.001;
       const dBas = bass - prevBassRef.current;
       prevBassRef.current = bass;
       if (dBas > BEAT_THRESHOLD && (nowS - lastBeatRef.current) > BEAT_COOLDOWN) {
         lastBeatRef.current = nowS;
-        const imp = Math.min(1, bass) * EXPLODE_GAIN * planeSize * 0.12;
+        const imp = Math.min(1, bass) * SHOCK_GAIN * planeSize * 0.10;
         for (let i = 0; i < COUNT; i++) {
-          const px = positions[i * 3], py = positions[i * 3 + 1], pz = positions[i * 3 + 2];
-          const len = Math.hypot(px, py, pz) || 1;
-          explodeVel[i * 3] += (px / len) * imp;
-          explodeVel[i * 3 + 1] += (py / len) * imp;
-          explodeVel[i * 3 + 2] += (pz / len) * imp;
+          explodeVel[i * 3] += galaxyUX[i] * imp;
+          explodeVel[i * 3 + 1] += galaxyUY[i] * imp;
         }
         beatPulseRef.current = 1;
       }
       beatPulseRef.current *= 0.90;
 
-      // 共振星核形态权重（core ↔ album ↔ lyric 平滑过渡）
-      let wC = 1, wA = 0, wL = 0;
-      if (isSingularity) {
-        const hasLyricNow = lyricAnyRef.current && isPlaying;
-        let tCore = 0, tAlbum = 0, tLyric = 0;
-        if (hasLyricNow) tLyric = 1;
-        else if (hasCoverRef.current && bassPulse > 0.12) tAlbum = 1;
-        else tCore = 1;
-        const fw = formWeightsRef.current;
-        fw.core += (tCore - fw.core) * 0.04;
-        fw.album += (tAlbum - fw.album) * 0.04;
-        fw.lyric += (tLyric - fw.lyric) * 0.04;
-        const sum = fw.core + fw.album + fw.lyric || 1;
-        wC = fw.core / sum; wA = fw.album / sum; wL = fw.lyric / sum;
-      }
-
-      // 未播放/暂停时强制回到主题色
-      const needColorUpdate = !useCover;
       const accentRGB = hexToRGB(accentRef.current || '#4FC3F7');
+      const cavg = coverAvgRef.current;
 
       // 形态切换：粒子从旧形态插值到新形态
       const tr = transitionRef.current;
@@ -555,7 +505,7 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
         fromBase = toBase;
       }
 
-      // 爆发偏移积分（弹簧回弹）
+      // 冲击波偏移积分（弹簧回弹）
       for (let i = 0; i < COUNT; i++) {
         for (let k = 0; k < 3; k++) {
           const o = i * 3 + k;
@@ -565,28 +515,35 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
         }
       }
 
+      const Rmax = planeSize * GALAXY_R_MAX_RATIO;
+
       for (let i = 0; i < COUNT; i++) {
         const u = origUV[i * 2];
         const v = origUV[i * 2 + 1];
         const dc = distFromCenter[i];
 
         let bx, by, bz, nx, ny, nz;
-        if (isSingularity) {
-          // 三形态加权混合
-          let sx = basePositionsCore[i * 3] * wC + basePositionsAlbum[i * 3] * wA + basePositionsLyric[i * 3] * wL;
-          let sy = basePositionsCore[i * 3 + 1] * wC + basePositionsAlbum[i * 3 + 1] * wA + basePositionsLyric[i * 3 + 1] * wL;
-          let sz = basePositionsCore[i * 3 + 2] * wC + basePositionsAlbum[i * 3 + 2] * wA + basePositionsLyric[i * 3 + 2] * wL;
+        if (isGalaxy) {
+          const rN = Math.min(1, galaxyR[i] / Rmax);
+          // 由内向外的径向涟漪波（随该频段能量起伏）
+          const band = Math.min(63, Math.floor(rN * 63));
+          const ripple = Math.sin(rN * RIPPLE_FREQ - time * RIPPLE_SPEED) * spectrumSmooth[band] * planeSize * 0.05;
+          // 低频推核球呼吸（越靠中心越强）
+          const bassPush = bassAttack * planeSize * 0.10 * (1 - rN * 0.6);
+          const disp = ripple + bassPush;
+          let sx = basePositionsGalaxy[i * 3] + galaxyUX[i] * disp + explodePos[i * 3];
+          let sy = basePositionsGalaxy[i * 3 + 1] + galaxyUY[i] * disp + explodePos[i * 3 + 1];
+          let sz = basePositionsGalaxy[i * 3 + 2] + explodePos[i * 3 + 2];
           if (tr.active) {
-            // 跨模式进入星核时，从源形态基础坐标平滑过渡到星核加权坐标
+            // 跨模式进入星河时，从源形态基础坐标平滑过渡到星河基础坐标
             const fb = baseFor(tr.from).pos;
             const mt = morphT;
             sx = fb[i * 3] * (1 - mt) + sx * mt;
             sy = fb[i * 3 + 1] * (1 - mt) + sy * mt;
             sz = fb[i * 3 + 2] * (1 - mt) + sz * mt;
           }
-          const rl = Math.hypot(sx, sy, sz) || 1;
           bx = sx; by = sy; bz = sz;
-          nx = sx / rl; ny = sy / rl; nz = sz / rl;
+          nx = galaxyUX[i]; ny = galaxyUY[i]; nz = 0;
         } else if (tr.active) {
           const fbx = fromBase[i * 3];
           const fby = fromBase[i * 3 + 1];
@@ -611,18 +568,16 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
 
         let x = bx, y = by, z = bz;
 
-        if (isSingularity) {
-          // 星核表面随频谱起伏（低频推整体、高频增加细碎抖动）
-          const ripple = (midSmooth * 0.8 + bassAttack * 0.6) * Math.sin(u * 40 + time * 4 + i * 0.5) * planeSize * 0.012
-            + (trebleSmooth * 0.5) * Math.sin(v * 52 + time * 6) * planeSize * 0.006;
-          const audioAmp = 0.5 + totalEnergy * 1.1;
-          x = bx + nx * (ripple + (bassAttack * 0.5 + midSmooth * 0.3) * planeSize * 0.04 * audioAmp);
-          y = by + ny * (ripple + (bassAttack * 0.5 + midSmooth * 0.3) * planeSize * 0.04 * audioAmp);
-          z = bz + nz * (ripple + (bassAttack * 0.5 + midSmooth * 0.3) * planeSize * 0.04 * audioAmp);
-          // 叠加爆发偏移（弹簧回弹）
-          x += explodePos[i * 3];
-          y += explodePos[i * 3 + 1];
-          z += explodePos[i * 3 + 2];
+        if (isGalaxy) {
+          // 星河内部缓慢公转（盘面内旋转成漩涡感，非镜头自转）
+          const ang = time * 0.12;
+          const ca = Math.cos(ang), sa = Math.sin(ang);
+          const rx = x * ca - y * sa;
+          const ry = x * sa + y * ca;
+          x = rx; y = ry;
+          // 频谱细碎抖动增强流动感
+          const jitter = trebleSmooth * 0.5 * Math.sin(u * 50 + time * 5 + i * 0.3) * planeSize * 0.004;
+          x += nx * jitter; y += ny * jitter; z += nz * jitter;
         } else if (targetShape === 'coverflow') {
           // 粒子封面：整个面 3D 飘动，幅度随整体能量起伏，连续细腻
           const audioAmp = 0.45 + totalEnergy * 1.3;
@@ -675,30 +630,32 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
         posAttr.array[i * 3 + 1] = y;
         posAttr.array[i * 3 + 2] = z;
 
-        if (needColorUpdate) {
-          if (isSingularity) {
-            // 专辑形态掺入封面色，其余用主题色；高频提亮、鼓点脉冲
-            const cr = coverColors[i * 3], cg = coverColors[i * 3 + 1], cb = coverColors[i * 3 + 2];
-            const accentMix = 1 - wA * 0.75;
-            const r = accentRGB.r * accentMix + cr * wA * 0.75;
-            const g = accentRGB.g * accentMix + cg * wA * 0.75;
-            const b = accentRGB.b * accentMix + cb * wA * 0.75;
-            const intensity = 0.5 + totalEnergy * 1.4 + trebleSmooth * 0.6 + beatPulseRef.current * 0.7;
-            colorAttr.array[i * 3]     = Math.min(1, r * intensity + beatPulseRef.current * 0.5);
-            colorAttr.array[i * 3 + 1] = Math.min(1, g * intensity + beatPulseRef.current * 0.5);
-            colorAttr.array[i * 3 + 2] = Math.min(1, b * intensity + trebleSmooth * 0.4 + beatPulseRef.current * 0.5);
-          } else {
-            const windGlow = targetShape === 'coverflow' ? Math.abs(z - bz) / (planeSize * 0.12 + 0.001) * 0.12 : 0;
-            const intensity = 0.42 + totalEnergy * 1.6 + windGlow;
-            const outFactor = 1 - dc * 0.25;
-            colorAttr.array[i * 3]     = Math.min(1, accentRGB.r * intensity * outFactor + bassPulse * 0.65);
-            colorAttr.array[i * 3 + 1] = Math.min(1, accentRGB.g * intensity * outFactor + bassPulse * 0.65);
-            colorAttr.array[i * 3 + 2] = Math.min(1, accentRGB.b * intensity * outFactor + bassPulse * 0.65 + windGlow * 0.35);
-          }
+        if (isGalaxy) {
+          // 星河着色：内核=主题色(炽热)，外圈=封面平均色(冷)，加色混合辉光
+          const rN = Math.min(1, galaxyR[i] / Rmax);
+          const coreMix = Math.pow(1 - rN, 1.6);
+          const cr = accentRGB.r, cg = accentRGB.g, cb = accentRGB.b;
+          const ar = cavg.r, ag = cavg.g, ab = cavg.b;
+          let r = cr * coreMix + ar * (1 - coreMix);
+          let g = cg * coreMix + ag * (1 - coreMix);
+          let b = cb * coreMix + ab * (1 - coreMix);
+          const band = Math.min(63, Math.floor(rN * 63));
+          const localE = spectrumSmooth[band];
+          const intensity = 0.42 + bassAttack * 1.1 + localE * 1.6 + beatPulseRef.current * 0.9 + galaxyBulge[i] * bassAttack * 0.6;
+          colorAttr.array[i * 3]     = Math.min(1, r * intensity);
+          colorAttr.array[i * 3 + 1] = Math.min(1, g * intensity);
+          colorAttr.array[i * 3 + 2] = Math.min(1, b * intensity);
+        } else if (!useCover) {
+          const windGlow = targetShape === 'coverflow' ? Math.abs(z - bz) / (planeSize * 0.12 + 0.001) * 0.12 : 0;
+          const intensity = 0.42 + totalEnergy * 1.6 + windGlow;
+          const outFactor = 1 - dc * 0.25;
+          colorAttr.array[i * 3]     = Math.min(1, accentRGB.r * intensity * outFactor + bassPulse * 0.65);
+          colorAttr.array[i * 3 + 1] = Math.min(1, accentRGB.g * intensity * outFactor + bassPulse * 0.65);
+          colorAttr.array[i * 3 + 2] = Math.min(1, accentRGB.b * intensity * outFactor + bassPulse * 0.65 + windGlow * 0.35);
         }
       }
       posAttr.needsUpdate = true;
-      if (needColorUpdate) colorAttr.needsUpdate = true;
+      if (!useCover || isGalaxy) colorAttr.needsUpdate = true;
 
       // 360° 旋转控制
       const g = gestureRef.current;

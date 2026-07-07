@@ -67,8 +67,8 @@
 | 2D 环状频谱 | 径向频谱、中心波形、bass 冲击波 | `frontend/src/components/Visualizer.jsx` | Web Audio | ✅ | 否 | - | ring 模式 |
 | 2D 镜像波形 | 上下镜像频谱带 + 时间域波形 | `frontend/src/components/Visualizer.jsx` | Web Audio | ✅ | 否 | - | wave 模式，已阻止多指默认行为 |
 | 3D 封面粒子画 | 2 万粒子构成封面穹顶，圆形纹理、间距加大，液体绸缎波动 + 鼓皮膨胀 | `frontend/src/components/Visualizer3D.jsx` | Three.js | ✅ | 否 | - | 3d 模式，手势驱动 |
-| 3D 手势控制 | 单指 360° 偏航+俯仰、双指缩放/扭转、滚轮/鼠标缩放、自动旋转空闲恢复 | `frontend/src/components/Visualizer3D.jsx` | 触摸/鼠标事件 | ✅ | 否 | - | coverflow/liquidmetal/singularity 均支持；默认关闭自动旋转 |
-| 3D 共振星核 | 星核(斐波那契球)/专辑浮雕/歌词汉字三形态 + 鼓点爆发物理(弹簧回弹) + 三形态权重 morph | `frontend/src/components/Visualizer3D.jsx` | Three.js + Web Audio | ✅ | 否 | - | singularity 模式，约 3.2 万粒子 |
+| 3D 手势控制 | 单指 360° 偏航+俯仰、双指缩放/扭转、滚轮/鼠标缩放、自动旋转空闲恢复 | `frontend/src/components/Visualizer3D.jsx` | 触摸/鼠标事件 | ✅ | 否 | - | coverflow/liquidmetal/galaxy 均支持；默认关闭自动旋转 |
+| 3D 星河漩涡 | 对数螺旋星系盘 + 中心核球；低频推核球呼吸、频谱激发由内向外径向涟漪波、鼓点甩出冲击波(弹簧回弹)；内核=主题色、外圈=封面平均色 | `frontend/src/components/Visualizer3D.jsx` | Three.js + Web Audio | ✅ | 否 | - | galaxy 模式，约 3.2 万粒子；盘面内缓慢公转(非镜头自转) |
 | 音频待机动画 | 无音频时的呼吸/涟漪动画 | `Visualizer.jsx` / `Visualizer3D.jsx` | 时间驱动 | ✅ | 否 | - | - |
 
 ### 五、搜索与音源
