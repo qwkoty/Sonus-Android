@@ -432,16 +432,16 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
 
           // 中间区域整体律动，向边缘按 activeFactor 衰减
           const localPulse = (energy * 1.15 + bassAttack * 0.7 + midSmooth * 0.5) * activeFactor;
-          const displacement = localPulse * planeSize * 0.225;
+          const displacement = localPulse * planeSize * 0.1125;
 
           const baseR = planeSize * LIQUID_RADIUS_RATIO * (0.82 + (coverLight[i] || 0.5) * 0.36);
 
           // 中间横面波纹，越往中间越明显
-          const wave = (midSmooth * 0.9 + bassAttack * 0.6) * Math.sin(u * 56 + time * 5 + groupPhase) * planeSize * 0.02 * activeFactor;
+          const wave = (midSmooth * 0.9 + bassAttack * 0.6) * Math.sin(u * 56 + time * 5 + groupPhase) * planeSize * 0.01 * activeFactor;
           // 赤道起伏：中间有舒缓横波，向边缘衰减
-          const equatorWave = (midSmooth * 0.8 + bassAttack * 0.6) * Math.sin(u * 48 + time * 4.5 + groupPhase) * planeSize * 0.0275 * activeFactor;
+          const equatorWave = (midSmooth * 0.8 + bassAttack * 0.6) * Math.sin(u * 48 + time * 4.5 + groupPhase) * planeSize * 0.01375 * activeFactor;
           // 鼓点冲击集中在中间横面
-          const bassBoost = bassPulse * planeSize * 0.225 * activeFactor;
+          const bassBoost = bassPulse * planeSize * 0.1125 * activeFactor;
 
           // 两端独立的舒缓起伏动画，不跟节奏但让整体更合群
           const idleWave = idleFactor * Math.sin(v * 20 + time * 1.8 + groupPhase * 0.4) * Math.cos(u * 14 + time * 1.3) * planeSize * 0.06;
