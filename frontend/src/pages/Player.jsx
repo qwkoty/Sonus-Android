@@ -270,9 +270,9 @@ export default function Player({ onProfile }) {
       {/* 底部控制栏：收起=左下角小胶囊 + 居中细进度条；展开=居中宽条 */}
       {!controlsExpanded ? (
         <>
-          {/* 细进度条（居中，收起时贴底上方，带起止时间） */}
-          <div style={{ position: 'absolute', left: '50%', bottom: 'calc(72px + var(--safe-bottom))', transform: 'translateX(-50%)', width: 'min(560px, calc(100% - 32px))', zIndex: 50, display: 'flex', alignItems: 'center' }}>
-            <ProgressStrip showTimes={true} />
+          {/* 细进度条（收起态：缩小宽度与小胶囊同步紧凑，不显示起止时间） */}
+          <div style={{ position: 'absolute', left: '50%', bottom: 'calc(72px + var(--safe-bottom))', transform: 'translateX(-50%)', width: 'min(200px, calc(100% - 32px))', zIndex: 50, display: 'flex', alignItems: 'center' }}>
+            <ProgressStrip showTimes={false} />
           </div>
           {/* 收起态：左下角紧凑小胶囊 */}
           <div
