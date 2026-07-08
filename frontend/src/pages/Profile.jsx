@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { ArrowLeft, ChevronRight, Loader2, Music2, LogOut, Play, User as UserIcon, RefreshCw, QrCode, Globe } from 'lucide-react';
+import { ArrowLeft, ChevronRight, Loader2, Music2, LogOut, Play, User as UserIcon, RefreshCw, QrCode, Globe, X } from 'lucide-react';
 import { useAuthStore } from '../store/useAuthStore';
 import { usePlayerStore } from '../store/usePlayerStore';
 import { listSources, getSource } from '../sources/registry';
@@ -37,13 +37,13 @@ export default function Profile({ onBack }) {
 
   const sources_ = listSources();
 
-  // 激活源切换（仅影响"默认播放音源"，不再影响歌单展示范围）
+  // 当前选中的音源（用于顶部按钮高亮 + 下方登录面板）
   const [selectedSourceId, setSelectedSourceId] = useState(() => {
     const st = useAuthStore.getState();
     const first = Object.keys(st.sources).find((id) => st.sources[id].isLoggedIn);
     return first || st.activeSourceId || 'qq';
   });
-  const [expandedSourceId, setExpandedSourceId] = useState(null); // 内嵌扫码展开的音源
+  const [loginMode, setLoginMode] = useState(null); // 'qr' | null
   const [webLoginSourceId, setWebLoginSourceId] = useState(null); // 正在使用原生网页登录的音源
   const webLoginTimerRef = useRef(null);
 
@@ -52,6 +52,7 @@ export default function Profile({ onBack }) {
   const [playlistDetail, setPlaylistDetail] = useState(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
 
+  const selectedSource = sources_.find((s) => s.id === selectedSourceId) || sources_[0];
   const selectedCreds = getSourceCreds(selectedSourceId);
 
   // 加载单个音源的歌单，结果合并进 allPlaylists
@@ -106,6 +107,7 @@ export default function Profile({ onBack }) {
 
   const selectSource = (id) => {
     setSelectedSourceId(id);
+    setLoginMode(null); // 切换音源时关闭登录面板
     if (getSourceCreds(id).isLoggedIn) setActiveSource(id);
   };
 
@@ -126,7 +128,6 @@ export default function Profile({ onBack }) {
 
   const playFromPlaylist = (track) => {
     if (!track || !playlistDetail?.tracks?.length) return;
-    // 播放时切换激活源为该歌单所属音源，保证播放走正确音源
     if (playlistDetail.sourceId && playlistDetail.sourceId !== activeSourceId) {
       setActiveSource(playlistDetail.sourceId);
     }
@@ -153,7 +154,7 @@ export default function Profile({ onBack }) {
 
   const handleLoginConfirmed = (id, creds) => {
     setAuth(id, creds);
-    setExpandedSourceId(null);
+    setLoginMode(null);
     setWebLoginSourceId(null);
     setSelectedSourceId(id);
     setActiveSource(id);
@@ -163,11 +164,10 @@ export default function Profile({ onBack }) {
   const startWebLogin = async (s) => {
     if (!CookieReader.isAvailable()) return;
     setWebLoginSourceId(s.id);
-    setExpandedSourceId(s.id);
+    setLoginMode(null);
     try {
       await getSource(s.id).openLogin();
     } catch (e) {
-      // 即使打开失败也继续轮询一次 cookie（可能已登录过）
       console.warn('打开登录 WebView', e);
     }
     if (webLoginTimerRef.current) clearInterval(webLoginTimerRef.current);
@@ -206,10 +206,13 @@ export default function Profile({ onBack }) {
     if (webLoginTimerRef.current) clearInterval(webLoginTimerRef.current);
   }, []);
 
-  // 统计：已登录音源数 + 全部歌单总数
+  // 统计
   const loggedInSources = sources_.filter((s) => getSourceCreds(s.id).isLoggedIn);
   const totalPlaylists = loggedInSources.reduce((sum, s) => sum + (allPlaylists[s.id]?.list?.length || 0), 0);
   const anyLoading = loggedInSources.some((s) => allPlaylists[s.id]?.loading);
+
+  // 顶部音源按钮：未登录点击后展开登录面板，已登录点击后切换激活源
+  const canWebLogin = CookieReader.isAvailable() && typeof selectedSource?.openLogin === 'function';
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'radial-gradient(ellipse at 30% 18%, rgba(0, 245, 212, .08) 0%, rgba(0,0,0,0.48) 55%, rgba(0,0,0,0.85) 100%)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
@@ -224,81 +227,111 @@ export default function Profile({ onBack }) {
         </button>
       </div>
 
-      {/* 双栏内容（窄屏由 CSS 折叠为单栏） */}
-      <div className="profile-shell">
-        {/* 左栏：账号 + 全部歌单 */}
-        <div className="profile-left">
-          {/* 账号区 */}
-          <div style={{ fontSize: 10, fontWeight: 760, letterSpacing: '.14em', color: 'var(--fc-muted)', textTransform: 'uppercase', padding: '4px 4px 8px' }}>音源账号</div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {sources_.map((s) => {
-              const c = getSourceCreds(s.id);
-              const isLoggedIn = c.isLoggedIn;
-              const color = SOURCE_COLOR[s.id] || '#888';
-              const isExpanded = expandedSourceId === s.id;
-              const isActive = activeSourceId === s.id && isLoggedIn;
-              return (
-                <div key={s.id} className="glass-panel" style={{ borderRadius: 16, padding: isExpanded ? 12 : 10, border: isActive ? `1px solid ${color}55` : '1px solid rgba(255,255,255,0.06)' }}>
-                  {isLoggedIn ? (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                      <div style={{ width: 46, height: 46, borderRadius: '50%', overflow: 'hidden', flexShrink: 0, background: 'rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: `2px solid ${color}55`, boxShadow: `0 0 0 1px ${color}22` }}>
-                        {c.userInfo?.avatar ? <img src={c.userInfo.avatar} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <UserIcon size={20} color="var(--text-muted)" />}
-                      </div>
-                      <div style={{ flex: 1, minWidth: 0 }} onClick={() => selectSource(s.id)}>
-                        <div style={{ fontSize: 14, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.nickname || s.name}</div>
-                        <span className="source-tag" style={{ background: `${color}22`, color, border: `1px solid ${color}55` }}>{s.name}{isActive ? ' · 当前' : ' · 已登录'}</span>
-                      </div>
-                      <button onClick={() => logout(s.id)} className="glass-button" style={{ width: 34, height: 34, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ff9fa6', flexShrink: 0 }} title="退出该音源">
-                        <LogOut size={15} />
-                      </button>
-                    </div>
-                  ) : s.ready ? (
-                    <div>
-                      {CookieReader.isAvailable() && typeof s.openLogin === 'function' ? (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                          <button onClick={() => startWebLogin(s)} className="glass-button-accent" style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '11px', borderRadius: 12, fontSize: 13, fontWeight: 700, color: '#050608' }}>
-                            {webLoginSourceId === s.id ? <Loader2 size={16} className="spin-icon" /> : <Globe size={16} />}
-                            {webLoginSourceId === s.id ? '等待登录完成…' : `网页登录${s.name}`}
-                          </button>
-                          <button onClick={() => setExpandedSourceId(isExpanded ? null : s.id)} className="glass-button" style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '10px', borderRadius: 12, fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)' }}>
-                            <QrCode size={14} /> {isExpanded ? '收起二维码' : '扫码登录（需后端）'}
-                          </button>
-                        </div>
-                      ) : (
-                        <button onClick={() => setExpandedSourceId(isExpanded ? null : s.id)} className="glass-button" style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '11px', borderRadius: 12, fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>
-                          <QrCode size={16} /> {isExpanded ? '收起' : `扫码登录${s.name}`}
-                        </button>
-                      )}
-                      {isExpanded && (
-                        <div style={{ marginTop: 10 }}>
-                          <QrLoginView sourceId={s.id} compact onConfirmed={(creds) => handleLoginConfirmed(s.id, creds)} onWebLogin={() => startWebLogin(s)} />
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, opacity: 0.6 }}>
-                      <div style={{ width: 46, height: 46, borderRadius: '50%', background: 'rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <UserIcon size={20} color="var(--text-muted)" />
-                      </div>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ fontSize: 14, fontWeight: 700 }}>{s.name}</div>
-                        <span className="source-tag" style={{ background: 'rgba(255,255,255,0.08)', color: 'var(--text-muted)', border: '1px solid rgba(255,255,255,0.1)' }}>开发中</span>
-                      </div>
-                    </div>
-                  )}
+      {/* 顶部音源按钮条：三个登录/切换按钮拼在一起 */}
+      <div style={{ padding: '8px 16px', flexShrink: 0 }}>
+        <div className="glass-panel" style={{ padding: 6, borderRadius: 16, display: 'flex', alignItems: 'center', gap: 6 }}>
+          {sources_.map((s) => {
+            const c = getSourceCreds(s.id);
+            const color = SOURCE_COLOR[s.id] || '#888';
+            const isSelected = selectedSourceId === s.id;
+            const isActive = activeSourceId === s.id && c.isLoggedIn;
+            return (
+              <button
+                key={s.id}
+                onClick={() => selectSource(s.id)}
+                style={{
+                  flex: 1,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                  padding: '9px 8px', borderRadius: 12, border: 'none', cursor: 'pointer',
+                  background: isSelected ? `${color}22` : 'transparent',
+                  color: isSelected ? color : 'var(--text-secondary)',
+                  fontSize: 12, fontWeight: 700, whiteSpace: 'nowrap',
+                  boxShadow: isSelected ? `inset 0 0 0 1px ${color}55` : 'none',
+                  transition: 'all .15s ease',
+                }}
+              >
+                <span style={{ width: 6, height: 6, borderRadius: '50%', background: c.isLoggedIn ? color : 'rgba(255,255,255,0.25)', boxShadow: c.isLoggedIn ? `0 0 6px ${color}` : 'none' }} />
+                <span>{c.isLoggedIn ? (c.nickname || s.name) : `登录${s.name}`}</span>
+                {isActive && <span style={{ fontSize: 10, opacity: 0.8 }}>·当前</span>}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* 主体：双栏，且整体可滚动（窄屏单列时） */}
+      <div className="profile-shell" style={{ overflow: 'hidden' }}>
+        {/* 左栏：当前音源操作 + 全部歌单 */}
+        <div className="profile-left" style={{ overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
+          {/* 当前音源操作卡 */}
+          <div className="glass-panel" style={{ borderRadius: 16, padding: 12, marginBottom: 10, border: activeSourceId === selectedSourceId && selectedCreds.isLoggedIn ? `1px solid ${SOURCE_COLOR[selectedSourceId]}55` : '1px solid rgba(255,255,255,0.06)' }}>
+            {selectedCreds.isLoggedIn ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={{ width: 46, height: 46, borderRadius: '50%', overflow: 'hidden', flexShrink: 0, background: 'rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: `2px solid ${SOURCE_COLOR[selectedSourceId]}55` }}>
+                  {selectedCreds.userInfo?.avatar ? <img src={selectedCreds.userInfo.avatar} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <UserIcon size={20} color="var(--text-muted)" />}
                 </div>
-              );
-            })}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 14, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{selectedCreds.nickname || selectedSource.name}</div>
+                  <span className="source-tag" style={{ background: `${SOURCE_COLOR[selectedSourceId]}22`, color: SOURCE_COLOR[selectedSourceId], border: `1px solid ${SOURCE_COLOR[selectedSourceId]}55` }}>
+                    {selectedSource.name}{activeSourceId === selectedSourceId ? ' · 当前' : ' · 已登录'}
+                  </span>
+                </div>
+                <button onClick={() => logout(selectedSourceId)} className="glass-button" style={{ width: 34, height: 34, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ff9fa6', flexShrink: 0 }} title="退出">
+                  <LogOut size={15} />
+                </button>
+              </div>
+            ) : selectedSource.ready ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <div style={{ width: 42, height: 42, borderRadius: '50%', background: 'rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <UserIcon size={20} color="var(--text-muted)" />
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 14, fontWeight: 700 }}>{selectedSource.name}</div>
+                    <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>未登录</div>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  {canWebLogin ? (
+                    <button onClick={() => startWebLogin(selectedSource)} className="glass-button-accent" style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '10px', borderRadius: 12, fontSize: 13, fontWeight: 700, color: '#050608' }}>
+                      {webLoginSourceId === selectedSourceId ? <Loader2 size={15} className="spin-icon" /> : <Globe size={15} />}
+                      {webLoginSourceId === selectedSourceId ? '登录中…' : '网页登录'}
+                    </button>
+                  ) : null}
+                  <button onClick={() => setLoginMode(loginMode === 'qr' ? null : 'qr')} className="glass-button" style={{ flex: canWebLogin ? 1 : 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '10px', borderRadius: 12, fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>
+                    <QrCode size={15} /> {loginMode === 'qr' ? '收起' : '扫码'}
+                  </button>
+                </div>
+                {loginMode === 'qr' && (
+                  <div style={{ position: 'relative', marginTop: 4 }}>
+                    <button onClick={() => setLoginMode(null)} style={{ position: 'absolute', top: -8, right: -8, zIndex: 5, width: 24, height: 24, borderRadius: '50%', border: 'none', background: 'rgba(255,255,255,0.1)', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+                      <X size={12} />
+                    </button>
+                    <QrLoginView sourceId={selectedSourceId} compact onConfirmed={(creds) => handleLoginConfirmed(selectedSourceId, creds)} onWebLogin={() => startWebLogin(selectedSource)} />
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, opacity: 0.6 }}>
+                <div style={{ width: 42, height: 42, borderRadius: '50%', background: 'rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <UserIcon size={20} color="var(--text-muted)" />
+                </div>
+                <div>
+                  <div style={{ fontSize: 14, fontWeight: 700 }}>{selectedSource.name}</div>
+                  <span className="source-tag" style={{ background: 'rgba(255,255,255,0.08)', color: 'var(--text-muted)', border: '1px solid rgba(255,255,255,0.1)' }}>开发中</span>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* 全部歌单（聚合所有已登录音源） */}
           {loggedInSources.length > 0 ? (
             <>
-              <div style={{ fontSize: 10, fontWeight: 760, letterSpacing: '.14em', color: 'var(--fc-muted)', textTransform: 'uppercase', padding: '16px 4px 8px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ fontSize: 10, fontWeight: 760, letterSpacing: '.14em', color: 'var(--fc-muted)', textTransform: 'uppercase', padding: '8px 4px 8px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <span>全部歌单</span>
                 <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{totalPlaylists} 个 · {loggedInSources.length} 源</span>
               </div>
-              <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch', padding: '0 2px' }}>
+              <div style={{ padding: '0 2px' }}>
                 {anyLoading && totalPlaylists === 0 ? (
                   <div style={{ display: 'flex', justifyContent: 'center', padding: 30 }}><Loader2 size={22} className="spin-icon" style={{ color: 'var(--accent-dynamic)' }} /></div>
                 ) : totalPlaylists === 0 ? (
@@ -344,13 +377,13 @@ export default function Profile({ onBack }) {
             </>
           ) : (
             <div style={{ textAlign: 'center', padding: 30, color: 'var(--text-muted)', fontSize: 12, marginTop: 12 }}>
-              选择上方音源扫码登录，<br />登录后即可查看全部歌单
+              点击上方音源按钮登录，<br />登录后即可查看全部歌单
             </div>
           )}
         </div>
 
         {/* 右栏：歌单详情 */}
-        <div className="profile-right" style={{ minHeight: 0 }}>
+        <div className="profile-right" style={{ minHeight: 0, overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
           {!playlistDetail ? (
             <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: 14 }}>
               <div style={{ textAlign: 'center' }}>
