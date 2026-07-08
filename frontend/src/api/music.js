@@ -2,7 +2,7 @@
 // 原 QQ 实现已迁入 sources/qqSource.js；此处仅按当前激活音源动态转发，
 // 使 usePlayerStore / Login / useAuthStore 等调用方无需感知具体音源。
 
-import { getActiveSource } from './sources/registry';
+import { getActiveSource } from '../sources/registry';
 
 // 动态转发到当前激活音源，支持运行时切换
 const music = new Proxy({}, {
