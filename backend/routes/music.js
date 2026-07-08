@@ -1,6 +1,7 @@
 const axios = require('axios');
 const express = require('express');
 const router = express.Router();
+const ne = require('./netease'); // 网易云：weapi 加密 + 扫码登录/目录
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
 const HEADERS = { 'User-Agent': UA, Referer: 'https://y.qq.com/' };
@@ -326,8 +327,12 @@ async function getQQPlaylist(id, cookie = '') {
 // 搜索
 router.get('/search', async (req, res) => {
   try {
-    const { keyword, limit = 20 } = req.query;
+    const { keyword, limit = 20, platform = 'qq' } = req.query;
     if (!keyword) return res.status(400).json({ error: 'keyword required' });
+    if (platform === 'netease') {
+      const list = await ne.neSearch(keyword, Number(limit));
+      return res.json({ code: 200, data: list });
+    }
     const list = await searchQQ(keyword, 1, Number(limit));
     res.json({ code: 200, data: list });
   } catch (err) {
@@ -338,8 +343,12 @@ router.get('/search', async (req, res) => {
 // 播放链接
 router.get('/url', async (req, res) => {
   try {
-    const { id, cookie = '', uin = '0' } = req.query;
+    const { id, cookie = '', uin = '0', platform = 'qq' } = req.query;
     if (!id) return res.status(400).json({ error: 'id required' });
+    if (platform === 'netease') {
+      const url = await ne.neUrl(id);
+      return res.json({ code: 200, data: { url, platform: 'netease' } });
+    }
     const url = await getQQUrl(id, cookie, uin);
     res.json({ code: 200, data: { url, platform: 'qq' } });
   } catch (err) {
@@ -350,9 +359,9 @@ router.get('/url', async (req, res) => {
 // 音频流代理
 router.get('/stream', async (req, res) => {
   try {
-    const { id, cookie = '', uin = '0' } = req.query;
+    const { id, cookie = '', uin = '0', platform = 'qq' } = req.query;
     if (!id) return res.status(400).json({ error: 'id required' });
-    const targetUrl = await getQQUrl(id, cookie, uin);
+    const targetUrl = platform === 'netease' ? await ne.neUrl(id) : await getQQUrl(id, cookie, uin);
     if (!targetUrl) return res.status(404).json({ error: 'no audio url' });
 
     const upstreamHeaders = { ...HEADERS };
@@ -400,8 +409,12 @@ router.get('/cover', async (req, res) => {
 // 歌词
 router.get('/lyric', async (req, res) => {
   try {
-    const { id } = req.query;
+    const { id, platform = 'qq' } = req.query;
     if (!id) return res.status(400).json({ error: 'id required' });
+    if (platform === 'netease') {
+      const { lyric, tlyric } = await ne.neLyric(id);
+      return res.json({ code: 200, data: { lyric, tlyric, platform: 'netease' } });
+    }
     const lyric = await getQQLyric(id);
     res.json({ code: 200, data: { lyric, platform: 'qq' } });
   } catch (err) {
@@ -530,8 +543,12 @@ router.get('/user/qq/playlists', async (req, res) => {
 // 歌单详情
 router.get('/playlist', async (req, res) => {
   try {
-    const { id, cookie = '' } = req.query;
+    const { id, cookie = '', platform = 'qq' } = req.query;
     if (!id) return res.status(400).json({ error: 'id required' });
+    if (platform === 'netease') {
+      const detail = await ne.nePlaylist(id);
+      return res.json({ code: 200, data: detail });
+    }
     const detail = await getQQPlaylist(id, cookie);
     res.json({ code: 200, data: detail });
   } catch (err) {

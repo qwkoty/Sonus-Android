@@ -4,6 +4,7 @@ const cors = require('cors');
 const path = require('path');
 
 const musicRoutes = require('./routes/music');
+const neteaseRoutes = require('./routes/netease').router;
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -16,6 +17,7 @@ app.get('/health', (req, res) => {
 });
 
 app.use('/api/music', musicRoutes);
+app.use('/api/music', neteaseRoutes);
 
 // Serve static frontend in production
 if (process.env.NODE_ENV === 'production') {

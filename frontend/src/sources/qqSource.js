@@ -3,6 +3,7 @@
 // 额外补充 SourceAdapter 元数据与登录辅助方法，使登录/音源访问统一走抽象接口。
 
 import { CookieReader } from '../plugins/CookieReader';
+import { apiUrl } from '../api/base';
 
 function qqUrl(payload) {
   return `https://u.y.qq.com/cgi-bin/musicu.fcg?data=${encodeURIComponent(JSON.stringify(payload))}`;
@@ -288,15 +289,92 @@ async function loginByCookieAPK(cookie) {
   }
 }
 
+// ==================== QQ 扫码登录（前端 JSONP 轮询 + 后端收 cookie）====================
+// 后端已提供 /login/qq/qrcode 与 /login/qq/redirect；扫码状态检查（ptqrlogin）走前端 JSONP，
+// 绕过服务器 IP 风控（服务器请求会被 403）。
+
+let _qqLoginSig = ''; // qrCreate 返回的 login_sig，qrCheck 复用
+
+async function qqQrCreate() {
+  const j = await (await fetch(apiUrl('/login/qq/qrcode'), { credentials: 'include' })).json();
+  _qqLoginSig = j?.data?.login_sig || '';
+  return { qrcode: j?.data?.qrcode, key: j?.data?.qrsig, login_sig: _qqLoginSig, status: 'waiting' };
+}
+
+// ptqrtoken：qrsig 的 33 位哈希（社区标准实现）
+function hash33(s) {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h += (h << 5) + s.charCodeAt(i);
+  return h & 0x7fffffff;
+}
+
+// JSONP 轮询 ptqrlogin：返回回调参数数组或 null（超时/失败）
+function qqPtqrlogin(qrsig, loginSig) {
+  return new Promise((resolve) => {
+    const cb = 'ptqrlogin_Callback';
+    const prev = window[cb];
+    let done = false;
+    const finish = (v) => {
+      if (done) return;
+      done = true;
+      try { delete window[cb]; } catch {}
+      if (script) script.remove();
+      if (prev) window[cb] = prev;
+      resolve(v);
+    };
+    window[cb] = (...args) => finish(args);
+    const token = hash33(qrsig);
+    const u1 = encodeURIComponent('https://y.qq.com/');
+    const url = `https://ssl.ptlogin2.qq.com/ptqrlogin?u1=${u1}&ptqrtoken=${token}` +
+      `&ptredirect=0&h=1&t=1&g=1&from_ui=1&ptlang=2052&js_type=1&js_ver=10220` +
+      `&login_sig=${encodeURIComponent(loginSig || '')}&pt_randsalt=0&qrsig=${encodeURIComponent(qrsig)}`;
+    const script = document.createElement('script');
+    script.src = url;
+    script.onerror = () => finish(null);
+    document.body.appendChild(script);
+    setTimeout(() => finish(null), 8000);
+  });
+}
+
+async function qqQrCheck(qrsig, loginSig) {
+  const args = await qqPtqrlogin(qrsig, loginSig);
+  if (!args) return { status: 'waiting' };
+  const status = Number(args[0]);
+  if (status === 0) return { status: 'waiting' };
+  if (status === 1) return { status: 'scanned' };
+  if (status === 2) {
+    // 已确认：args[1]（或 args[4]）为跳转 URL，交给后端跟随收集 cookie
+    const redirectUrl = args[1] || args[4] || '';
+    if (!redirectUrl) return { status: 'confirmed', cookie: '', uid: '', nickname: 'QQ音乐用户' };
+    try {
+      const r = await fetch(apiUrl('/login/qq/redirect'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ redirectUrl, qrsig }),
+      });
+      const j = await r.json();
+      const d = j?.data || {};
+      return { status: 'confirmed', cookie: d.cookie, uid: d.uin, nickname: d.nickname || 'QQ音乐用户' };
+    } catch {
+      return { status: 'confirmed', cookie: '', uid: '', nickname: 'QQ音乐用户' };
+    }
+  }
+  return { status: 'expired' };
+}
+
 // ==================== SourceAdapter 导出 ====================
 export const qqSource = {
   id: 'qq',
   name: 'QQ 音乐',
   loginDomains: ['https://y.qq.com'],
   ready: true,
+  loginMethod: 'qr', // 扫码登录
 
   // —— 登录辅助（供 Login.jsx 使用）——
   openLogin: async () => CookieReader.openLoginWebView(),
+  qrCreate: qqQrCreate,
+  qrCheck: (key, ctx) => qqQrCheck(key, (ctx && ctx.login_sig) || _qqLoginSig),
   parseCredentials: (cookie) => {
     const m = (cookie || '').match(/(?:^|;\s*)(?:uin|wxuin)=o?(\d+)/);
     const uin = m ? m[1] : '';
