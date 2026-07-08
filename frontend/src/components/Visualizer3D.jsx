@@ -25,15 +25,16 @@ const RIPPLE_FREQ = 10;           // 径向涟漪空间频率
 const RIPPLE_SPEED = 2.2;         // 涟漪向外传播速度
 const OCEAN_SIZE_RATIO = 1.35;    // 海浪平面相对画面尺寸
 const OCEAN_WAVE_GAIN = 0.28;     // 海浪音频驱动高度增益
-const BEAT_THRESHOLD = 0.16;      // 低频能量一阶导超此值触发冲击波
-const BEAT_COOLDOWN = 0.11;       // 两次冲击波最小间隔（s）
+const BEAT_THRESHOLD = 0.10;      // 低频能量一阶导超此值触发冲击波（越低越容易触发）
+const BEAT_COOLDOWN = 0.07;       // 两次冲击波最小间隔（s）
 const SPRING_K = 0.05;            // 冲击波回弹弹簧系数
 const DAMPING = 0.88;             // 速度阻尼
-const SHOCK_GAIN = 1.6;           // 鼓点冲击波冲量增益（× bass）— 增强鼓点强度
-// —— 鼓点频率增强（本次新增，与 beatPulse 平行的独立包络）——
-const BEAT_FREQ_BOOST_DECAY = 0.90; // 频率增强包络每帧衰减（≈鼓点后 0.3s 归零）
-const GALAXY_BEAT_FREQ_GAIN = 2.2;  // galaxy：鼓点时频谱响应放大倍数（涟漪/抖动/颜色）
-const LIQUID_BEAT_FREQ_GAIN = 1.6;  // liquidmetal：鼓点时频谱响应放大倍数（位移）
+const SHOCK_GAIN = 2.2;           // 鼓点冲击波冲量增益（× bass）
+// —— 鼓点频率增强（与 beatPulse 平行的独立包络）——
+const BEAT_FREQ_BOOST_DECAY = 0.94; // 频率增强包络每帧衰减（鼓点后持续更久）
+const BEAT_PULSE_DECAY = 0.92;      // beatPulse 每帧衰减系数（更持久）
+const GALAXY_BEAT_FREQ_GAIN = 2.6;  // galaxy：鼓点时频谱响应放大倍数
+const LIQUID_BEAT_FREQ_GAIN = 2.0;  // liquidmetal：鼓点时频谱响应放大倍数
 
 // 稳定伪随机（保证星系形态每次重建一致）
 function mulberry32(a) {
@@ -692,8 +693,8 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
           beatFreqBoostRef.current = Math.min(1, beatFreqBoostRef.current + 0.35);
         }
       }
-      beatPulseRef.current *= Math.pow(0.90, dt * 60);          // 帧率无关衰减（60fps 等价于 ×0.90）
-      beatFreqBoostRef.current *= Math.pow(BEAT_FREQ_BOOST_DECAY, dt * 60); // 频率增强包络衰减（同）
+      beatPulseRef.current *= Math.pow(BEAT_PULSE_DECAY, dt * 60);          // 帧率无关衰减
+      beatFreqBoostRef.current *= Math.pow(BEAT_FREQ_BOOST_DECAY, dt * 60); // 频率增强包络衰减
 
       const accentRGB = hexToRGB(accentRef.current || '#4FC3F7');
       const cavg = coverAvgRef.current;
@@ -814,7 +815,7 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
           x = rx; y = ry;
 
           // 鼓点切向冲击：让旋臂在鼓点时"甩"一下
-          const beatSpin = beatPulseRef.current * planeSize * 0.10 * (1 - rN * 0.5);
+          const beatSpin = beatPulseRef.current * planeSize * 0.14 * (1 - rN * 0.5);
           x += -ny * beatSpin;
           y += nx * beatSpin;
 
@@ -881,8 +882,8 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
           for (let k = coarseBand * 8; k < (coarseBand + 1) * 8 && k < 64; k++) energy += spectrumSmooth[k];
           energy /= 8;
 
-          const localPulse = (energy * 1.15 * (1 + beatFreqBoost * LIQUID_BEAT_FREQ_GAIN) + bassAttack * 0.7 + midSmooth * 0.5) * activeFactor; // 鼓点增强频谱能量位移
-          const displacement = localPulse * planeSize * 0.09;
+          const localPulse = (energy * 1.25 * (1 + beatFreqBoost * LIQUID_BEAT_FREQ_GAIN) + bassAttack * 0.9 + midSmooth * 0.5) * activeFactor; // 鼓点增强频谱能量位移
+          const displacement = localPulse * planeSize * 0.10;
 
           // 整体呼吸脉动（待机时更明显）
           const breathe = hasData ? 1.0 : (0.97 + Math.sin(time * Math.PI / 4) * 0.03);
@@ -917,7 +918,7 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
           // 表面张力波：多波长沿法向振动，相位差营造流动感
           const wave = (midSmooth * 0.9 + bassAttack * 0.6) * Math.sin(u * 56 + time * 5 + i * 0.5) * planeSize * 0.008 * activeFactor;
           const equatorWave = (midSmooth * 0.8 + bassAttack * 0.6) * Math.sin(u * 48 + time * 4.5 + i * 0.5) * planeSize * 0.011 * activeFactor;
-          const bassBoost = bassPulse * planeSize * 0.14 * activeFactor; // 鼓点强度增强（原 0.09）
+          const bassBoost = bassPulse * planeSize * 0.18 * activeFactor; // 鼓点强度增强
 
           // 两端舒缓起伏（原有逻辑保留）
           const idleWave = idleFactor * Math.sin(v * 20 + time * 1.8 + i * 0.1) * Math.cos(u * 14 + time * 1.3) * planeSize * 0.06;
@@ -993,7 +994,7 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
 
           const band = Math.min(63, Math.floor(rN * 63));
           const localE = spectrumSmooth[band];
-          let intensity = 0.45 + bassAttack * 1.2 + localE * 1.8 * (1 + beatFreqBoost * GALAXY_BEAT_FREQ_GAIN) + beatPulseRef.current * 1.1;
+          let intensity = 0.45 + bassAttack * 1.2 + localE * 1.8 * (1 + beatFreqBoost * GALAXY_BEAT_FREQ_GAIN) + beatPulseRef.current * 1.5;
           if (galaxyBulge[i]) intensity += 0.5 + bassAttack * 0.8;
           if (isHaloNow) intensity *= 0.55;
 

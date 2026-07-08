@@ -3,6 +3,7 @@ import { Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Repeat1, ListMusic
 import { usePlayerStore } from '../store/usePlayerStore';
 import { useAuthStore } from '../store/useAuthStore';
 import { music } from '../api/music';
+import { listSources, getSource } from '../sources/registry';
 import Visualizer from '../components/Visualizer';
 import FloatingLyrics from '../components/FloatingLyrics';
 import LyricScroll from '../components/LyricScroll';
@@ -172,10 +173,14 @@ function FloatPanel({ open, onClose, title, width = 360, children }) {
 
 export default function Player({ onProfile }) {
   const { currentTrack, isPlaying, currentTime, duration, volume, playMode, playlist, togglePlay, next, prev, seek, setVolume, toggleMode, playTrack, lyrics, currentLyric, isLoadingUrl, error, clearError, setError } = usePlayerStore();
-  const { userInfo, isLoggedIn } = useAuthStore();
+  const { userInfo, isLoggedIn, getSourceCreds } = useAuthStore();
   const [sq, setSq] = useState(false); const [qo, setQo] = useState(false); const [viz, setViz] = useState(false);
   const [controlsExpanded, setControlsExpanded] = useState(() => { try { return localStorage.getItem('sonus_controls_expanded') !== 'false'; } catch { return true } });
-  const [query, setQuery] = useState(''); const [results, setResults] = useState([]); const [searching, setSearching] = useState(false); const st = useRef(null);
+  const [query, setQuery] = useState('');
+  const [searchMap, setSearchMap] = useState({}); // { [sourceId]: { list, loading, loggedIn } }
+  const [searching, setSearching] = useState(false);
+  const st = useRef(null);
+  const sources = listSources();
   const [vm, setVm] = useState(() => { try { return localStorage.getItem('sonus_viz_mode') || 'ring' } catch { return 'ring' } });
   const [v3m, setV3m] = useState(() => { try { const v = localStorage.getItem('sonus_3d_mode'); const valid = ['coverflow','liquidmetal','galaxy','ocean']; return valid.includes(v) ? v : 'liquidmetal'; } catch { return 'liquidmetal' } });
   const [ac, setAc] = useState(() => { try { return localStorage.getItem('sonus_accent') || '#00F5D4' } catch { return '#00F5D4' } });
@@ -192,11 +197,37 @@ export default function Player({ onProfile }) {
   useEffect(() => { if (error) { const t = setTimeout(clearError, 5000); return () => clearTimeout(t); } }, [error, clearError]);
 
   const doSearch = async kw => {
-    if (!kw.trim()) { setResults([]); return; }
+    if (!kw.trim()) { setSearchMap({}); return; }
     setSearching(true);
-    try { setResults(await music.search(kw, 30) || []) } catch (e) { setError('搜索失败') } finally { setSearching(false); }
+    const initMap = Object.fromEntries(sources.map(s => [s.id, { list: [], loading: true, loggedIn: false, name: s.name }]));
+    setSearchMap(initMap);
+    try {
+      await Promise.all(sources.map(async (s) => {
+        const creds = getSourceCreds(s.id);
+        if (!creds.isLoggedIn) {
+          setSearchMap(prev => ({ ...prev, [s.id]: { ...prev[s.id], loading: false, loggedIn: false } }));
+          return;
+        }
+        try {
+          const adapter = getSource(s.id);
+          const list = await adapter.search(kw, 3);
+          setSearchMap(prev => ({ ...prev, [s.id]: { ...prev[s.id], list: list || [], loading: false, loggedIn: true } }));
+        } catch (e) {
+          setSearchMap(prev => ({ ...prev, [s.id]: { ...prev[s.id], list: [], loading: false, loggedIn: true } }));
+        }
+      }));
+    } catch (e) {
+      setError('搜索失败');
+    } finally {
+      setSearching(false);
+    }
   };
-  const onQ = v => { setQuery(v); if (st.current) clearTimeout(st.current); if (!v.trim()) { setResults([]); return; } st.current = setTimeout(() => doSearch(v), 350); };
+  const onQ = v => {
+    setQuery(v);
+    if (st.current) clearTimeout(st.current);
+    if (!v.trim()) { setSearchMap({}); return; }
+    st.current = setTimeout(() => doSearch(v), 350);
+  };
 
   const hp = (e) => {
     if (!pr.current || !duration || !isFinite(duration)) return;
@@ -350,12 +381,30 @@ export default function Player({ onProfile }) {
           <div className="glass-input-wrap" style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', height: 48, borderRadius: 18 }}>
             <Search size={16} color="var(--text-secondary)" />
             <input value={query} onChange={e => onQ(e.target.value)} placeholder="歌曲、歌手、专辑…" autoFocus style={{ flex: 1, fontSize: 14, background: 'transparent', border: 'none', outline: 'none', color: '#fff' }} />
-            {query && <button onClick={() => { setQuery(''); setResults([]); }} className="glass-button" style={{ width: 24, height: 24, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><X size={14} /></button>}
+            {query && <button onClick={() => { setQuery(''); setSearchMap({}); }} className="glass-button" style={{ width: 24, height: 24, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><X size={14} /></button>}
           </div>
         </div>
-        {searching && results.length === 0 ? <div style={{ display: 'flex', justifyContent: 'center', padding: 28 }}><Loader2 size={18} className="spin-icon" color="var(--text-secondary)" /></div>
-          : results.length === 0 ? <div style={{ textAlign: 'center', padding: 28, color: 'var(--text-muted)', fontSize: 12, letterSpacing: '.3px' }}>{query ? '无结果' : '输入关键词开始搜索'}</div>
-            : results.map(t => <Row key={t.id} track={t} active={currentTrack?.id === t.id} onPlay={tr => { playTrack(tr); setSq(false); }} />)}
+        {searching && Object.keys(searchMap).length === 0 ? <div style={{ display: 'flex', justifyContent: 'center', padding: 28 }}><Loader2 size={18} className="spin-icon" color="var(--text-secondary)" /></div>
+          : !query ? <div style={{ textAlign: 'center', padding: 28, color: 'var(--text-muted)', fontSize: 12, letterSpacing: '.3px' }}>输入关键词开始搜索</div>
+            : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                {sources.map(s => {
+                  const entry = searchMap[s.id] || { list: [], loading: false, loggedIn: false };
+                  return (
+                    <div key={s.id}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 4px 8px' }}>
+                        <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)' }}>{s.name}</span>
+                        <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.06)' }} />
+                      </div>
+                      {entry.loading ? <div style={{ display: 'flex', justifyContent: 'center', padding: 14 }}><Loader2 size={16} className="spin-icon" color="var(--text-secondary)" /></div>
+                        : !entry.loggedIn ? <div style={{ padding: '10px 6px', color: 'var(--text-muted)', fontSize: 12 }}>未登录，不显示</div>
+                          : entry.list.length === 0 ? <div style={{ padding: '10px 6px', color: 'var(--text-muted)', fontSize: 12 }}>无结果</div>
+                            : entry.list.map(t => <Row key={t.id} track={t} active={currentTrack?.id === t.id} onPlay={tr => { playTrack(tr); setSq(false); }} />)}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
       </FloatPanel>
 
       {/* 队列浮窗 */}
