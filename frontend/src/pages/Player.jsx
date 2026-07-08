@@ -3,6 +3,7 @@ import { Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Repeat1, ListMusic
 import { usePlayerStore } from '../store/usePlayerStore';
 import { useAuthStore } from '../store/useAuthStore';
 import { music } from '../api/music';
+import { listSources, getActiveSource, setActiveSource } from '../sources/registry';
 import Visualizer from '../components/Visualizer';
 import FloatingLyrics from '../components/FloatingLyrics';
 import LyricScroll from '../components/LyricScroll';
@@ -180,6 +181,7 @@ export default function Player({ onProfile }) {
   const [ac, setAc] = useState(() => { try { return localStorage.getItem('sonus_accent') || '#00F5D4' } catch { return '#00F5D4' } });
   const [lyricPanel, setLyricPanel] = useState(() => { try { return localStorage.getItem('sonus_lyric_panel') !== 'false' } catch { return true } });
   const [vizTab, setVizTab] = useState('调色');
+  const [sourceId, setSourceId] = useState(() => { try { return getActiveSource().id; } catch { return 'qq'; } });
   const pr = useRef(null); const [sk, setSk] = useState(false);
 
   const pct = duration ? (currentTime / duration) * 100 : 0;
@@ -388,7 +390,18 @@ export default function Player({ onProfile }) {
 
           {/* 额外设置 */}
           {vizTab === '额外' && (
-            <Toggle label="歌词面板" value={lyricPanel} onChange={v => { setLyricPanel(v); try { localStorage.setItem('sonus_lyric_panel', String(v)); } catch { } }} />
+            <>
+              <div style={{ fontSize: 10, fontWeight: 760, letterSpacing: '.14em', color: 'var(--fc-muted)', textTransform: 'uppercase', marginBottom: 10 }}>音源</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 14 }}>
+                {listSources().map(s => (
+                  <button key={s.id} onClick={() => { setActiveSource(s.id); setSourceId(s.id); }} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 12px', borderRadius: 12, fontSize: 12, border: 'none', cursor: 'pointer', background: sourceId === s.id ? 'var(--accent-dynamic)' : 'rgba(255,255,255,0.06)', color: sourceId === s.id ? '#050608' : 'var(--text-primary)', fontWeight: sourceId === s.id ? 700 : 500 }}>
+                    <span>{s.name}</span>
+                    <span style={{ fontSize: 10, opacity: 0.7 }}>{s.ready ? '可用' : '开发中'}</span>
+                  </button>
+                ))}
+              </div>
+              <Toggle label="歌词面板" value={lyricPanel} onChange={v => { setLyricPanel(v); try { localStorage.setItem('sonus_lyric_panel', String(v)); } catch { } }} />
+            </>
           )}
         </div>
       </FloatPanel>

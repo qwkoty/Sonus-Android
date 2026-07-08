@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { music } from '../api/music';
+import { getActiveSource } from '../sources/registry';
 
 const STORAGE_KEY = 'sonus_auth';
 
@@ -8,7 +9,7 @@ function loadPersisted() {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
     const obj = JSON.parse(raw);
-    if (obj && obj.cookie && obj.uin) return obj;
+    if (obj && obj.cookie && obj.uin) return { ...obj, sourceId: obj.sourceId || 'qq' };
   } catch {}
   return null;
 }
@@ -22,6 +23,7 @@ function savePersisted(state) {
         uin: state.uin,
         key: state.key,
         nickname: state.nickname,
+        sourceId: state.sourceId || 'qq',
       }));
     } else {
       localStorage.removeItem(STORAGE_KEY);
@@ -38,6 +40,7 @@ export const useAuthStore = create((set, get) => {
     uin: persisted?.uin || '',
     key: persisted?.key || '',
     nickname: persisted?.nickname || 'QQ音乐用户',
+    sourceId: persisted?.sourceId || 'qq',
     userInfo: null,
     loadingInfo: false,
 
@@ -48,6 +51,7 @@ export const useAuthStore = create((set, get) => {
         cookie,
         uin: String(uin || ''),
         key: key || '',
+        sourceId: getActiveSource().id,
         nickname: nickname || 'QQ音乐用户',
         userInfo: null,
       };

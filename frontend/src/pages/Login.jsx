@@ -2,10 +2,12 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { Loader2, Music, ArrowLeft, User, ListMusic, LogOut, CheckCircle2, LogIn } from 'lucide-react';
 import { useAuthStore } from '../store/useAuthStore';
 import { CookieReader } from '../plugins/CookieReader';
+import { getActiveSource } from '../sources/registry';
 import { music } from '../api/music';
 
 export default function Login({ onBack }) {
   const { setAuth, isLoggedIn, userInfo, cookie, uin, nickname, logout, fetchUserInfo } = useAuthStore();
+  const loginDomain = getActiveSource().loginDomains[0];
 
   const [view, setView] = useState(isLoggedIn ? 'account' : 'webview');
   const [webviewPhase, setWebviewPhase] = useState('idle');
@@ -26,7 +28,7 @@ export default function Login({ onBack }) {
     stopPolling();
     pollRef.current = setInterval(async () => {
       try {
-        const cookies = await CookieReader.getCookiesForUrl('https://y.qq.com');
+        const cookies = await CookieReader.getCookiesForUrl(loginDomain);
         if (cookies.loggedIn && cookies.cookie && cookies.uin) {
           stopPolling();
           await handleCookieLogin(cookies);
@@ -35,13 +37,13 @@ export default function Login({ onBack }) {
         // 轮询中忽略单点错误
       }
     }, 1200);
-  }, [stopPolling]);
+  }, [stopPolling, loginDomain]);
 
   const startWebViewLogin = useCallback(async () => {
     setWebviewPhase('opening');
     setWebviewTip('正在打开 QQ 音乐登录页面…');
     try {
-      const currentCookies = await CookieReader.getCookiesForUrl('https://y.qq.com');
+      const currentCookies = await CookieReader.getCookiesForUrl(loginDomain);
       if (currentCookies.loggedIn) {
         await handleCookieLogin(currentCookies);
         return;
@@ -54,13 +56,13 @@ export default function Login({ onBack }) {
       setWebviewPhase('error');
       setWebviewTip('打开登录窗口失败：' + (e.message || ''));
     }
-  }, [startPolling]);
+  }, [startPolling, loginDomain]);
 
   const extractCookieAndLogin = async () => {
     setWebviewPhase('polling');
     setWebviewTip('正在读取登录信息…');
     try {
-      const cookies = await CookieReader.getCookiesForUrl('https://y.qq.com');
+      const cookies = await CookieReader.getCookiesForUrl(loginDomain);
       if (cookies.loggedIn && cookies.cookie && cookies.uin) {
         stopPolling();
         await handleCookieLogin(cookies);
@@ -133,7 +135,7 @@ export default function Login({ onBack }) {
 
   const handleLogout = () => {
     logout();
-    CookieReader.clearCookiesForUrl('https://y.qq.com').catch(() => {});
+    CookieReader.clearCookiesForUrl(loginDomain).catch(() => {});
     setView('webview');
     setPlaylists(null);
     setWebviewPhase('idle');
