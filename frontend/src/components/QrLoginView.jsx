@@ -63,7 +63,11 @@ export default function QrLoginView({ sourceId, onConfirmed, compact = false }) 
       }, 1500);
     } catch (e) {
       setPhase('error');
-      setQrTip('生成二维码失败：' + (e?.message || ''));
+      const msg = e?.message || '';
+      const connLike = /failed to fetch|network|ECONN|timeout|connect|404|500/i.test(msg);
+      setQrTip(connLike
+        ? '登录服务未连接：请先启动后端（npm start），再点击重试'
+        : '生成二维码失败：' + msg);
     }
   }, [src, stopPolling, onConfirmed]);
 
@@ -76,6 +80,7 @@ export default function QrLoginView({ sourceId, onConfirmed, compact = false }) 
 
   const isScanned = phase === 'scanned';
   const isExpired = phase === 'expired';
+  const isError = phase === 'error';
   const isLoading = phase === 'loading';
   const isUnsupported = phase === 'unsupported';
 
@@ -114,6 +119,14 @@ export default function QrLoginView({ sourceId, onConfirmed, compact = false }) 
             <div style={{ position: 'absolute', inset: 0, background: 'rgba(255,255,255,0.86)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <button onClick={startQr} className="glass-button-accent" style={{ padding: '10px 16px', borderRadius: 12, fontSize: 13, fontWeight: 700, color: '#050608', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                 <RefreshCw size={14} /> 刷新二维码
+              </button>
+            </div>
+          )}
+          {isError && (
+            <div style={{ position: 'absolute', inset: 0, background: 'rgba(255,255,255,0.9)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12, padding: 16, textAlign: 'center' }}>
+              <span style={{ fontSize: 13, fontWeight: 600, color: '#c0392b', lineHeight: 1.5 }}>二维码生成失败</span>
+              <button onClick={startQr} className="glass-button-accent" style={{ padding: '10px 16px', borderRadius: 12, fontSize: 13, fontWeight: 700, color: '#050608', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                <RefreshCw size={14} /> 重试
               </button>
             </div>
           )}

@@ -267,18 +267,22 @@ export default function Player({ onProfile }) {
         </div>
       </div>
 
-      {/* 底部统一 Now-Playing 控制栏（进度条内嵌，mini / full 两态） */}
+      {/* 底部控制栏：收起=左下角小胶囊 + 居中细进度条；展开=居中宽条 */}
       {!controlsExpanded ? (
-        <div
-          className="glass-panel"
-          style={{
-            position: 'absolute', left: '50%', bottom: 'calc(14px + var(--safe-bottom))', transform: 'translateX(-50%)', zIndex: 50,
-            width: 'min(560px, calc(100% - 32px))', padding: '8px 12px 10px', borderRadius: 18,
-            display: 'flex', flexDirection: 'column', gap: 6
-          }}
-        >
-          <ProgressStrip showTimes={false} />
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <>
+          {/* 细进度条（居中，收起时贴底上方，带起止时间） */}
+          <div style={{ position: 'absolute', left: '50%', bottom: 'calc(72px + var(--safe-bottom))', transform: 'translateX(-50%)', width: 'min(560px, calc(100% - 32px))', zIndex: 50, display: 'flex', alignItems: 'center' }}>
+            <ProgressStrip showTimes={true} />
+          </div>
+          {/* 收起态：左下角紧凑小胶囊 */}
+          <div
+            className="glass-panel"
+            style={{
+              position: 'absolute', left: 14, bottom: 'calc(14px + var(--safe-bottom))', transform: 'none', zIndex: 50,
+              height: 52, padding: '6px 8px', borderRadius: 16,
+              display: 'flex', alignItems: 'center', gap: 8
+            }}
+          >
             <button onClick={() => setControlsExpanded(true)} style={{ width: 40, height: 40, borderRadius: 11, overflow: 'hidden', flexShrink: 0, background: 'rgba(255,255,255,0.06)', border: 'none', padding: 0, cursor: 'pointer' }}>
               {currentTrack?.cover ? <img key={currentTrack.id} src={currentTrack.cover} alt="" className={`cover-fade ${isPlaying ? 'cover-playing' : ''}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <div style={{ width: '100%', height: '100%', background: 'linear-gradient(135deg, rgba(0,245,212,0.25), rgba(36,66,255,0.18))' }} />}
             </button>
@@ -288,7 +292,7 @@ export default function Player({ onProfile }) {
             <button onClick={next} className="glass-button" style={{ width: 32, height: 32, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.78)' }}><SkipForward size={18} fill="currentColor" /></button>
             <button onClick={() => setControlsExpanded(true)} className="glass-button" style={{ width: 28, height: 28, borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-secondary)' }}><ChevronUp size={16} /></button>
           </div>
-        </div>
+        </>
       ) : (
         <div
           className="glass-panel"
