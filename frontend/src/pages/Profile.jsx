@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { ArrowLeft, ChevronRight, Loader2, Music2, LogOut, Play, User as UserIcon, RefreshCw, QrCode } from 'lucide-react';
 import { useAuthStore } from '../store/useAuthStore';
 import { usePlayerStore } from '../store/usePlayerStore';
@@ -36,6 +36,7 @@ export default function Profile({ onBack }) {
 
   const sources_ = listSources();
 
+  // 激活源切换（仅影响"默认播放音源"，不再影响歌单展示范围）
   const [selectedSourceId, setSelectedSourceId] = useState(() => {
     const st = useAuthStore.getState();
     const first = Object.keys(st.sources).find((id) => st.sources[id].isLoggedIn);
@@ -43,52 +44,76 @@ export default function Profile({ onBack }) {
   });
   const [expandedSourceId, setExpandedSourceId] = useState(null); // 内嵌扫码展开的音源
 
-  const [playlists, setPlaylists] = useState([]);
-  const [loadingPlaylists, setLoadingPlaylists] = useState(false);
+  // 聚合所有已登录音源的歌单：{ [sourceId]: { list, loading, loaded } }
+  const [allPlaylists, setAllPlaylists] = useState({});
   const [playlistDetail, setPlaylistDetail] = useState(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
 
   const selectedCreds = getSourceCreds(selectedSourceId);
 
-  const loadPlaylists = useCallback(async (sourceId) => {
+  // 加载单个音源的歌单，结果合并进 allPlaylists
+  const loadPlaylistsForSource = useCallback(async (sourceId) => {
     const c = getSourceCreds(sourceId);
-    if (!c.isLoggedIn || !c.cookie || !c.uin) { setPlaylists([]); return; }
-    setLoadingPlaylists(true);
+    if (!c.isLoggedIn || !c.cookie || !c.uin) {
+      setAllPlaylists((prev) => ({ ...prev, [sourceId]: { list: [], loading: false, loaded: true } }));
+      return;
+    }
+    setAllPlaylists((prev) => ({ ...prev, [sourceId]: { list: [], loading: true, loaded: false } }));
     try {
       const list = await getSource(sourceId).userPlaylists(c.cookie, c.uin);
-      setPlaylists(list || []);
+      setAllPlaylists((prev) => ({ ...prev, [sourceId]: { list: list || [], loading: false, loaded: true } }));
     } catch (e) {
-      setPlaylists([]);
-    } finally {
-      setLoadingPlaylists(false);
+      setAllPlaylists((prev) => ({ ...prev, [sourceId]: { list: [], loading: false, loaded: true } }));
     }
   }, [getSourceCreds]);
 
-  // 首次进入刷新各已登录源的用户信息
+  // 首次进入刷新各已登录源的用户信息 + 歌单
   useEffect(() => {
-    Object.keys(sources).forEach((id) => { if (sources[id].isLoggedIn) fetchUserInfo(id); });
+    Object.keys(sources).forEach((id) => {
+      if (sources[id].isLoggedIn) {
+        fetchUserInfo(id);
+        loadPlaylistsForSource(id);
+      }
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // 选中源变化或登录态变化时重载歌单
+  // 登录态变化时补载新增的已登录音源歌单
+  const prevLoggedInRef = useRef({});
   useEffect(() => {
-    if (selectedCreds.isLoggedIn) loadPlaylists(selectedSourceId);
-    else setPlaylists([]);
-  }, [selectedSourceId, selectedCreds.isLoggedIn, loadPlaylists]);
+    const prev = prevLoggedInRef.current;
+    Object.keys(sources).forEach((id) => {
+      const nowLoggedIn = sources[id].isLoggedIn;
+      if (nowLoggedIn && !prev[id]) {
+        // 新登录的音源
+        loadPlaylistsForSource(id);
+      } else if (!nowLoggedIn && prev[id]) {
+        // 刚登出的音源：清空其歌单
+        setAllPlaylists((p) => {
+          const next = { ...p };
+          delete next[id];
+          return next;
+        });
+      }
+    });
+    prevLoggedInRef.current = Object.fromEntries(
+      Object.keys(sources).filter((id) => sources[id].isLoggedIn).map((id) => [id, true])
+    );
+  }, [sources, loadPlaylistsForSource]);
 
   const selectSource = (id) => {
     setSelectedSourceId(id);
-    setPlaylistDetail(null);
     if (getSourceCreds(id).isLoggedIn) setActiveSource(id);
   };
 
-  const openPlaylistDetail = async (pl) => {
+  // 歌单详情按歌单所属音源拉取（不依赖 selectedSourceId）
+  const openPlaylistDetail = async (pl, sourceId) => {
     setLoadingDetail(true);
-    setPlaylistDetail({ name: pl.name, tracks: [] });
+    setPlaylistDetail({ name: pl.name, tracks: [], sourceId });
     try {
-      const creds = getSourceCreds(selectedSourceId);
-      const detail = await getSource(selectedSourceId).playlist(pl.id, creds.cookie);
-      setPlaylistDetail({ name: detail?.name || pl.name, tracks: detail?.tracks || [] });
+      const creds = getSourceCreds(sourceId);
+      const detail = await getSource(sourceId).playlist(pl.id, creds.cookie);
+      setPlaylistDetail({ name: detail?.name || pl.name, tracks: detail?.tracks || [], sourceId });
     } catch (e) {
       setPlaylistDetail(null);
     } finally {
@@ -98,16 +123,29 @@ export default function Profile({ onBack }) {
 
   const playFromPlaylist = (track) => {
     if (!track || !playlistDetail?.tracks?.length) return;
+    // 播放时切换激活源为该歌单所属音源，保证播放走正确音源
+    if (playlistDetail.sourceId && playlistDetail.sourceId !== activeSourceId) {
+      setActiveSource(playlistDetail.sourceId);
+    }
     try { playTrackFromList(track, playlistDetail.tracks); } catch (e) { console.error('播放歌单歌曲失败', e); }
   };
 
   const playAll = () => {
-    if (playlistDetail?.tracks?.length) playTrackFromList(playlistDetail.tracks[0], playlistDetail.tracks);
+    if (playlistDetail?.tracks?.length) {
+      if (playlistDetail.sourceId && playlistDetail.sourceId !== activeSourceId) {
+        setActiveSource(playlistDetail.sourceId);
+      }
+      playTrackFromList(playlistDetail.tracks[0], playlistDetail.tracks);
+    }
   };
 
   const handleRefresh = () => {
-    Object.keys(sources).forEach((id) => { if (sources[id].isLoggedIn) fetchUserInfo(id); });
-    loadPlaylists(selectedSourceId);
+    Object.keys(sources).forEach((id) => {
+      if (sources[id].isLoggedIn) {
+        fetchUserInfo(id);
+        loadPlaylistsForSource(id);
+      }
+    });
   };
 
   const handleLoginConfirmed = (id, creds) => {
@@ -116,6 +154,11 @@ export default function Profile({ onBack }) {
     setSelectedSourceId(id);
     setActiveSource(id);
   };
+
+  // 统计：已登录音源数 + 全部歌单总数
+  const loggedInSources = sources_.filter((s) => getSourceCreds(s.id).isLoggedIn);
+  const totalPlaylists = loggedInSources.reduce((sum, s) => sum + (allPlaylists[s.id]?.list?.length || 0), 0);
+  const anyLoading = loggedInSources.some((s) => allPlaylists[s.id]?.loading);
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'radial-gradient(ellipse at 30% 18%, rgba(0, 245, 212, .08) 0%, rgba(0,0,0,0.48) 55%, rgba(0,0,0,0.85) 100%)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
@@ -126,13 +169,13 @@ export default function Profile({ onBack }) {
         </button>
         <span style={{ fontSize: 16, fontWeight: 760, flex: 1, letterSpacing: '.04em' }}>{playlistDetail ? playlistDetail.name : '我的账户'}</span>
         <button onClick={handleRefresh} className="glass-button" style={{ width: 38, height: 38, borderRadius: 11, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-secondary)' }} title="刷新">
-          <RefreshCw size={16} className={loadingPlaylists ? 'spin-icon' : ''} />
+          <RefreshCw size={16} className={anyLoading ? 'spin-icon' : ''} />
         </button>
       </div>
 
       {/* 双栏内容（窄屏由 CSS 折叠为单栏） */}
       <div className="profile-shell">
-        {/* 左栏：账号 + 歌单 */}
+        {/* 左栏：账号 + 全部歌单 */}
         <div className="profile-left">
           {/* 账号区 */}
           <div style={{ fontSize: 10, fontWeight: 760, letterSpacing: '.14em', color: 'var(--fc-muted)', textTransform: 'uppercase', padding: '4px 4px 8px' }}>音源账号</div>
@@ -142,9 +185,9 @@ export default function Profile({ onBack }) {
               const isLoggedIn = c.isLoggedIn;
               const color = SOURCE_COLOR[s.id] || '#888';
               const isExpanded = expandedSourceId === s.id;
-              const isSelected = selectedSourceId === s.id && isLoggedIn;
+              const isActive = activeSourceId === s.id && isLoggedIn;
               return (
-                <div key={s.id} className="glass-panel" style={{ borderRadius: 16, padding: isExpanded ? 12 : 10, border: isSelected ? `1px solid ${color}55` : '1px solid rgba(255,255,255,0.06)' }}>
+                <div key={s.id} className="glass-panel" style={{ borderRadius: 16, padding: isExpanded ? 12 : 10, border: isActive ? `1px solid ${color}55` : '1px solid rgba(255,255,255,0.06)' }}>
                   {isLoggedIn ? (
                     <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                       <div style={{ width: 46, height: 46, borderRadius: '50%', overflow: 'hidden', flexShrink: 0, background: 'rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: `2px solid ${color}55`, boxShadow: `0 0 0 1px ${color}22` }}>
@@ -152,7 +195,7 @@ export default function Profile({ onBack }) {
                       </div>
                       <div style={{ flex: 1, minWidth: 0 }} onClick={() => selectSource(s.id)}>
                         <div style={{ fontSize: 14, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.nickname || s.name}</div>
-                        <span className="source-tag" style={{ background: `${color}22`, color, border: `1px solid ${color}55` }}>{s.name} · 已登录</span>
+                        <span className="source-tag" style={{ background: `${color}22`, color, border: `1px solid ${color}55` }}>{s.name}{isActive ? ' · 当前' : ' · 已登录'}</span>
                       </div>
                       <button onClick={() => logout(s.id)} className="glass-button" style={{ width: 34, height: 34, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ff9fa6', flexShrink: 0 }} title="退出该音源">
                         <LogOut size={15} />
@@ -185,36 +228,60 @@ export default function Profile({ onBack }) {
             })}
           </div>
 
-          {/* 歌单列表 */}
-          {selectedCreds.isLoggedIn && (
+          {/* 全部歌单（聚合所有已登录音源） */}
+          {loggedInSources.length > 0 ? (
             <>
               <div style={{ fontSize: 10, fontWeight: 760, letterSpacing: '.14em', color: 'var(--fc-muted)', textTransform: 'uppercase', padding: '16px 4px 8px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <span>{getSource(selectedSourceId)?.name || '音源'}歌单</span>
-                <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{playlists.length} 个</span>
+                <span>全部歌单</span>
+                <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{totalPlaylists} 个 · {loggedInSources.length} 源</span>
               </div>
               <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch', padding: '0 2px' }}>
-                {loadingPlaylists ? <div style={{ display: 'flex', justifyContent: 'center', padding: 30 }}><Loader2 size={22} className="spin-icon" style={{ color: 'var(--accent-dynamic)' }} /></div>
-                  : playlists.length === 0 ? <div style={{ textAlign: 'center', padding: 30, color: 'var(--text-muted)', fontSize: 12 }}>暂无歌单</div>
-                    : <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                      {playlists.map((pl) => (
-                        <button key={pl.id} onClick={() => openPlaylistDetail(pl)} className={`glass-row ${playlistDetail?.name === pl.name ? 'is-active' : ''}`} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', borderRadius: 12, textAlign: 'left' }}>
-                          <div style={{ width: 44, height: 44, borderRadius: 10, overflow: 'hidden', flexShrink: 0, background: 'rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                            {pl.cover ? <img src={pl.cover} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <Music2 size={18} color="var(--text-secondary)" />}
+                {anyLoading && totalPlaylists === 0 ? (
+                  <div style={{ display: 'flex', justifyContent: 'center', padding: 30 }}><Loader2 size={22} className="spin-icon" style={{ color: 'var(--accent-dynamic)' }} /></div>
+                ) : totalPlaylists === 0 ? (
+                  <div style={{ textAlign: 'center', padding: 30, color: 'var(--text-muted)', fontSize: 12 }}>暂无歌单</div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    {loggedInSources.map((s) => {
+                      const color = SOURCE_COLOR[s.id] || '#888';
+                      const entry = allPlaylists[s.id];
+                      const list = entry?.list || [];
+                      if (!entry || (entry.loading && list.length === 0)) {
+                        return (
+                          <div key={s.id}>
+                            <SourceHeader name={s.name} color={color} count={null} loading />
+                            <div style={{ display: 'flex', justifyContent: 'center', padding: 12 }}><Loader2 size={16} className="spin-icon" color={color} /></div>
                           </div>
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{pl.name}</div>
-                            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>{pl.songCount ?? 0} 首</div>
+                        );
+                      }
+                      if (list.length === 0) return null;
+                      return (
+                        <div key={s.id}>
+                          <SourceHeader name={s.name} color={color} count={list.length} />
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                            {list.map((pl) => (
+                              <button key={`${s.id}_${pl.id}`} onClick={() => openPlaylistDetail(pl, s.id)} className={`glass-row ${playlistDetail?.name === pl.name && playlistDetail?.sourceId === s.id ? 'is-active' : ''}`} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', borderRadius: 12, textAlign: 'left' }}>
+                                <div style={{ width: 44, height: 44, borderRadius: 10, overflow: 'hidden', flexShrink: 0, background: 'rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                  {pl.cover ? <img src={pl.cover} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <Music2 size={18} color="var(--text-secondary)" />}
+                                </div>
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                  <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{pl.name}</div>
+                                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>{pl.songCount ?? 0} 首</div>
+                                </div>
+                                <ChevronRight size={15} color="var(--text-muted)" />
+                              </button>
+                            ))}
                           </div>
-                          <ChevronRight size={15} color="var(--text-muted)" />
-                        </button>
-                      ))}
-                    </div>}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             </>
-          )}
-          {!selectedCreds.isLoggedIn && (
+          ) : (
             <div style={{ textAlign: 'center', padding: 30, color: 'var(--text-muted)', fontSize: 12, marginTop: 12 }}>
-              选择上方已登录音源查看歌单，<br />或扫码登录一个音源
+              选择上方音源扫码登录，<br />登录后即可查看全部歌单
             </div>
           )}
         </div>
@@ -253,6 +320,18 @@ export default function Profile({ onBack }) {
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+// 音源分组标题
+function SourceHeader({ name, color, count, loading }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 4px 6px' }}>
+      <span style={{ width: 6, height: 6, borderRadius: '50%', background: color, boxShadow: `0 0 6px ${color}` }} />
+      <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-secondary)', letterSpacing: '.06em' }}>{name}</span>
+      <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>{loading ? '加载中…' : `${count ?? 0} 个`}</span>
+      <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.06)' }} />
     </div>
   );
 }
