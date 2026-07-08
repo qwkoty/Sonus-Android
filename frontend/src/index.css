@@ -358,3 +358,60 @@ input[type="range"]:active::-webkit-slider-thumb {
 .toast-in {
   animation: toastIn .28s cubic-bezier(.16, 1, .3, 1) both;
 }
+
+/* ============ 账户中心（Profile）响应式双栏 ============ */
+.profile-shell {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+  gap: 12px;
+  padding: 12px;
+}
+
+.profile-left {
+  width: 340px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.profile-right {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 18px;
+  overflow: hidden;
+}
+
+/* 窄屏（<720px）：双栏折叠为上下单栏 */
+@media (max-width: 720px) {
+  .profile-shell {
+    flex-direction: column;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .profile-left,
+  .profile-right {
+    width: auto;
+    flex: initial;
+  }
+  .profile-right {
+    min-height: 60vh;
+  }
+}
+
+/* 音源标签胶囊 */
+.source-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  margin-top: 4px;
+}
