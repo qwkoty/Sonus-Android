@@ -13,12 +13,16 @@ const ROTATE_SENSITIVITY = 0.006; // 滑动旋转灵敏度 rad/px
 
 // —— 星河漩涡（galaxy）参数 ——
 const GALAXY_DPR_CAP = 2;         // 高 dpi 渲染上限，保帧
-const GALAXY_ARMS = 3;            // 旋臂数
-const GALAXY_TWIST = 3.4;         // 旋臂总扭转（弧度）
-const GALAXY_BULGE_FRAC = 0.24;   // 中心核球粒子占比
+const GALAXY_ARMS = 5;            // 旋臂数（真实星系多为多臂）
+const GALAXY_TWIST = 5.5;         // 旋臂总扭转（弧度），越大漩涡越紧
+const GALAXY_BULGE_FRAC = 0.15;   // 中心核球粒子占比
+const GALAXY_DISC_FRAC = 0.72;    // 盘面旋臂粒子占比
+const GALAXY_HALO_FRAC = 0.13;    // 弥散晕/尘埃粒子占比
 const GALAXY_R_MAX_RATIO = 0.96;  // 星系盘半径相对画面
-const RIPPLE_FREQ = 14;           // 径向涟漪空间频率
-const RIPPLE_SPEED = 3.0;         // 涟漪向外传播速度
+const GALAXY_ARM_WIDTH_INNER = 0.18; // 内圈臂宽（rad）
+const GALAXY_ARM_WIDTH_OUTER = 0.55; // 外圈臂宽（rad）
+const RIPPLE_FREQ = 10;           // 径向涟漪空间频率
+const RIPPLE_SPEED = 2.2;         // 涟漪向外传播速度
 const BEAT_THRESHOLD = 0.16;      // 低频能量一阶导超此值触发冲击波
 const BEAT_COOLDOWN = 0.11;       // 两次冲击波最小间隔（s）
 const SPRING_K = 0.05;            // 冲击波回弹弹簧系数
@@ -246,6 +250,8 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
     const galaxyR = new Float32Array(COUNT);                 // 每粒子半径
     const galaxyUX = new Float32Array(COUNT);                // 径向单位向量 X
     const galaxyUY = new Float32Array(COUNT);                // 径向单位向量 Y
+    const galaxyTheta = new Float32Array(COUNT);             // 每粒子角位置（用于螺旋推进）
+    const galaxyArm = new Int8Array(COUNT);                  // 所属旋臂索引（-1=弥散晕）
     const galaxyBulge = new Float32Array(COUNT);             // 1=核球粒子
     const coverColors = new Float32Array(COUNT * 3);         // 封面 RGB（取平均色用）
     const explodeVel = new Float32Array(COUNT * 3);          // 冲击波速度
@@ -300,36 +306,69 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
           baseNormalsLiquid[idx * 3 + 1] = ly / len;
           baseNormalsLiquid[idx * 3 + 2] = lz / len;
 
-          // 星河漩涡：对数螺旋星系盘 + 中心核球
-          const arm = Math.floor(grng() * GALAXY_ARMS);
-          const isBulge = grng() < GALAXY_BULGE_FRAC;
-          let gx2, gy2, gz2, rr, th;
+          // 星河漩涡：真实对数螺旋星系盘 + 中心核球 + 弥散晕
+          const galRoll = grng();
+          const isBulge = galRoll < GALAXY_BULGE_FRAC;
+          const isHalo = !isBulge && galRoll > (GALAXY_BULGE_FRAC + GALAXY_DISC_FRAC);
+          let gx2, gy2, gz2, rr, th, armIdx = -1;
+
           if (isBulge) {
-            // 中心核球：略呈球状的密集亮核
-            rr = Math.pow(grng(), 0.5) * Rmax * 0.26;
+            // 中心核球：略呈椭球的密集亮核，密度随半径衰减
+            rr = Math.pow(grng(), 0.35) * Rmax * 0.22;
             const phi2 = grng() * Math.PI * 2;
             const ct = grng() * 2 - 1;
             const st = Math.sqrt(Math.max(0, 1 - ct * ct));
             th = phi2;
             gx2 = rr * st * Math.cos(phi2);
             gy2 = rr * st * Math.sin(phi2);
-            gz2 = rr * ct * 0.55;
-          } else {
-            // 旋臂：半径越外扭转越多；越靠中心散布越宽
-            rr = Rmax * Math.pow(grng(), 0.82);
-            const twist = (rr / Rmax) * GALAXY_TWIST;
-            const scatter = (grng() - 0.5) * (0.62 * (1 - 0.45 * rr / Rmax));
-            th = arm * (Math.PI * 2 / GALAXY_ARMS) + twist + scatter;
+            gz2 = rr * ct * 0.45;
+          } else if (isHalo) {
+            // 弥散晕/尘埃：填充旋臂之间，低密度散布
+            rr = Rmax * (0.12 + 0.88 * Math.pow(grng(), 0.7));
+            th = grng() * Math.PI * 2;
+            const armPhase = (th / (Math.PI * 2) * GALAXY_ARMS) % GALAXY_ARMS;
+            const nearestArmOffset = Math.min(
+              ...Array.from({ length: GALAXY_ARMS }, (_, a) => Math.abs(armPhase - a))
+            );
+            // 让晕粒子略偏向旋臂之间的中点，形成暗隙
+            const bias = (nearestArmOffset - GALAXY_ARMS * 0.5) * 0.08 * (rr / Rmax);
+            th += bias;
+            const haloScatter = (grng() - 0.5) * (0.6 + 0.5 * rr / Rmax);
+            th += haloScatter;
             gx2 = Math.cos(th) * rr;
             gy2 = Math.sin(th) * rr;
-            gz2 = (grng() - 0.5) * planeSize * 0.045 * (1 - 0.4 * rr / Rmax);
+            gz2 = (grng() - 0.5) * planeSize * 0.055 * (0.4 + 0.6 * rr / Rmax);
+          } else {
+            // 旋臂：对数螺旋，内圈窄外圈宽，密度内高外低
+            armIdx = Math.floor(grng() * GALAXY_ARMS);
+            // 半径分布：在中环（0.35-0.8 Rmax）密度最高
+            const rT = Math.pow(grng(), 0.65);
+            rr = Rmax * (0.06 + 0.94 * rT);
+            // 对数螺旋：theta = 基准角 + twist * log(r)
+            const baseAngle = armIdx * (Math.PI * 2 / GALAXY_ARMS);
+            const twist = Math.log(Math.max(0.08, rr / Rmax)) * GALAXY_TWIST;
+            const idealTh = baseAngle + twist;
+            // 臂宽：内圈窄、外圈宽，用高斯散射
+            const width = GALAXY_ARM_WIDTH_INNER + (GALAXY_ARM_WIDTH_OUTER - GALAXY_ARM_WIDTH_INNER) * (rr / Rmax);
+            // Box-Muller 近似正态分布
+            const u1 = grng(); const u2 = grng();
+            const gauss = Math.sqrt(-2 * Math.log(Math.max(0.001, u1))) * Math.cos(Math.PI * 2 * u2);
+            const scatter = gauss * width * 0.5;
+            th = idealTh + scatter;
+            // 轻微径向振动，让臂有厚度
+            rr *= (1 + (grng() - 0.5) * 0.08 * width);
+            gx2 = Math.cos(th) * rr;
+            gy2 = Math.sin(th) * rr;
+            gz2 = (grng() - 0.5) * planeSize * 0.04 * (1 - 0.35 * rr / Rmax);
           }
           basePositionsGalaxy[idx * 3] = gx2;
           basePositionsGalaxy[idx * 3 + 1] = gy2;
           basePositionsGalaxy[idx * 3 + 2] = gz2;
-          galaxyR[idx] = rr;
+          galaxyR[idx] = Math.hypot(gx2, gy2);
           galaxyUX[idx] = Math.cos(th);
           galaxyUY[idx] = Math.sin(th);
+          galaxyTheta[idx] = th;
+          galaxyArm[idx] = armIdx;
           galaxyBulge[idx] = isBulge ? 1 : 0;
 
           const initial = modeRef.current === 'liquidmetal' ? basePositionsLiquid
@@ -535,13 +574,12 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
             else twinkle[di] = 0;
           }
 
-          // 流星事件
+          // 流星事件：更频繁，沿螺旋切向飞出
           if (!meteor.active && t > meteor.nextT) {
-            // 从外圈随机选一个粒子作为起点（放宽阈值+增加尝试次数，确保流星可靠生成）
             let spawnIdx = -1;
-            for (let mi = 0; mi < 40; mi++) {
+            for (let mi = 0; mi < 60; mi++) {
               const ci = Math.floor(Math.random() * COUNT);
-              if (galaxyR[ci] / Rmax > 0.55 && !galaxyBulge[ci]) {
+              if (galaxyR[ci] / Rmax > 0.45 && !galaxyBulge[ci]) {
                 spawnIdx = ci; break;
               }
             }
@@ -550,25 +588,26 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
               meteor.idx = spawnIdx;
               meteor.sx = basePositionsGalaxy[spawnIdx * 3];
               meteor.sy = basePositionsGalaxy[spawnIdx * 3 + 1];
-              // 切向方向飞出
+              // 沿旋臂切向（螺旋方向）飞出
+              const rN = galaxyR[spawnIdx] / Rmax;
               const tangX = -galaxyUY[spawnIdx];
               const tangY = galaxyUX[spawnIdx];
-              const flyDist = planeSize * 0.5;
+              const flyDist = planeSize * (0.35 + 0.35 * rN);
               meteor.ex = meteor.sx + tangX * flyDist;
               meteor.ey = meteor.sy + tangY * flyDist;
               meteor.prog = 0;
             }
-            meteor.nextT = t + 10 + Math.random() * 8; // 下次流星
+            meteor.nextT = t + 4 + Math.random() * 5; // 流星更频繁
           }
           if (meteor.active) {
             meteor.prog += dt * 0.7; // 流星速度
             if (meteor.prog >= 1) meteor.active = false;
           }
 
-          // 极慢的整体能量（星系几乎是静止的）
-          bass   = 0.06 + Math.sin(t * 0.12) * 0.03;   // 16s 周期的核心心跳
-          mid    = 0.04 + Math.sin(t * 0.09 + 0.5) * 0.02;
-          treble = 0.025;
+          // 待机能量：让星系持续有缓慢呼吸与流转
+          bass   = 0.08 + Math.sin(t * 0.15) * 0.04 + Math.sin(t * 0.05) * 0.02;
+          mid    = 0.05 + Math.sin(t * 0.12 + 1) * 0.03;
+          treble = 0.035 + Math.sin(t * 0.28 + 2) * 0.015;
         }
       }
       if (bass > bassAttack) bassAttack += (bass - bassAttack) * 0.55;
@@ -682,15 +721,23 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
         let bx, by, bz, nx, ny, nz;
         if (isGalaxy) {
           const rN = Math.min(1, galaxyR[i] * invRmax);
-          // 由内向外的径向涟漪波（随该频段能量起伏）
           const band = Math.min(63, Math.floor(rN * 63));
-          const ripple = Math.sin(rN * RIPPLE_FREQ - time * RIPPLE_SPEED) * spectrumSmooth[band] * planeSize * 0.05 * (1 + beatFreqBoost * GALAXY_BEAT_FREQ_GAIN); // 鼓点增强频率响应
+          const rr = galaxyR[i];
+
+          // 由内向外的径向涟漪波
+          const ripple = Math.sin(rN * RIPPLE_FREQ - time * RIPPLE_SPEED) * spectrumSmooth[band] * planeSize * 0.06 * (1 + beatFreqBoost * GALAXY_BEAT_FREQ_GAIN);
+
           // 低频推核球呼吸（越靠中心越强）
-          const bassPush = bassAttack * planeSize * 0.10 * (1 - rN * 0.6);
-          const disp = ripple + bassPush;
+          const bassPush = bassAttack * planeSize * 0.12 * Math.pow(1 - rN, 1.4);
+
+          // 臂波动：沿半径方向螺旋波，让旋臂像流体一样起伏
+          const armWave = (hasData ? 1.0 : 0.7) * Math.sin(rN * 16 - time * 2.2 + (galaxyArm[i] >= 0 ? galaxyArm[i] : 0) * 1.1) * planeSize * 0.018 * (1 + beatFreqBoost * 0.6);
+
+          const disp = ripple + bassPush + armWave;
           let sx = basePositionsGalaxy[i * 3] + galaxyUX[i] * disp + explodePos[i * 3];
           let sy = basePositionsGalaxy[i * 3 + 1] + galaxyUY[i] * disp + explodePos[i * 3 + 1];
           let sz = basePositionsGalaxy[i * 3 + 2] + explodePos[i * 3 + 2];
+
           if (tr.active) {
             // 跨模式进入星河时，从源形态基础坐标平滑过渡到星河基础坐标
             const fb = baseFor(tr.from).pos;
@@ -699,6 +746,7 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
             sy = fb[i * 3 + 1] * (1 - mt) + sy * mt;
             sz = fb[i * 3 + 2] * (1 - mt) + sz * mt;
           }
+
           bx = sx; by = sy; bz = sz;
           nx = galaxyUX[i]; ny = galaxyUY[i]; nz = 0;
         } else if (tr.active) {
@@ -726,26 +774,36 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
         let x = bx, y = by, z = bz;
 
         if (isGalaxy) {
-          // ═══ galaxy 待机：深空星尘 — 差速旋转 + 核心心跳 + 流星 ═══
+          // ═══ galaxy：差速旋转 + 螺旋推进 + 鼓点切向冲击 + 核心心跳 + 流星 ═══
           const rN = Math.min(1, galaxyR[i] * invRmax);
 
-          // 差速旋转：内圈快(0.08 rad/s) → 外圈慢(0.02 rad/s)，模拟真实星系
-          const diffOmega = hasData ? 0.12 : 0.08; // 有音频时稍快
+          // 差速旋转：内圈快 → 外圈慢，模拟真实星系漩涡
+          const diffOmega = hasData ? 0.18 : 0.12;
           const innerOmega = diffOmega;
-          const outerOmega = diffOmega * 0.22;
+          const outerOmega = diffOmega * 0.28;
           const ang = time * (innerOmega + (outerOmega - innerOmega) * rN);
           const ca = Math.cos(ang), sa = Math.sin(ang);
           const rx = x * ca - y * sa;
           const ry = x * sa + y * ca;
           x = rx; y = ry;
+
+          // 鼓点切向冲击：让旋臂在鼓点时"甩"一下
+          const beatSpin = beatPulseRef.current * planeSize * 0.10 * (1 - rN * 0.5);
+          x += -ny * beatSpin;
+          y += nx * beatSpin;
+
           // 频谱细碎抖动增强流动感
-          const jitter = trebleSmooth * 0.5 * Math.sin(u * 50 + time * 5 + i * 0.3) * planeSize * 0.004 * (1 + beatFreqBoost * GALAXY_BEAT_FREQ_GAIN); // 鼓点增强频率响应
+          const jitter = (trebleSmooth + midSmooth * 0.5) * Math.sin(u * 50 + time * 5 + i * 0.3) * planeSize * 0.005 * (1 + beatFreqBoost * GALAXY_BEAT_FREQ_GAIN);
           x += nx * jitter; y += ny * jitter; z += nz * jitter;
 
-          // 核心心跳：核球粒子做 12s 周期的极慢膨胀/收缩（待机时更明显）
-          if (galaxyBulge[i] && !hasData) {
-            const heartPhase = Math.sin(time * Math.PI / 6); // 12s 周期
-            const breathe = 1 + heartPhase * 0.05; // ±5% 半径
+          // 整体呼吸缩放（待机时更明显）
+          const globalBreathe = 1 + (hasData ? 0.015 : 0.04) * Math.sin(time * (hasData ? 0.9 : 0.5));
+          x *= globalBreathe; y *= globalBreathe; z *= globalBreathe;
+
+          // 核心心跳：核球粒子做缓慢膨胀/收缩
+          if (galaxyBulge[i]) {
+            const heartPhase = Math.sin(time * Math.PI / (hasData ? 4 : 5));
+            const breathe = 1 + heartPhase * (hasData ? 0.05 : 0.09);
             x *= breathe; y *= breathe; z *= breathe;
           }
 
@@ -753,10 +811,13 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
           const meteor = idleMeteorRef.current;
           if (!hasData && meteor.active && meteor.idx === i) {
             const mp = meteor.prog;
-            // 缓入缓出的流星轨迹
-            const easeP = mp < 0.15 ? mp / 0.15 : (mp > 0.85 ? (1 - mp) / 0.15 : 1);
+            const easeP = mp < 0.12 ? mp / 0.12 : (mp > 0.88 ? (1 - mp) / 0.12 : 1);
             x = meteor.sx + (meteor.ex - meteor.sx) * mp;
             y = meteor.sy + (meteor.ey - meteor.sy) * mp;
+            // 流星带一点弧线：向中心偏
+            const arc = Math.sin(mp * Math.PI) * planeSize * 0.04;
+            x += galaxyUX[i] * arc;
+            y += galaxyUY[i] * arc;
           }
         } else if (targetShape === 'coverflow') {
           // ═══ coverflow 待机：绸缎飘风 ═══
@@ -851,6 +912,7 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
         if (isGalaxy) {
           // 星河着色：内核=主题色(炽热)，外圈=封面平均色(冷)，加色混合辉光
           const rN = Math.min(1, galaxyR[i] * invRmax);
+          const isHaloNow = galaxyArm[i] < 0 && !galaxyBulge[i];
           const coreMix = Math.pow(1 - rN, 1.6);
           const cr = accentRGB.r, cg = accentRGB.g, cb = accentRGB.b;
           const ar = cavg.r, ag = cavg.g, ab = cavg.b;
@@ -858,26 +920,38 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
           let g = cg * coreMix + ag * (1 - coreMix);
           let b = cb * coreMix + ab * (1 - coreMix);
 
-          // 星云漂移：外圈颜色在封面平均色与 accent 之间极慢往复（30s 周期）
+          // 弥散晕偏冷、偏暗，形成背景星尘
+          if (isHaloNow) {
+            r = r * 0.6 + 0.1; g = g * 0.65 + 0.12; b = b * 0.85 + 0.18;
+          }
+
+          // 星云漂移：外圈颜色在封面平均色与 accent 之间极慢往复
           if (!hasData && rN > 0.5) {
-            const nebulaPhase = Math.sin(time * Math.PI / 15) * 0.5 + 0.5; // 30s
-            r = r * (1 - nebulaPhase * 0.15) + ar * nebulaPhase * 0.15;
-            g = g * (1 - nebulaPhase * 0.15) + ag * nebulaPhase * 0.15;
-            b = b * (1 - nebulaPhase * 0.15) + ab * nebulaPhase * 0.15;
+            const nebulaPhase = Math.sin(time * Math.PI / 12) * 0.5 + 0.5;
+            r = r * (1 - nebulaPhase * 0.2) + ar * nebulaPhase * 0.2;
+            g = g * (1 - nebulaPhase * 0.2) + ag * nebulaPhase * 0.2;
+            b = b * (1 - nebulaPhase * 0.2) + ab * nebulaPhase * 0.2;
           }
 
           const band = Math.min(63, Math.floor(rN * 63));
           const localE = spectrumSmooth[band];
-          const intensity = 0.42 + bassAttack * 1.1 + localE * 1.6 * (1 + beatFreqBoost * GALAXY_BEAT_FREQ_GAIN) + beatPulseRef.current * 0.9 + galaxyBulge[i] * bassAttack * 0.6; // 鼓点增强频段亮度
+          let intensity = 0.45 + bassAttack * 1.2 + localE * 1.8 * (1 + beatFreqBoost * GALAXY_BEAT_FREQ_GAIN) + beatPulseRef.current * 1.1;
+          if (galaxyBulge[i]) intensity += 0.5 + bassAttack * 0.8;
+          if (isHaloNow) intensity *= 0.55;
 
-          // 星星闪烁叠加（待机时更明显）
+          // 星星闪烁叠加
           let twinkleBoost = 0;
           if (idleTwinkleRef.current) {
-            twinkleBoost = idleTwinkleRef.current[i] * (!hasData ? 1.2 : 0.5);
+            twinkleBoost = idleTwinkleRef.current[i] * (!hasData ? 1.4 : 0.6);
           }
-          // 流星粒子额外增亮
-          if (!hasData && idleMeteorRef.current.active && idleMeteorRef.current.idx === i) {
-            twinkleBoost += 2.0; // 流星很亮
+          // 流星粒子额外增亮，并拖出尾迹感（通过周围粒子也增亮一点）
+          const meteor = idleMeteorRef.current;
+          if (!hasData && meteor.active) {
+            const dx = basePositionsGalaxy[i * 3] - meteor.sx;
+            const dy = basePositionsGalaxy[i * 3 + 1] - meteor.sy;
+            const dMeteor = Math.hypot(dx, dy);
+            if (meteor.idx === i) twinkleBoost += 2.2;
+            else if (dMeteor < planeSize * 0.08) twinkleBoost += 0.25 * (1 - dMeteor / (planeSize * 0.08));
           }
 
           colorAttr.array[i * 3]     = Math.min(1, r * intensity + twinkleBoost);
