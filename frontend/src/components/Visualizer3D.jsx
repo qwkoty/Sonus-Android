@@ -23,18 +23,18 @@ const GALAXY_ARM_WIDTH_INNER = 0.18; // 内圈臂宽（rad）
 const GALAXY_ARM_WIDTH_OUTER = 0.55; // 外圈臂宽（rad）
 const RIPPLE_FREQ = 10;           // 径向涟漪空间频率
 const RIPPLE_SPEED = 2.2;         // 涟漪向外传播速度
-const OCEAN_SIZE_RATIO = 1.35;    // 海浪平面相对画面尺寸
-const OCEAN_WAVE_GAIN = 0.28;     // 海浪音频驱动高度增益
-const BEAT_THRESHOLD = 0.10;      // 低频能量一阶导超此值触发冲击波（越低越容易触发）
-const BEAT_COOLDOWN = 0.07;       // 两次冲击波最小间隔（s）
+const TERRAIN_SIZE_RATIO = 1.35;  // 地形平面相对画面尺寸
+const TERRAIN_GAIN = 0.26;        // 地形音频驱动高度增益
+const BEAT_THRESHOLD = 0.07;      // 鼓点触发阈值（越低越敏感）
+const BEAT_COOLDOWN = 0.05;       // 两次鼓点最小间隔（s）
 const SPRING_K = 0.05;            // 冲击波回弹弹簧系数
 const DAMPING = 0.88;             // 速度阻尼
 const SHOCK_GAIN = 2.2;           // 鼓点冲击波冲量增益（× bass）
 // —— 鼓点频率增强（与 beatPulse 平行的独立包络）——
-const BEAT_FREQ_BOOST_DECAY = 0.94; // 频率增强包络每帧衰减（鼓点后持续更久）
-const BEAT_PULSE_DECAY = 0.92;      // beatPulse 每帧衰减系数（更持久）
+const BEAT_FREQ_BOOST_DECAY = 0.96; // 频率增强包络每帧衰减（鼓点后持续更久）
+const BEAT_PULSE_DECAY = 0.93;      // beatPulse 每帧衰减系数
 const GALAXY_BEAT_FREQ_GAIN = 2.6;  // galaxy：鼓点时频谱响应放大倍数
-const LIQUID_BEAT_FREQ_GAIN = 2.0;  // liquidmetal：鼓点时频谱响应放大倍数
+const LIQUID_BEAT_FREQ_GAIN = 2.4;  // liquidmetal：鼓点时频谱响应放大倍数
 
 // 稳定伪随机（保证星系形态每次重建一致）
 function mulberry32(a) {
@@ -89,6 +89,7 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
   // 星河漩涡跨渲染状态（必须置于组件顶层，遵守 hooks 规则）
   const albumBuiltRef = useRef(-1);
   const prevBassRef = useRef(0);
+  const prevMidRef = useRef(0);
   const lastBeatRef = useRef(0);
   const beatPulseRef = useRef(0);
   const beatFreqBoostRef = useRef(0); // 鼓点频率增强包络（与 beatPulse 平行，独立衰减）
@@ -256,8 +257,8 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
     const galaxyTheta = new Float32Array(COUNT);             // 每粒子角位置（用于螺旋推进）
     const galaxyArm = new Int8Array(COUNT);                  // 所属旋臂索引（-1=弥散晕）
     const galaxyBulge = new Float32Array(COUNT);             // 1=核球粒子
-    const basePositionsOcean = new Float32Array(COUNT * 3);  // 海浪基础坐标
-    const oceanBand = new Uint8Array(COUNT);                 // 每粒子对应的频段
+    const basePositionsTerrain = new Float32Array(COUNT * 3);  // 地形基础坐标
+      const terrainBand = new Uint8Array(COUNT);                 // 每粒子对应频段（中心=高频，外圈=低频）
     const coverColors = new Float32Array(COUNT * 3);         // 封面 RGB（取平均色用）
     const explodeVel = new Float32Array(COUNT * 3);          // 冲击波速度
     const explodePos = new Float32Array(COUNT * 3);          // 冲击波偏移（弹簧回弹）
@@ -376,18 +377,25 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
           galaxyArm[idx] = armIdx;
           galaxyBulge[idx] = isBulge ? 1 : 0;
 
-          // 海浪：平面网格，X 方向映射频段
-          const oceanSize = planeSize * OCEAN_SIZE_RATIO;
-          const ox = (u - 0.5) * oceanSize;
-          const oz = (v - 0.5) * oceanSize;
-          basePositionsOcean[idx * 3] = ox;
-          basePositionsOcean[idx * 3 + 1] = 0;
-          basePositionsOcean[idx * 3 + 2] = oz;
-          oceanBand[idx] = Math.min(63, Math.floor(u * 64));
+          // 地形：极坐标网格，中心=高频，外圈=低频
+          const terrainSize = planeSize * TERRAIN_SIZE_RATIO;
+          // u -> 角度，v -> 半径；把平面映射成圆盘
+          const tTheta = u * Math.PI * 2;
+          const rN = Math.sqrt(v); // 半径归一化，均匀分布面积
+          const tR = rN * terrainSize * 0.5;
+          const tx = Math.cos(tTheta) * tR;
+          const tz = Math.sin(tTheta) * tR;
+          // 基础待机地形：中心低、周围略有起伏的盆地
+          const idleH = Math.sin(tTheta * 3 + rN * 8) * 0.02 + Math.cos(rN * 12) * 0.015;
+          basePositionsTerrain[idx * 3] = tx;
+          basePositionsTerrain[idx * 3 + 1] = idleH * planeSize;
+          basePositionsTerrain[idx * 3 + 2] = tz;
+          // 频段：中心(半径小)对应高频索引大，外圈对应低频索引小
+          terrainBand[idx] = Math.min(63, Math.floor((1 - rN) * 63));
 
           const initial = modeRef.current === 'liquidmetal' ? basePositionsLiquid
             : modeRef.current === 'galaxy' ? basePositionsGalaxy
-              : modeRef.current === 'ocean' ? basePositionsOcean
+              : modeRef.current === 'ocean' ? basePositionsTerrain
                 : basePositionsCover;
           positions[idx * 3] = initial[idx * 3];
           positions[idx * 3 + 1] = initial[idx * 3 + 1];
@@ -471,11 +479,11 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
       return true;
     };
 
-    // 取某形态的基础坐标集（coverflow / liquidmetal / galaxy 星河 / ocean 海浪）
+    // 取某形态的基础坐标集（coverflow / liquidmetal / galaxy 星河 / ocean 地形）
     const baseFor = (m) => {
       if (m === 'liquidmetal') return { pos: basePositionsLiquid, nrm: baseNormalsLiquid };
       if (m === 'galaxy') return { pos: basePositionsGalaxy, nrm: null };
-      if (m === 'ocean') return { pos: basePositionsOcean, nrm: null };
+      if (m === 'ocean') return { pos: basePositionsTerrain, nrm: null };
       return { pos: basePositionsCover, nrm: baseNormalsCover };
     };
 
@@ -643,7 +651,7 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
       const isPlaying = isPlayingRef.current;
       const useCover = isPlaying && hasCoverRef.current;
       const isGalaxy = modeRef.current === 'galaxy';
-      const isOcean = modeRef.current === 'ocean';
+      const isTerrain = modeRef.current === 'ocean';
 
       if (useCover && appliedCoverVersionRef.current !== coverVersionRef.current) {
         if (applyCoverColors()) appliedCoverVersionRef.current = coverVersionRef.current;
@@ -689,8 +697,8 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
             }
           }
         } else if (modeRef.current === 'ocean') {
-          // 鼓点给海浪一个全局浪涌：所有频段瞬时增强
-          beatFreqBoostRef.current = Math.min(1, beatFreqBoostRef.current + 0.35);
+          // 鼓点给地形一个整体脉冲 + 中心涟漪增强
+          beatFreqBoostRef.current = Math.min(1, beatFreqBoostRef.current + 0.45);
         }
       }
       beatPulseRef.current *= Math.pow(BEAT_PULSE_DECAY, dt * 60);          // 帧率无关衰减
@@ -743,7 +751,6 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
           const rN = Math.min(1, galaxyR[i] * invRmax);
           // 频谱映射：中心=高频，外圈=低频，把 64 段频谱绕成同心环
           const band = Math.min(63, Math.floor((1 - rN) * 63));
-          const rr = galaxyR[i];
 
           // 由内向外的径向涟漪波（频段能量驱动，振幅收小）
           const ripple = Math.sin(rN * RIPPLE_FREQ - time * RIPPLE_SPEED) * spectrumSmooth[band] * planeSize * 0.045 * (1 + beatFreqBoost * GALAXY_BEAT_FREQ_GAIN);
@@ -931,36 +938,36 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
           y = ny * r;
           z = nz * r;
         } else if (targetShape === 'ocean') {
-          // ═══ ocean 海浪：小振幅、节奏传播的音浪海岸 ═══
-          const band = oceanBand[i];
+          // ═══ terrain 地形：中心高频、周围低频 ═══
+          const rN = Math.sqrt(v); // 0=中心, 1=外圈
+          const band = terrainBand[i];
           const energy = spectrumSmooth[band];
 
-          // 待机基础海浪：小振幅多层慢波
-          const idleBase = hasData ? 0.035 : 0.09;
-          const wave1 = Math.sin(u * 5 + time * 0.6) * Math.cos(v * 4 + time * 0.5) * idleBase;
-          const wave2 = Math.sin(u * 10 - time * 0.9) * Math.sin(v * 8 + time * 0.75) * idleBase * 0.45;
-          const wave3 = Math.sin(u * 18 + time * 1.4) * Math.cos(v * 14 - time * 1.1) * idleBase * 0.20;
+          // 基础待机高度（buildBase 中已生成轻微起伏）
+          let h = by;
 
-          // 节奏传播：音频能量形成一个从远海（z 小）向岸边（z 大）推进的浪前
-          const travelWave = energy * 0.14 * (1 + beatFreqBoost * 1.2) * Math.exp(-Math.max(0, v - 0.6) * 3) * Math.sin(v * 12 - time * 4 + band * 0.08) * (hasData ? 1 : 0.3);
+          // 音频驱动高度：中心高频强、外圈低频弱，带鼓点增强
+          const audioH = energy * planeSize * TERRAIN_GAIN * (1 - rN * 0.35) * (1 + beatFreqBoost * 1.8);
+          h += audioH;
 
-          // 低频鼓点：产生一个大浪头从远处扑来
-          const bassWave = Math.min(0.16, bassAttack * 0.18) * (1 + beatFreqBoost) * Math.exp(-Math.max(0, v - 0.35) * 4) * Math.sin(v * 8 - time * 6) * (hasData ? 1 : 0.3);
+          // 低频鼓点：整体地形脉冲
+          const beatPulseH = bassAttack * planeSize * 0.08 * (1 + beatPulseRef.current * 2.5) * (1 - rN * 0.4);
+          h += beatPulseH;
 
-          // 鼓点浪花：只在局部浪尖溅起
-          const splash = beatPulseRef.current * 0.04 * Math.sin(u * 32 + time * 7) * Math.sin(v * 32 + time * 6);
+          // 中心涟漪：鼓点从中心向外扩散
+          const ripple = beatPulseRef.current * planeSize * 0.12 * Math.sin(rN * 18 - time * 8) * Math.exp(-rN * 2.5) * (1 + beatFreqBoost);
+          h += ripple;
 
-          let oy = (wave1 + wave2 + wave3 + travelWave + bassWave + splash) * planeSize;
-          // 严格限制最大振幅，避免白色巨浪
-          oy = Math.max(-planeSize * 0.16, Math.min(planeSize * 0.20, oy));
+          // 待机缓慢地形呼吸
+          const idleBreathe = Math.sin(time * 0.25 + rN * 6) * planeSize * 0.012 * (hasData ? 0 : 1);
+          h += idleBreathe;
 
-          // X/Z 方向缓慢漂移
-          const driftX = Math.sin(v * 2 + time * 0.25) * planeSize * 0.010 * (1 + energy * (hasData ? 0.5 : 0));
-          const driftZ = Math.cos(u * 2 + time * 0.20) * planeSize * 0.010 * (1 + energy * (hasData ? 0.5 : 0));
+          // 严格限制振幅
+          h = Math.max(-planeSize * 0.22, Math.min(planeSize * 0.32, h));
 
-          x = bx + driftX;
-          y = by + oy;
-          z = bz + driftZ;
+          x = bx;
+          y = h;
+          z = bz;
           nx = 0; ny = 1; nz = 0;
         }
 
@@ -1016,31 +1023,39 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
           colorAttr.array[i * 3]     = Math.min(1, r * intensity + twinkleBoost);
           colorAttr.array[i * 3 + 1] = Math.min(1, g * intensity + twinkleBoost);
           colorAttr.array[i * 3 + 2] = Math.min(1, b * intensity + twinkleBoost);
-        } else if (isOcean) {
-          // 海浪着色：深海青蓝 → 浅海 accent → 浪尖微白，严格分级避免全白
-          const band = oceanBand[i];
+        } else if (isTerrain) {
+          // 地形着色：低谷深色 → 中坡 accent → 峰顶泛白
+          const rN = Math.sqrt(v); // 0=中心, 1=外圈
+          const band = terrainBand[i];
           const energy = spectrumSmooth[band];
-          const waveHeight = y / (planeSize * 0.18 + 0.001); // 归一化到当前振幅范围
+          // 归一化高度 [-0.22, 0.32] -> [0, 1]
+          const normH = Math.max(0, Math.min(1, (y / planeSize + 0.22) / 0.54));
 
-          // 深海基色（偏暗的青蓝色）
-          let r = accentRGB.r * 0.10 + 0.02;
-          let g = accentRGB.g * 0.22 + 0.06;
-          let b = accentRGB.b * 0.45 + 0.12;
+          // 低谷深色
+          let r = accentRGB.r * 0.08 + 0.02;
+          let g = accentRGB.g * 0.08 + 0.02;
+          let b = accentRGB.b * 0.12 + 0.03;
 
-          // 中层海水：随高度逐渐增加 accent 亮度
-          const midLayer = Math.max(0, Math.min(1, waveHeight * 1.2 + 0.15));
-          r += midLayer * accentRGB.r * 0.55;
-          g += midLayer * accentRGB.g * 0.55;
-          b += midLayer * accentRGB.b * 0.45;
+          // 中坡 accent
+          const midLayer = Math.max(0, Math.min(1, normH * 1.3));
+          r += midLayer * accentRGB.r * 0.75;
+          g += midLayer * accentRGB.g * 0.75;
+          b += midLayer * accentRGB.b * 0.75;
 
-          // 浪尖：只有真正的高峰才泛少量白色
-          const crest = Math.max(0, Math.min(1, waveHeight * 1.8 - 0.5));
-          r += crest * 0.35;
-          g += crest * 0.35;
-          b += crest * 0.38;
+          // 峰顶泛白
+          const crest = Math.max(0, Math.min(1, normH * 2.2 - 0.9));
+          r += crest * 0.45;
+          g += crest * 0.45;
+          b += crest * 0.48;
 
-          // 音频能量点亮局部，但控制上限
-          const intensity = 0.65 + energy * 1.1 * (1 + beatFreqBoost * 0.6) + bassAttack * 0.45 + beatPulseRef.current * 0.55;
+          // 中心高频更亮、外圈低频更暗
+          const centerGlow = (1 - rN) * 0.25;
+          r += centerGlow * accentRGB.r;
+          g += centerGlow * accentRGB.g;
+          b += centerGlow * accentRGB.b;
+
+          // 音频能量点亮局部，控制上限
+          const intensity = 0.55 + energy * 1.2 * (1 + beatFreqBoost * 0.8) + bassAttack * 0.5 + beatPulseRef.current * 0.7;
 
           colorAttr.array[i * 3]     = Math.min(1, r * intensity);
           colorAttr.array[i * 3 + 1] = Math.min(1, g * intensity);
@@ -1067,7 +1082,7 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
         }
       }
       posAttr.needsUpdate = true;
-      if (!useCover || isGalaxy || isOcean) colorAttr.needsUpdate = true;
+      if (!useCover || isGalaxy || isTerrain) colorAttr.needsUpdate = true;
 
       // 360° 旋转控制
       const g = gestureRef.current;

@@ -6,11 +6,11 @@ import { listSources, getSource } from '../sources/registry';
 import QrLoginView from '../components/QrLoginView';
 import { CookieReader } from '../plugins/CookieReader';
 
-// 各音源标签配色
+// 各音源标签配色（QQ 绿 / 网易云红 / 酷狗蓝）
 const SOURCE_COLOR = {
-  qq: '#00F5D4',
-  netease: '#ff5a5f',
-  kugou: '#9aa0a6',
+  qq: '#00C853',
+  netease: '#C62F2F',
+  kugou: '#1E88E5',
 };
 
 function TrackRow({ track, index, active, onPlay }) {

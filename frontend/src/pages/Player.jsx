@@ -22,7 +22,13 @@ const VIZ_3D_MODES = [
   { key: 'coverflow', label: '粒子封面' },
   { key: 'liquidmetal', label: '液态金属' },
   { key: 'galaxy', label: '星河漩涡' },
-  { key: 'ocean', label: '海浪' }
+  { key: 'ocean', label: '地形' }
+];
+
+const SEARCH_SOURCE_TABS = [
+  { id: 'qq', name: 'QQ 音乐', color: '#00C853' },
+  { id: 'netease', name: '网易云', color: '#C62F2F' },
+  { id: 'kugou', name: '酷狗', color: '#1E88E5' },
 ];
 
 const PRESETS = [
@@ -179,6 +185,7 @@ export default function Player({ onProfile }) {
   const [query, setQuery] = useState('');
   const [searchMap, setSearchMap] = useState({}); // { [sourceId]: { list, loading, loggedIn } }
   const [searching, setSearching] = useState(false);
+  const [activeSearchSource, setActiveSearchSource] = useState('qq');
   const st = useRef(null);
   const sources = listSources();
   const [vm, setVm] = useState(() => { try { return localStorage.getItem('sonus_viz_mode') || 'ring' } catch { return 'ring' } });
@@ -210,7 +217,7 @@ export default function Player({ onProfile }) {
         }
         try {
           const adapter = getSource(s.id);
-          const list = await adapter.search(kw, 3);
+          const list = await adapter.search(kw, 50);
           setSearchMap(prev => ({ ...prev, [s.id]: { ...prev[s.id], list: list || [], loading: false, loggedIn: true } }));
         } catch (e) {
           setSearchMap(prev => ({ ...prev, [s.id]: { ...prev[s.id], list: [], loading: false, loggedIn: true } }));
@@ -384,21 +391,43 @@ export default function Player({ onProfile }) {
             {query && <button onClick={() => { setQuery(''); setSearchMap({}); }} className="glass-button" style={{ width: 24, height: 24, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><X size={14} /></button>}
           </div>
         </div>
+
+        {/* 三音源顶部导航 */}
+        {query && (
+          <div style={{ display: 'flex', gap: 6, padding: '0 2px 10px' }}>
+            {SEARCH_SOURCE_TABS.map(tab => {
+              const active = activeSearchSource === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveSearchSource(tab.id)}
+                  style={{
+                    flex: 1, padding: '8px 0', borderRadius: 12, border: 'none', cursor: 'pointer',
+                    background: active ? tab.color : 'rgba(255,255,255,0.08)',
+                    color: active ? '#fff' : 'var(--text-secondary)',
+                    fontSize: 12, fontWeight: active ? 700 : 600,
+                    transition: 'all .15s ease'
+                  }}
+                >
+                  {tab.name}
+                </button>
+              );
+            })}
+          </div>
+        )}
+
         {searching && Object.keys(searchMap).length === 0 ? <div style={{ display: 'flex', justifyContent: 'center', padding: 28 }}><Loader2 size={18} className="spin-icon" color="var(--text-secondary)" /></div>
           : !query ? <div style={{ textAlign: 'center', padding: 28, color: 'var(--text-muted)', fontSize: 12, letterSpacing: '.3px' }}>输入关键词开始搜索</div>
             : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-                {sources.map(s => {
-                  const entry = searchMap[s.id] || { list: [], loading: false, loggedIn: false };
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {SEARCH_SOURCE_TABS.map(tab => {
+                  if (tab.id !== activeSearchSource) return null;
+                  const entry = searchMap[tab.id] || { list: [], loading: false, loggedIn: false };
                   return (
-                    <div key={s.id}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 4px 8px' }}>
-                        <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)' }}>{s.name}</span>
-                        <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.06)' }} />
-                      </div>
-                      {entry.loading ? <div style={{ display: 'flex', justifyContent: 'center', padding: 14 }}><Loader2 size={16} className="spin-icon" color="var(--text-secondary)" /></div>
-                        : !entry.loggedIn ? <div style={{ padding: '10px 6px', color: 'var(--text-muted)', fontSize: 12 }}>未登录，不显示</div>
-                          : entry.list.length === 0 ? <div style={{ padding: '10px 6px', color: 'var(--text-muted)', fontSize: 12 }}>无结果</div>
+                    <div key={tab.id}>
+                      {entry.loading ? <div style={{ display: 'flex', justifyContent: 'center', padding: 14 }}><Loader2 size={16} className="spin-icon" color={tab.color} /></div>
+                        : !entry.loggedIn ? <div style={{ padding: '18px 6px', color: 'var(--text-muted)', fontSize: 12, textAlign: 'center' }}>未登录，无法显示 {tab.name} 的搜索结果</div>
+                          : entry.list.length === 0 ? <div style={{ padding: '18px 6px', color: 'var(--text-muted)', fontSize: 12, textAlign: 'center' }}>无结果</div>
                             : entry.list.map(t => <Row key={t.id} track={t} active={currentTrack?.id === t.id} onPlay={tr => { playTrack(tr); setSq(false); }} />)}
                     </div>
                   );
