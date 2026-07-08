@@ -23,6 +23,10 @@ const BEAT_COOLDOWN = 0.11;       // 两次冲击波最小间隔（s）
 const SPRING_K = 0.05;            // 冲击波回弹弹簧系数
 const DAMPING = 0.88;             // 速度阻尼
 const SHOCK_GAIN = 1.6;           // 鼓点冲击波冲量增益（× bass）— 增强鼓点强度
+// —— 鼓点频率增强（本次新增，与 beatPulse 平行的独立包络）——
+const BEAT_FREQ_BOOST_DECAY = 0.90; // 频率增强包络每帧衰减（≈鼓点后 0.3s 归零）
+const GALAXY_BEAT_FREQ_GAIN = 2.2;  // galaxy：鼓点时频谱响应放大倍数（涟漪/抖动/颜色）
+const LIQUID_BEAT_FREQ_GAIN = 1.6;  // liquidmetal：鼓点时频谱响应放大倍数（位移）
 
 // 稳定伪随机（保证星系形态每次重建一致）
 function mulberry32(a) {
@@ -79,6 +83,7 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
   const prevBassRef = useRef(0);
   const lastBeatRef = useRef(0);
   const beatPulseRef = useRef(0);
+  const beatFreqBoostRef = useRef(0); // 鼓点频率增强包络（与 beatPulse 平行，独立衰减）
   // ====== 待机动画专用状态 ======
   const idleWindRef = useRef({ phase: 0, lastGust: 0, gustDir: 1, gustAmp: 0 });
   const idleHotspotsRef = useRef(null);        // 液态金属：对流热点 [{cx,cy,period,phase}]
@@ -575,6 +580,7 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
 
       const bassPulse = Math.max(0, bassAttack - bassRelease);
       const totalEnergy = (bassAttack + midSmooth * 0.7 + trebleSmooth * 0.4) / 2.1;
+      const beatFreqBoost = beatFreqBoostRef.current; // 鼓点频率增强包络（0..1，逐帧衰减），用于放大频谱响应
 
       const zAmp = planeSize * MAX_Z_RATIO;
       const isPlaying = isPlayingRef.current;
@@ -603,6 +609,7 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
           explodeVel[i * 3 + 1] += galaxyUY[i] * imp;
         }
         beatPulseRef.current = 1;
+        beatFreqBoostRef.current = 1; // 同步触发频率增强包络
 
         // ═══ 鼓点驱动的模式专属事件（增强"数量"）═══
         if (modeRef.current === 'liquidmetal') {
@@ -626,6 +633,7 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
         }
       }
       beatPulseRef.current *= 0.90;
+      beatFreqBoostRef.current *= BEAT_FREQ_BOOST_DECAY; // 频率增强包络衰减
 
       const accentRGB = hexToRGB(accentRef.current || '#4FC3F7');
       const cavg = coverAvgRef.current;
@@ -674,7 +682,7 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
           const rN = Math.min(1, galaxyR[i] / Rmax);
           // 由内向外的径向涟漪波（随该频段能量起伏）
           const band = Math.min(63, Math.floor(rN * 63));
-          const ripple = Math.sin(rN * RIPPLE_FREQ - time * RIPPLE_SPEED) * spectrumSmooth[band] * planeSize * 0.05;
+          const ripple = Math.sin(rN * RIPPLE_FREQ - time * RIPPLE_SPEED) * spectrumSmooth[band] * planeSize * 0.05 * (1 + beatFreqBoost * GALAXY_BEAT_FREQ_GAIN); // 鼓点增强频率响应
           // 低频推核球呼吸（越靠中心越强）
           const bassPush = bassAttack * planeSize * 0.10 * (1 - rN * 0.6);
           const disp = ripple + bassPush;
@@ -729,7 +737,7 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
           const ry = x * sa + y * ca;
           x = rx; y = ry;
           // 频谱细碎抖动增强流动感
-          const jitter = trebleSmooth * 0.5 * Math.sin(u * 50 + time * 5 + i * 0.3) * planeSize * 0.004;
+          const jitter = trebleSmooth * 0.5 * Math.sin(u * 50 + time * 5 + i * 0.3) * planeSize * 0.004 * (1 + beatFreqBoost * GALAXY_BEAT_FREQ_GAIN); // 鼓点增强频率响应
           x += nx * jitter; y += ny * jitter; z += nz * jitter;
 
           // 核心心跳：核球粒子做 12s 周期的极慢膨胀/收缩（待机时更明显）
@@ -784,7 +792,7 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
           for (let k = coarseBand * 8; k < (coarseBand + 1) * 8 && k < 64; k++) energy += spectrumSmooth[k];
           energy /= 8;
 
-          const localPulse = (energy * 1.15 + bassAttack * 0.7 + midSmooth * 0.5) * activeFactor;
+          const localPulse = (energy * 1.15 * (1 + beatFreqBoost * LIQUID_BEAT_FREQ_GAIN) + bassAttack * 0.7 + midSmooth * 0.5) * activeFactor; // 鼓点增强频谱能量位移
           const displacement = localPulse * planeSize * 0.09;
 
           // 整体呼吸脉动（待机时更明显）
@@ -858,7 +866,7 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
 
           const band = Math.min(63, Math.floor(rN * 63));
           const localE = spectrumSmooth[band];
-          const intensity = 0.42 + bassAttack * 1.1 + localE * 1.6 + beatPulseRef.current * 0.9 + galaxyBulge[i] * bassAttack * 0.6;
+          const intensity = 0.42 + bassAttack * 1.1 + localE * 1.6 * (1 + beatFreqBoost * GALAXY_BEAT_FREQ_GAIN) + beatPulseRef.current * 0.9 + galaxyBulge[i] * bassAttack * 0.6; // 鼓点增强频段亮度
 
           // 星星闪烁叠加（待机时更明显）
           let twinkleBoost = 0;
