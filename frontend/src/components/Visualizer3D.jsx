@@ -740,25 +740,24 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
         let bx, by, bz, nx, ny, nz;
         if (isGalaxy) {
           const rN = Math.min(1, galaxyR[i] * invRmax);
-          // 频谱映射：中心=低频，外圈=高频，把 64 段频谱绕成同心环
-          const band = Math.min(63, Math.floor(rN * 63));
-          const invBand = Math.min(63, Math.floor((1 - rN) * 63));
+          // 频谱映射：中心=高频，外圈=低频，把 64 段频谱绕成同心环
+          const band = Math.min(63, Math.floor((1 - rN) * 63));
           const rr = galaxyR[i];
 
-          // 由内向外的径向涟漪波（频段能量驱动）
-          const ripple = Math.sin(rN * RIPPLE_FREQ - time * RIPPLE_SPEED) * spectrumSmooth[band] * planeSize * 0.08 * (1 + beatFreqBoost * GALAXY_BEAT_FREQ_GAIN);
+          // 由内向外的径向涟漪波（频段能量驱动，振幅收小）
+          const ripple = Math.sin(rN * RIPPLE_FREQ - time * RIPPLE_SPEED) * spectrumSmooth[band] * planeSize * 0.045 * (1 + beatFreqBoost * GALAXY_BEAT_FREQ_GAIN);
 
           // 径向频谱柱：不同半径的粒子被对应频段向外推，形成"音波环"
-          const radialSpectrum = spectrumSmooth[band] * planeSize * 0.22 * (1 + beatFreqBoost * GALAXY_BEAT_FREQ_GAIN);
+          const radialSpectrum = spectrumSmooth[band] * planeSize * 0.10 * (1 + beatFreqBoost * GALAXY_BEAT_FREQ_GAIN);
 
           // 低频推核球呼吸（越靠中心越强）
-          const bassPush = bassAttack * planeSize * 0.14 * Math.pow(1 - rN, 1.4);
+          const bassPush = bassAttack * planeSize * 0.08 * Math.pow(1 - rN, 1.4);
 
           // 臂波动：沿半径方向螺旋波，让旋臂像流体一样起伏
-          const armWave = (hasData ? 1.0 : 0.7) * Math.sin(rN * 16 - time * 2.2 + (galaxyArm[i] >= 0 ? galaxyArm[i] : 0) * 1.1) * planeSize * 0.022 * (1 + beatFreqBoost * 0.6);
+          const armWave = (hasData ? 1.0 : 0.7) * Math.sin(rN * 16 - time * 2.2 + (galaxyArm[i] >= 0 ? galaxyArm[i] : 0) * 1.1) * planeSize * 0.012 * (1 + beatFreqBoost * 0.6);
 
-          // 垂直音浪：Z 轴随低频/中频起伏，让星系盘面像被音波冲击
-          const zWave = (spectrumSmooth[invBand] * 0.7 + bassAttack * 0.5) * planeSize * 0.08 * (1 + beatFreqBoost) * Math.sin(rN * 8 + time * 3);
+          // 垂直音浪：Z 轴随频段能量起伏，中心高频处更明显
+          const zWave = spectrumSmooth[band] * planeSize * 0.04 * (1 + beatFreqBoost) * Math.sin(rN * 8 + time * 3);
 
           const disp = ripple + radialSpectrum + bassPush + armWave;
           let sx = basePositionsGalaxy[i * 3] + galaxyUX[i] * disp + explodePos[i * 3];
@@ -931,28 +930,32 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
           y = ny * r;
           z = nz * r;
         } else if (targetShape === 'ocean') {
-          // ═══ ocean 海浪：平面网格随频谱起伏 ═══
+          // ═══ ocean 海浪：小振幅、节奏传播的音浪海岸 ═══
           const band = oceanBand[i];
           const energy = spectrumSmooth[band];
 
-          // 待机基础海浪：多频叠加
-          const idleBase = hasData ? 0.08 : 0.22;
-          const wave1 = Math.sin(u * 7 + time * 1.2) * Math.cos(v * 5 + time * 1.0) * idleBase;
-          const wave2 = Math.sin(u * 13 - time * 1.8) * Math.sin(v * 11 + time * 1.5) * idleBase * 0.55;
-          const wave3 = Math.sin(u * 25 + time * 2.6) * Math.cos(v * 20 - time * 2.1) * idleBase * 0.25;
+          // 待机基础海浪：小振幅多层慢波
+          const idleBase = hasData ? 0.035 : 0.09;
+          const wave1 = Math.sin(u * 5 + time * 0.6) * Math.cos(v * 4 + time * 0.5) * idleBase;
+          const wave2 = Math.sin(u * 10 - time * 0.9) * Math.sin(v * 8 + time * 0.75) * idleBase * 0.45;
+          const wave3 = Math.sin(u * 18 + time * 1.4) * Math.cos(v * 14 - time * 1.1) * idleBase * 0.20;
 
-          // 音频驱动巨浪：每个 X 列对应一个频段
-          const audioWave = energy * OCEAN_WAVE_GAIN * (1 + beatFreqBoost * 1.5) * (hasData ? 1 : 0.35);
-          const bassSurge = bassAttack * 0.12 * (1 + beatFreqBoost) * (hasData ? 1 : 0.4);
+          // 节奏传播：音频能量形成一个从远海（z 小）向岸边（z 大）推进的浪前
+          const travelWave = energy * 0.14 * (1 + beatFreqBoost * 1.2) * Math.exp(-Math.max(0, v - 0.6) * 3) * Math.sin(v * 12 - time * 4 + band * 0.08) * (hasData ? 1 : 0.3);
 
-          // 鼓点浪花：高频细碎溅起
-          const splash = beatPulseRef.current * 0.10 * Math.sin(u * 36 + time * 9) * Math.sin(v * 34 + time * 8);
+          // 低频鼓点：产生一个大浪头从远处扑来
+          const bassWave = Math.min(0.16, bassAttack * 0.18) * (1 + beatFreqBoost) * Math.exp(-Math.max(0, v - 0.35) * 4) * Math.sin(v * 8 - time * 6) * (hasData ? 1 : 0.3);
 
-          let oy = (wave1 + wave2 + wave3 + audioWave + bassSurge + splash) * planeSize;
+          // 鼓点浪花：只在局部浪尖溅起
+          const splash = beatPulseRef.current * 0.04 * Math.sin(u * 32 + time * 7) * Math.sin(v * 32 + time * 6);
 
-          // X/Z 方向缓慢漂移，让海面有流动感
-          const driftX = Math.sin(v * 3 + time * 0.35) * planeSize * 0.015 * (1 + energy * (hasData ? 1 : 0));
-          const driftZ = Math.cos(u * 3 + time * 0.28) * planeSize * 0.015 * (1 + energy * (hasData ? 1 : 0));
+          let oy = (wave1 + wave2 + wave3 + travelWave + bassWave + splash) * planeSize;
+          // 严格限制最大振幅，避免白色巨浪
+          oy = Math.max(-planeSize * 0.16, Math.min(planeSize * 0.20, oy));
+
+          // X/Z 方向缓慢漂移
+          const driftX = Math.sin(v * 2 + time * 0.25) * planeSize * 0.010 * (1 + energy * (hasData ? 0.5 : 0));
+          const driftZ = Math.cos(u * 2 + time * 0.20) * planeSize * 0.010 * (1 + energy * (hasData ? 0.5 : 0));
 
           x = bx + driftX;
           y = by + oy;
@@ -1013,24 +1016,30 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
           colorAttr.array[i * 3 + 1] = Math.min(1, g * intensity + twinkleBoost);
           colorAttr.array[i * 3 + 2] = Math.min(1, b * intensity + twinkleBoost);
         } else if (isOcean) {
-          // 海浪着色：低谷深蓝/青，波峰 accent/白，能量高处更亮
+          // 海浪着色：深海青蓝 → 浅海 accent → 浪尖微白，严格分级避免全白
           const band = oceanBand[i];
           const energy = spectrumSmooth[band];
-          const waveHeight = y / (planeSize + 0.001);
-          const crest = Math.max(0, Math.min(1, waveHeight * 2.5 + 0.3));
+          const waveHeight = y / (planeSize * 0.18 + 0.001); // 归一化到当前振幅范围
 
-          // 深海基色
-          let r = accentRGB.r * 0.15 + 0.03;
-          let g = accentRGB.g * 0.30 + 0.08;
-          let b = accentRGB.b * 0.55 + 0.15;
+          // 深海基色（偏暗的青蓝色）
+          let r = accentRGB.r * 0.10 + 0.02;
+          let g = accentRGB.g * 0.22 + 0.06;
+          let b = accentRGB.b * 0.45 + 0.12;
 
-          // 波峰叠加 accent 并泛白
-          r += crest * (accentRGB.r * 0.75 + 0.35);
-          g += crest * (accentRGB.g * 0.75 + 0.35);
-          b += crest * (accentRGB.b * 0.55 + 0.45);
+          // 中层海水：随高度逐渐增加 accent 亮度
+          const midLayer = Math.max(0, Math.min(1, waveHeight * 1.2 + 0.15));
+          r += midLayer * accentRGB.r * 0.55;
+          g += midLayer * accentRGB.g * 0.55;
+          b += midLayer * accentRGB.b * 0.45;
 
-          // 音频能量让局部更亮（浪花感）
-          const intensity = 0.55 + energy * 2.2 * (1 + beatFreqBoost) + bassAttack * 0.9 + beatPulseRef.current * 1.0;
+          // 浪尖：只有真正的高峰才泛少量白色
+          const crest = Math.max(0, Math.min(1, waveHeight * 1.8 - 0.5));
+          r += crest * 0.35;
+          g += crest * 0.35;
+          b += crest * 0.38;
+
+          // 音频能量点亮局部，但控制上限
+          const intensity = 0.65 + energy * 1.1 * (1 + beatFreqBoost * 0.6) + bassAttack * 0.45 + beatPulseRef.current * 0.55;
 
           colorAttr.array[i * 3]     = Math.min(1, r * intensity);
           colorAttr.array[i * 3 + 1] = Math.min(1, g * intensity);
