@@ -3,7 +3,8 @@ import * as THREE from 'three';
 import { getSpectrumBars } from '../audio/engine';
 import { getProxyUrl } from '../api/music';
 
-const GRID = 180;             // 180x180 = 32400 粒子（统一用于全部 3D 形态）
+const TARGET_PARTICLES = 20000; // 三套形态统一目标粒子数（「两万左右」）
+const GRID = Math.round(Math.sqrt(TARGET_PARTICLES)); // ≈141 → COUNT ≈ 19881，覆盖全部 3D 形态
 const FOV = 55;
 const AUTO_ROTATE_SPEED = 0.35;   // 自动偏航角速度 rad/s（≈20°/s）— 默认关闭
 const AUTO_RESUME_MS = 2500;      // 停止交互后多久恢复自动旋转（ms）
@@ -214,6 +215,7 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
     const LIQUID_RADIUS_RATIO = 0.56;
 
     let planeSize, cameraZ;
+    let Rmax = 0; // 星系盘半径，顶层变量：buildBase / 星空待机(流星) / 着色 均可见，避免 TDZ 崩溃
 
     const computeLayout = () => {
       W = container.offsetWidth;
@@ -227,6 +229,7 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
       camera.aspect = aspect;
       camera.position.z = cameraZ;
       camera.updateProjectionMatrix();
+      Rmax = planeSize * GALAXY_R_MAX_RATIO;
     };
     computeLayout();
 
@@ -253,7 +256,6 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
     const spectrumSmooth = new Float32Array(64);
 
     const buildBase = () => {
-      const Rmax = planeSize * GALAXY_R_MAX_RATIO;
       const grng = mulberry32(0x9e3779b9); // 稳定种子 → 星系形态固定
       let idx = 0;
       const half = planeSize;
@@ -632,8 +634,8 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
           }
         }
       }
-      beatPulseRef.current *= 0.90;
-      beatFreqBoostRef.current *= BEAT_FREQ_BOOST_DECAY; // 频率增强包络衰减
+      beatPulseRef.current *= Math.pow(0.90, dt * 60);          // 帧率无关衰减（60fps 等价于 ×0.90）
+      beatFreqBoostRef.current *= Math.pow(BEAT_FREQ_BOOST_DECAY, dt * 60); // 频率增强包络衰减（同）
 
       const accentRGB = hexToRGB(accentRef.current || '#4FC3F7');
       const cavg = coverAvgRef.current;
@@ -670,7 +672,7 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
         }
       }
 
-      const Rmax = planeSize * GALAXY_R_MAX_RATIO;
+      const invRmax = 1 / Rmax; // 预计算倒数，避免每粒子多次除法
 
       for (let i = 0; i < COUNT; i++) {
         const u = origUV[i * 2];
@@ -679,7 +681,7 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
 
         let bx, by, bz, nx, ny, nz;
         if (isGalaxy) {
-          const rN = Math.min(1, galaxyR[i] / Rmax);
+          const rN = Math.min(1, galaxyR[i] * invRmax);
           // 由内向外的径向涟漪波（随该频段能量起伏）
           const band = Math.min(63, Math.floor(rN * 63));
           const ripple = Math.sin(rN * RIPPLE_FREQ - time * RIPPLE_SPEED) * spectrumSmooth[band] * planeSize * 0.05 * (1 + beatFreqBoost * GALAXY_BEAT_FREQ_GAIN); // 鼓点增强频率响应
@@ -725,7 +727,7 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
 
         if (isGalaxy) {
           // ═══ galaxy 待机：深空星尘 — 差速旋转 + 核心心跳 + 流星 ═══
-          const rN = Math.min(1, galaxyR[i] / Rmax);
+          const rN = Math.min(1, galaxyR[i] * invRmax);
 
           // 差速旋转：内圈快(0.08 rad/s) → 外圈慢(0.02 rad/s)，模拟真实星系
           const diffOmega = hasData ? 0.12 : 0.08; // 有音频时稍快
@@ -848,7 +850,7 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
 
         if (isGalaxy) {
           // 星河着色：内核=主题色(炽热)，外圈=封面平均色(冷)，加色混合辉光
-          const rN = Math.min(1, galaxyR[i] / Rmax);
+          const rN = Math.min(1, galaxyR[i] * invRmax);
           const coreMix = Math.pow(1 - rN, 1.6);
           const cr = accentRGB.r, cg = accentRGB.g, cb = accentRGB.b;
           const ar = cavg.r, ag = cavg.g, ab = cavg.b;
@@ -912,9 +914,11 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
       if (g.autoRotate && !g.dragging && !g.pinching && idle) {
         g.targetRotationY += dt * AUTO_ROTATE_SPEED;
       }
-      g.zoom += (g.targetZoom - g.zoom) * 0.18;
-      g.rotationY += (g.targetRotationY - g.rotationY) * 0.18;
-      g.rotationX += (g.targetRotationX - g.rotationX) * 0.18;
+      // 帧率无关缓动：60fps 时等价于原 0.18 系数；掉帧时按真实时间推进，拖拽/缩放跟手一致
+      const LERP = 1 - Math.pow(1 - 0.18, dt * 60);
+      g.zoom += (g.targetZoom - g.zoom) * LERP;
+      g.rotationY += (g.targetRotationY - g.rotationY) * LERP;
+      g.rotationX += (g.targetRotationX - g.rotationX) * LERP;
       const clampedZoom = Math.max(0.4, Math.min(3.0, g.zoom));
       camera.position.z = cameraZ / clampedZoom * (1 - beatPulseRef.current * 0.05);
       // 鼓点短促 punch-in（FOV 微缩）

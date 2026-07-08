@@ -5,6 +5,7 @@ let analyser = null;
 let source = null;
 let connected = false;
 let rawFreq = null;
+let spectrumBuf = null; // 频谱结果复用缓冲，避免每帧 new Float32Array 引发 GC 抖动
 
 export function getAudio() {
   if (!audio) {
@@ -59,9 +60,12 @@ export function getAnalyser() {
 }
 
 export function getSpectrumBars(numBars = 64) {
+  if (!spectrumBuf || spectrumBuf.length !== numBars) {
+    spectrumBuf = new Float32Array(numBars);
+  }
   if (!analyser) {
     const t = Date.now() * 0.001;
-    const data = new Float32Array(numBars);
+    const data = spectrumBuf;
     for (let i = 0; i < numBars; i++) {
       data[i] = (Math.sin(i * 0.2 + t * 1.8) * 0.5 + 0.5) * 0.15;
     }
@@ -76,7 +80,7 @@ export function getSpectrumBars(numBars = 64) {
 
   const usableBins = bins - 2;
   const startBin = 2;
-  const result = new Float32Array(numBars);
+  const result = spectrumBuf;
   const logMin = 0;
   const logMax = Math.log(usableBins);
   let totalEnergy = 0;
