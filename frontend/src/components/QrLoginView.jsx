@@ -1,13 +1,15 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Loader2, QrCode, CheckCircle2, RefreshCw } from 'lucide-react';
+import { Loader2, QrCode, CheckCircle2, RefreshCw, Globe } from 'lucide-react';
 import { getSource } from '../sources/registry';
+import { CookieReader } from '../plugins/CookieReader';
 
 // 可复用的扫码登录视图：
 // - 供 Login 独立页使用（full 尺寸）
 // - 供 Profile 账户中心内嵌使用（compact 尺寸，传入 sourceId）
 // 登录成功后回调 onConfirmed({ cookie, uin, key, nickname })
-export default function QrLoginView({ sourceId, onConfirmed, compact = false }) {
+export default function QrLoginView({ sourceId, onConfirmed, compact = false, onWebLogin }) {
   const src = getSource(sourceId);
+  const supportsWebLogin = typeof src?.openLogin === 'function' && CookieReader.isAvailable();
 
   const [phase, setPhase] = useState('loading'); // loading|waiting|scanned|confirmed|expired|unsupported|error
   const [qrImage, setQrImage] = useState('');
@@ -63,11 +65,11 @@ export default function QrLoginView({ sourceId, onConfirmed, compact = false }) 
       }, 1500);
     } catch (e) {
       setPhase('error');
-      const msg = e?.message || '';
-      const connLike = /failed to fetch|network|ECONN|timeout|connect|404|500/i.test(msg);
+      const msg = (e?.message || String(e)) || '未知错误';
+      const connLike = /failed to fetch|network|ECONN|timeout|connect|404|500|无法连接|网络/i.test(msg);
       setQrTip(connLike
         ? '登录服务未连接：请先启动后端（npm start），再点击重试'
-        : '生成二维码失败：' + msg);
+        : '二维码生成失败：' + msg);
     }
   }, [src, stopPolling, onConfirmed]);
 
@@ -123,9 +125,15 @@ export default function QrLoginView({ sourceId, onConfirmed, compact = false }) 
             </div>
           )}
           {isError && (
-            <div style={{ position: 'absolute', inset: 0, background: 'rgba(255,255,255,0.9)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12, padding: 16, textAlign: 'center' }}>
-              <span style={{ fontSize: 13, fontWeight: 600, color: '#c0392b', lineHeight: 1.5 }}>二维码生成失败</span>
-              <button onClick={startQr} className="glass-button-accent" style={{ padding: '10px 16px', borderRadius: 12, fontSize: 13, fontWeight: 700, color: '#050608', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+            <div style={{ position: 'absolute', inset: 0, background: 'rgba(255,255,255,0.92)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 10, padding: 16, textAlign: 'center' }}>
+              <span style={{ fontSize: 13, fontWeight: 700, color: '#c0392b' }}>二维码生成失败</span>
+              <span style={{ fontSize: 12, color: '#444', lineHeight: 1.5, maxHeight: 64, overflow: 'auto' }}>{qrTip}</span>
+              {supportsWebLogin && (
+                <button onClick={onWebLogin} className="glass-button-accent" style={{ padding: '10px 16px', borderRadius: 12, fontSize: 13, fontWeight: 700, color: '#050608', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                  <Globe size={14} /> 改用网页登录
+                </button>
+              )}
+              <button onClick={startQr} className="glass-button" style={{ padding: '10px 16px', borderRadius: 12, fontSize: 13, fontWeight: 700, color: '#050608', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                 <RefreshCw size={14} /> 重试
               </button>
             </div>

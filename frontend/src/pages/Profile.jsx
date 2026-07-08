@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { ArrowLeft, ChevronRight, Loader2, Music2, LogOut, Play, User as UserIcon, RefreshCw, QrCode } from 'lucide-react';
+import { ArrowLeft, ChevronRight, Loader2, Music2, LogOut, Play, User as UserIcon, RefreshCw, QrCode, Globe } from 'lucide-react';
 import { useAuthStore } from '../store/useAuthStore';
 import { usePlayerStore } from '../store/usePlayerStore';
 import { listSources, getSource } from '../sources/registry';
 import QrLoginView from '../components/QrLoginView';
+import { CookieReader } from '../plugins/CookieReader';
 
 // 各音源标签配色
 const SOURCE_COLOR = {
@@ -43,6 +44,8 @@ export default function Profile({ onBack }) {
     return first || st.activeSourceId || 'qq';
   });
   const [expandedSourceId, setExpandedSourceId] = useState(null); // 内嵌扫码展开的音源
+  const [webLoginSourceId, setWebLoginSourceId] = useState(null); // 正在使用原生网页登录的音源
+  const webLoginTimerRef = useRef(null);
 
   // 聚合所有已登录音源的歌单：{ [sourceId]: { list, loading, loaded } }
   const [allPlaylists, setAllPlaylists] = useState({});
@@ -151,9 +154,57 @@ export default function Profile({ onBack }) {
   const handleLoginConfirmed = (id, creds) => {
     setAuth(id, creds);
     setExpandedSourceId(null);
+    setWebLoginSourceId(null);
     setSelectedSourceId(id);
     setActiveSource(id);
   };
+
+  // 原生网页登录（APK 下 QQ 音乐等）：打开 WebView 后轮询 Cookie
+  const startWebLogin = async (s) => {
+    if (!CookieReader.isAvailable()) return;
+    setWebLoginSourceId(s.id);
+    setExpandedSourceId(s.id);
+    try {
+      await getSource(s.id).openLogin();
+    } catch (e) {
+      // 即使打开失败也继续轮询一次 cookie（可能已登录过）
+      console.warn('打开登录 WebView', e);
+    }
+    if (webLoginTimerRef.current) clearInterval(webLoginTimerRef.current);
+    let checks = 0;
+    const MAX_CHECKS = 240; // 最多轮询 6 分钟
+    webLoginTimerRef.current = setInterval(async () => {
+      checks += 1;
+      if (checks > MAX_CHECKS) {
+        clearInterval(webLoginTimerRef.current);
+        webLoginTimerRef.current = null;
+        setWebLoginSourceId(null);
+        return;
+      }
+      try {
+        const c = await CookieReader.getCookiesForUrl(s.loginDomains?.[0] || 'https://y.qq.com');
+        if (c.loggedIn && c.cookie) {
+          clearInterval(webLoginTimerRef.current);
+          webLoginTimerRef.current = null;
+          setWebLoginSourceId(null);
+          const parsed = getSource(s.id).parseCredentials?.(c.cookie) || { uin: c.uin, key: c.qqmusic_key };
+          handleLoginConfirmed(s.id, {
+            cookie: c.cookie,
+            uin: parsed.uin || c.uin || '',
+            key: parsed.key || c.qqmusic_key || '',
+            nickname: c.login_type || s.name,
+          });
+        }
+      } catch (e) {
+        // 轮询失败忽略
+      }
+    }, 1500);
+  };
+
+  // 组件卸载时清理轮询
+  useEffect(() => () => {
+    if (webLoginTimerRef.current) clearInterval(webLoginTimerRef.current);
+  }, []);
 
   // 统计：已登录音源数 + 全部歌单总数
   const loggedInSources = sources_.filter((s) => getSourceCreds(s.id).isLoggedIn);
@@ -203,12 +254,24 @@ export default function Profile({ onBack }) {
                     </div>
                   ) : s.ready ? (
                     <div>
-                      <button onClick={() => setExpandedSourceId(isExpanded ? null : s.id)} className="glass-button" style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '11px', borderRadius: 12, fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>
-                        <QrCode size={16} /> {isExpanded ? '收起' : `扫码登录${s.name}`}
-                      </button>
+                      {CookieReader.isAvailable() && typeof s.openLogin === 'function' ? (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                          <button onClick={() => startWebLogin(s)} className="glass-button-accent" style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '11px', borderRadius: 12, fontSize: 13, fontWeight: 700, color: '#050608' }}>
+                            {webLoginSourceId === s.id ? <Loader2 size={16} className="spin-icon" /> : <Globe size={16} />}
+                            {webLoginSourceId === s.id ? '等待登录完成…' : `网页登录${s.name}`}
+                          </button>
+                          <button onClick={() => setExpandedSourceId(isExpanded ? null : s.id)} className="glass-button" style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '10px', borderRadius: 12, fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)' }}>
+                            <QrCode size={14} /> {isExpanded ? '收起二维码' : '扫码登录（需后端）'}
+                          </button>
+                        </div>
+                      ) : (
+                        <button onClick={() => setExpandedSourceId(isExpanded ? null : s.id)} className="glass-button" style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '11px', borderRadius: 12, fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>
+                          <QrCode size={16} /> {isExpanded ? '收起' : `扫码登录${s.name}`}
+                        </button>
+                      )}
                       {isExpanded && (
                         <div style={{ marginTop: 10 }}>
-                          <QrLoginView sourceId={s.id} compact onConfirmed={(creds) => handleLoginConfirmed(s.id, creds)} />
+                          <QrLoginView sourceId={s.id} compact onConfirmed={(creds) => handleLoginConfirmed(s.id, creds)} onWebLogin={() => startWebLogin(s)} />
                         </div>
                       )}
                     </div>

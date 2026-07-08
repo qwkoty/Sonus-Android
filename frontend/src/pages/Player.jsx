@@ -267,18 +267,22 @@ export default function Player({ onProfile }) {
         </div>
       </div>
 
-      {/* 底部控制栏：收起=左下角小胶囊 + 居中细进度条；展开=居中宽条 */}
+      {/* 底部控制栏：收起=左下角紧凑胶囊（进度条在胶囊上方一体联动）；展开=居中宽条 */}
       {!controlsExpanded ? (
-        <>
-          {/* 细进度条（收起态：缩小宽度与小胶囊同步紧凑，不显示起止时间） */}
-          <div style={{ position: 'absolute', left: '50%', bottom: 'calc(72px + var(--safe-bottom))', transform: 'translateX(-50%)', width: 'min(200px, calc(100% - 32px))', zIndex: 50, display: 'flex', alignItems: 'center' }}>
+        <div
+          style={{
+            position: 'absolute', left: 14, bottom: 'calc(14px + var(--safe-bottom))', zIndex: 50,
+            display: 'flex', flexDirection: 'column', gap: 8
+          }}
+        >
+          {/* 收起态进度条：与小胶囊同宽左对齐，不显示起止时间 */}
+          <div style={{ width: 216, padding: '0 8px' }}>
             <ProgressStrip showTimes={false} />
           </div>
-          {/* 收起态：左下角紧凑小胶囊 */}
+          {/* 左下角紧凑小胶囊 */}
           <div
             className="glass-panel"
             style={{
-              position: 'absolute', left: 14, bottom: 'calc(14px + var(--safe-bottom))', transform: 'none', zIndex: 50,
               height: 52, padding: '6px 8px', borderRadius: 16,
               display: 'flex', alignItems: 'center', gap: 8
             }}
@@ -292,7 +296,7 @@ export default function Player({ onProfile }) {
             <button onClick={next} className="glass-button" style={{ width: 32, height: 32, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.78)' }}><SkipForward size={18} fill="currentColor" /></button>
             <button onClick={() => setControlsExpanded(true)} className="glass-button" style={{ width: 28, height: 28, borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-secondary)' }}><ChevronUp size={16} /></button>
           </div>
-        </>
+        </div>
       ) : (
         <div
           className="glass-panel"
