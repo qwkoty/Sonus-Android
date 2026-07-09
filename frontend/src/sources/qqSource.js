@@ -214,17 +214,21 @@ async function userInfoAPK(uin, cookie = '') {
     comm: { uin: String(uin), format: 'json', ct: 24, cv: 0 },
     req_0: { module: 'music.UserInfo.userInfoServer', method: 'GetLoginUserInfo', param: {} },
   }), cookie);
-  const i = d?.req_0?.data;
-  const avatar = i?.headpic || i?.headimg || i?.avatar || i?.face || i?.headPic || '';
-  console.log('[userInfo] raw fields:', { nick: i?.nick, headpic: i?.headpic, headimg: i?.headimg, avatar: i?.avatar, face: i?.face, headPic: i?.headPic });
+  // 兼容多种响应嵌套：data.data / data / req_0 自身
+  const raw = d?.req_0?.data?.data ?? d?.req_0?.data ?? d?.req_0 ?? {};
+  const pick = (...keys) =>
+    keys.map((k) => raw?.[k]).find((v) => v !== undefined && v !== null && v !== '');
+  const nick = pick('nick', 'nickname', 'name', 'user_name', 'usrName');
+  const avatar = pick('headpic', 'headimg', 'avatar', 'face', 'headPic', 'pic', 'picurl', 'headpic_url', 'icon');
+  const qlogo = uin ? `https://q1.qlogo.cn/g?b=qq&nk=${String(uin)}&s=640` : ''; // 稳定兜底头像（按 uin 拼）
   return {
-    nickname: i?.nick || 'QQ音乐用户',
-    avatar,
+    nickname: nick || 'QQ音乐用户',
+    avatar: avatar || qlogo,           // 接口头像缺失时回退 qlogo，保证必有图
     uin: String(uin),
-    vipLevel: i?.vipLevel || 0,
-    isVip: !!(i?.isVip || i?.vip || i?.vipStatus || i?.svipLevel || i?.payPackId),
-    follow: i?.follow || 0,
-    fans: i?.fans || 0,
+    vipLevel: raw?.vipLevel || 0,
+    isVip: !!(raw?.isVip || raw?.vip || raw?.vipStatus || raw?.svipLevel || raw?.payPackId),
+    follow: raw?.follow || 0,
+    fans: raw?.fans || 0,
   };
 }
 

@@ -268,10 +268,14 @@ export default function Profile({ onBack }) {
             {selectedCreds.isLoggedIn ? (
               <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                 <div style={{ width: 46, height: 46, borderRadius: '50%', overflow: 'hidden', flexShrink: 0, background: 'rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: `2px solid ${SOURCE_COLOR[selectedSourceId]}55` }}>
-                  {selectedCreds.userInfo?.avatar ? <img src={selectedCreds.userInfo.avatar} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <UserIcon size={20} color="var(--text-muted)" />}
+                  {(() => {
+                    const qlogo = selectedCreds.uin ? `https://q1.qlogo.cn/g?b=qq&nk=${selectedCreds.uin}&s=640` : '';
+                    const src = selectedCreds.userInfo?.avatar || qlogo;
+                    return src ? <img src={src} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <UserIcon size={20} color="var(--text-muted)" />;
+                  })()}
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 14, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{selectedCreds.nickname || selectedSource.name}</div>
+                  <div style={{ fontSize: 14, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{selectedCreds.userInfo?.nickname || selectedCreds.nickname || selectedSource.name}</div>
                   <span className="source-tag" style={{ background: `${SOURCE_COLOR[selectedSourceId]}22`, color: SOURCE_COLOR[selectedSourceId], border: `1px solid ${SOURCE_COLOR[selectedSourceId]}55` }}>
                     {selectedSource.name}{activeSourceId === selectedSourceId ? ' · 当前' : ' · 已登录'}
                   </span>
