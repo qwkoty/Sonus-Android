@@ -268,11 +268,14 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
     const bandArr = new Float32Array(COUNT);
     const freqBand = new Uint8Array(COUNT);
     const spectrumSmooth = new Float32Array(64);
-    // 错层黏土封面：每粒子所属层 + 基础 Z 偏移 + 有机位移相位
-    const coverLayer = new Uint8Array(COUNT);
-    const coverLayerZ = new Float32Array(COUNT);
-    const clayPhaseX = new Float32Array(COUNT);
-    const clayPhaseY = new Float32Array(COUNT);
+    // 粒子封面「腻子脱落」：每粒子独立深度状态（0=前层完整封面, 1=后层光晕）
+    const clayDepth = new Float32Array(COUNT);      // 当前深度 [0,1]
+    const clayTarget = new Float32Array(COUNT);     // 目标深度 [0,1]
+    const clayVel = new Float32Array(COUNT);         // 深度变化速度
+    const clayPhaseX = new Float32Array(COUNT);     // 有机位移相位 X
+    const clayPhaseY = new Float32Array(COUNT);     // 有机位移相位 Y
+    const CLAY_FALL_RATE = 0.002;                   // 每帧随机脱落概率
+    const CLAY_SPECTRUM_TRIGGER = 0.55;            // 频谱触发脱落阈值
 
     const buildBase = () => {
       const grng = mulberry32(0x9e3779b9); // 稳定种子 → 星系形态固定
@@ -300,19 +303,17 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
           // 中间横面（band≈0）对应高频，向两极（band≈1）依次降低
           freqBand[idx] = Math.min(63, Math.floor((1 - band) * 63));
 
-          // coverflow 形态：错层软质叠片（前清后糊，Z 轴错开）
-          const layer = idx % COVER_LAYERS;
-          const layerCenter = (layer - (COVER_LAYERS - 1) / 2) * planeSize * LAYER_GAP;
-          coverLayer[idx] = layer;
-          coverLayerZ[idx] = layerCenter;
+          // coverflow 形态：全部粒子在同一平面（初始完整封面），深度由运行时 clayDepth 驱动
           clayPhaseX[idx] = cph(); // 有机位移相位（确定性）
           clayPhaseY[idx] = cph();
-          // 轻微穹顶 + 层 Z 偏移（错层深度）
-          const cbz = -planeSize * DOME_DEPTH_RATIO * (1 - Math.cos(dc * Math.PI / 2)) + layerCenter;
+          clayDepth[idx] = 0;       // 初始全在前层
+          clayTarget[idx] = 0;      // 目标也在前层
+          clayVel[idx] = 0;         // 无速度
+          // 轻微穹顶（无层偏移，所有粒子共面）
+          const cbz = -planeSize * DOME_DEPTH_RATIO * (1 - Math.cos(dc * Math.PI / 2));
           basePositionsCover[idx * 3] = x;
           basePositionsCover[idx * 3 + 1] = y;
           basePositionsCover[idx * 3 + 2] = cbz;
-          // 法线近似：中心垂直，边缘略斜（腻子明暗用）
           baseNormalsCover[idx * 3] = 0;
           baseNormalsCover[idx * 3 + 1] = 0;
           baseNormalsCover[idx * 3 + 2] = 1.0 - dc * 0.5;
@@ -416,8 +417,8 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
           const ridge = Math.abs(Math.sin(tTheta * trFreq[0] * 0.7 + rN * 11.0 + trPhase[0] * 1.3));
           terH += (ridge * 2.0 - 1.0) * 0.6; // 映射到 [-0.6, +0.6]
           const radial = Math.pow(Math.max(0, 1 - rN), 1.2); // 衰减放缓，外圈保留台地感
-          // 归一化 terH(~[-3.8,3.8]) 到 [0,1]，避免山峰穿出视锥
-          const hN = (terH / 3.8 * 0.5 + 0.5) * radial;
+          // tanh 软饱和归一化（避免高值区截断导致平顶，永远平滑）
+          const hN = (Math.tanh(terH * 0.4) * 0.5 + 0.5) * radial;
           basePositionsTerrain[idx * 3] = tx;
           basePositionsTerrain[idx * 3 + 1] = (hN - 0.35) * planeSize * 0.70; // 静态山体高度（立体感强、可控）
           basePositionsTerrain[idx * 3 + 2] = tz;
@@ -493,20 +494,18 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
       return [d[i] / 255, d[i + 1] / 255, d[i + 2] / 255];
     };
     const applyCoverColors = () => {
-      // 仅在播放中且已加载封面时应用封面颜色；暂停/未播放时使用主题色
       if (!hasCoverRef.current || !isPlayingRef.current) return false;
       const accentRGB = hexToRGB(accentRef.current || '#4FC3F7');
-      // 各层亮度衰减 + 主题色混入（前层清晰封面，后层渐隐为腻子光晕）
-      const layerDim = [1.0, 0.8, 0.5, 0.25];
-      const accentMix = [0.0, 0.2, 0.5, 1.0];
       for (let i = 0; i < COUNT; i++) {
         const u = origUV[i * 2];
         const v = origUV[i * 2 + 1];
         const s = sampleCover(u, v);
         const boost = 1.45;
         const minBright = 0.35;
-        const li = layerDim[coverLayer[i]];
-        const am = accentMix[coverLayer[i]];
+        // 动态深度混合：clayDepth=0→纯封面，clayDepth=1→纯主题色光晕
+        const cd = clayDepth[i]; // [0,1]
+        const li = 1.0 - cd * 0.75;       // 深度0→亮1.0, 深度1→暗0.25
+        const am = cd * 0.9;              // 深度0→纯封面, 深度1→90%主题色
         colorAttr.array[i * 3]     = Math.min(1, (Math.max(s[0] * boost, minBright * (0.8 + s[0])) * (1 - am) + accentRGB.r * am) * li);
         colorAttr.array[i * 3 + 1] = Math.min(1, (Math.max(s[1] * boost, minBright * (0.8 + s[1])) * (1 - am) + accentRGB.g * am) * li);
         colorAttr.array[i * 3 + 2] = Math.min(1, (Math.max(s[2] * boost, minBright * (0.8 + s[2])) * (1 - am) + accentRGB.b * am) * li);
@@ -530,9 +529,7 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
     let midSmooth = 0;
     let trebleSmooth = 0;
 
-    // 错层黏土封面：每层独立的鼓点脉冲包络（鼓点从前层向后层接力传播）
-    const beatPulseLayers = new Float32Array(COVER_LAYERS);
-    const beatRelay = new Float32Array(COVER_LAYERS); // 各层脉冲的触发延时（前→后）
+    // 错层黏土封面：每粒子独立深度状态（clayDepth/clayTarget/clayVel 已在上面分配）
 
     const animate = () => {
       const { data, hasData } = getSpectrumBars(64);
@@ -713,10 +710,13 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
       prevBassRef.current = bass;
       if (dBas > BEAT_THRESHOLD && (nowS - lastBeatRef.current) > BEAT_COOLDOWN) {
         lastBeatRef.current = nowS;
-        const imp = Math.min(1, bass) * SHOCK_GAIN * planeSize * 0.10;
-        for (let i = 0; i < COUNT; i++) {
-          explodeVel[i * 3] += galaxyUX[i] * imp;
-          explodeVel[i * 3 + 1] += galaxyUY[i] * imp;
+        // 冲击波：仅非 galaxy 模式注入（用户要求星河去掉鼓点打击感）
+        if (modeRef.current !== 'galaxy') {
+          const imp = Math.min(1, bass) * SHOCK_GAIN * planeSize * 0.10;
+          for (let i = 0; i < COUNT; i++) {
+            explodeVel[i * 3] += galaxyUX[i] * imp;
+            explodeVel[i * 3 + 1] += galaxyUY[i] * imp;
+          }
         }
         beatPulseRef.current = 1;
         beatFreqBoostRef.current = 1; // 同步触发频率增强包络
@@ -743,9 +743,6 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
         } else if (modeRef.current === 'ocean') {
           // 鼓点给地形一个整体脉冲 + 中心涟漪增强
           beatFreqBoostRef.current = Math.min(1, beatFreqBoostRef.current + 0.45);
-        } else if (modeRef.current === 'coverflow') {
-          // 鼓点：各层脉冲依次触发（前→后接力），形成 jelly 传播
-          for (let lp = 0; lp < COVER_LAYERS; lp++) beatRelay[lp] = lp * 0.06;
         }
       }
       beatPulseRef.current *= Math.pow(BEAT_PULSE_DECAY, dt * 60);          // 帧率无关衰减
@@ -788,13 +785,32 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
 
       const invRmax = 1 / Rmax; // 预计算倒数，避免每粒子多次除法
 
-      // 错层黏土封面：鼓点脉冲逐层接力触发 + 衰减
-      for (let lp = 0; lp < COVER_LAYERS; lp++) {
-        if (beatRelay[lp] > 0) {
-          beatRelay[lp] -= dt;
-          if (beatRelay[lp] <= 0) beatPulseLayers[lp] = 1; // 到点触发该层脉冲
+      // ═══ 粒子封面「腻子脱落」模拟：每帧驱动 clayDepth ═══
+      // 1) 随机脱落（始终少量进行，营造"活"的感觉）
+      for (let fi = 0; fi < COUNT * CLAY_FALL_RATE + 1; fi++) {
+        const ri = Math.floor(Math.random() * COUNT);
+        if (clayDepth[ri] < 0.12) {
+          clayTarget[ri] = 0.5 + Math.random() * 0.5; // 掉到中后层
         }
-        beatPulseLayers[lp] *= Math.pow(BEAT_PULSE_DECAY, dt * 60);
+      }
+      // 2) 频谱驱动脱落（播放时：高频能量高的区域更易脱落）
+      if (hasData) {
+        const spOff = Math.floor(time * 60) % COUNT; // 时间偏移避免每帧同一批粒子
+        for (let di = 0; di < COUNT; di += 25) {
+          const ri = (di + spOff) % COUNT;
+          const bIdx = Math.min(63, Math.floor(distFromCenter[ri] * 63));
+          if (spectrumSmooth[bIdx] > CLAY_SPECTRUM_TRIGGER && clayDepth[ri] < 0.18 && Math.random() < 0.07) {
+            clayTarget[ri] = 0.4 + Math.random() * 0.6;
+          }
+        }
+      }
+      // 3) 每粒子弹簧积分（平滑深度过渡 + 自动回弹）
+      for (let ci = 0; ci < COUNT; ci++) {
+        const diff = clayTarget[ci] - clayDepth[ci];
+        clayVel[ci] += diff * 8.0 * dt;
+        clayVel[ci] *= Math.pow(0.92, dt * 60);   // 阻尼
+        clayDepth[ci] += clayVel[ci] * dt;
+        clayTarget[ci] *= Math.pow(0.997, dt * 60); // 目标缓慢衰减回0 → 粒子自动浮回前层
       }
 
       for (let i = 0; i < COUNT; i++) {
@@ -808,20 +824,20 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
           // 频谱映射：中心=高频，外圈=低频，把 64 段频谱绕成同心环
           const band = Math.min(63, Math.floor((1 - rN) * 63));
 
-          // 由内向外的径向涟漪波（频段能量驱动，振幅收小）
-          const ripple = Math.sin(rN * RIPPLE_FREQ - time * RIPPLE_SPEED) * spectrumSmooth[band] * planeSize * 0.045 * (1 + beatFreqBoost * GALAXY_BEAT_FREQ_GAIN);
+          // 由内向外的径向涟漪波（频段能量驱动——大幅增强可见度）
+          const ripple = Math.sin(rN * RIPPLE_FREQ - time * RIPPLE_SPEED) * spectrumSmooth[band] * planeSize * 0.12 * (1 + beatFreqBoost * GALAXY_BEAT_FREQ_GAIN);
 
           // 径向频谱柱：不同半径的粒子被对应频段向外推，形成"音波环"
-          const radialSpectrum = spectrumSmooth[band] * planeSize * 0.10 * (1 + beatFreqBoost * GALAXY_BEAT_FREQ_GAIN);
+          const radialSpectrum = spectrumSmooth[band] * planeSize * 0.24 * (1 + beatFreqBoost * GALAXY_BEAT_FREQ_GAIN);
 
-          // 低频推核球呼吸（越靠中心越强）
-          const bassPush = bassAttack * planeSize * 0.08 * Math.pow(1 - rN, 1.4);
+          // 低频推核球呼吸（越靠中心越强——大幅增强）
+          const bassPush = bassAttack * planeSize * 0.18 * Math.pow(1 - rN, 1.4);
 
-          // 臂波动：沿半径方向螺旋波，让旋臂像流体一样起伏
-          const armWave = (hasData ? 1.0 : 0.7) * Math.sin(rN * 16 - time * 2.2 + (galaxyArm[i] >= 0 ? galaxyArm[i] : 0) * 1.1) * planeSize * 0.012 * (1 + beatFreqBoost * 0.6);
+          // 臂波动：沿半径方向螺旋波，让旋臂像流体一样起伏——大幅增强
+          const armWave = (hasData ? 1.0 : 0.7) * Math.sin(rN * 16 - time * 2.2 + (galaxyArm[i] >= 0 ? galaxyArm[i] : 0) * 1.1) * planeSize * 0.03 * (1 + beatFreqBoost * 0.6);
 
-          // 垂直音浪：Z 轴随频段能量起伏，中心高频处更明显
-          const zWave = spectrumSmooth[band] * planeSize * 0.04 * (1 + beatFreqBoost) * Math.sin(rN * 8 + time * 3);
+          // 垂直音浪：Z 轴随频段能量起伏——大幅增强
+          const zWave = spectrumSmooth[band] * planeSize * 0.10 * (1 + beatFreqBoost) * Math.sin(rN * 8 + time * 3);
 
           const disp = ripple + radialSpectrum + bassPush + armWave;
           let sx = basePositionsGalaxy[i * 3] + galaxyUX[i] * disp + explodePos[i * 3];
@@ -877,10 +893,7 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
           const ry = x * sa + y * ca;
           x = rx; y = ry;
 
-          // 鼓点切向冲击：让旋臂在鼓点时"甩"一下
-          const beatSpin = beatPulseRef.current * planeSize * 0.20 * (1 - rN * 0.5); // 鼓点切向冲击 0.14→0.20
-          x += -ny * beatSpin;
-          y += nx * beatSpin;
+          // （已移除鼓点切向冲击 beatSpin —— 用户要求去掉鼓点打击感，仅保留平滑频谱跟随）
 
           // 频谱细碎抖动增强流动感
           const jitter = (trebleSmooth + midSmooth * 0.5) * Math.sin(u * 50 + time * 5 + i * 0.3) * planeSize * 0.005 * (1 + beatFreqBoost * GALAXY_BEAT_FREQ_GAIN);
@@ -910,40 +923,32 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
             y += galaxyUY[i] * arc;
           }
         } else if (targetShape === 'coverflow') {
-          // ═══ 错层黏土封面：4 层软质叠片 + 各层相位动画 + 鼓点 jelly 传播 ═══
-          const lp = coverLayer[i];
-          const layerCenter = coverLayerZ[i];
-          const layerPhase = lp * 1.7;            // 各层相位差 → 错层动画感
-          const bpl = beatPulseLayers[lp];        // 该层鼓点脉冲（前→后接力）
+          // ═══ 粒子封面「腻子脱落」动画：全部粒子初始在前层(完整封面)，播放时个别粒子掉到后层再浮回 ═══
+          const cd = clayDepth[i];           // 当前深度 [0,1]
+          const layerZ = cd * planeSize * LAYER_GAP * (COVER_LAYERS - 1); // 深度→Z偏移
 
-          // L1 — 整体呼吸（Z 深度起伏），各层相位错开
+          // 呼吸（整体轻微深度起伏，深层粒子相位略不同）
           const breathe = hasData
-            ? (0.04 + totalEnergy * 0.15 + bassAttack * 0.20)
-            : (0.05 + Math.sin(time * 0.4 + layerPhase) * 0.03);
+            ? (0.04 + totalEnergy * 0.12)
+            : (0.03 + Math.sin(time * 0.4 + cd * 2.5) * 0.02);
 
-          // L2 — 径向波纹：频谱能量沿半径向外扩散（Z 轴为主）
-          const bandIdx = Math.min(63, Math.floor(dc * 63)); // 中心=低频, 外圈=高频
+          // 径向波纹（Z轴为主，深度影响相位）
+          const bandIdx = Math.min(63, Math.floor(dc * 63));
           const localE = spectrumSmooth[bandIdx];
-          const ripple = Math.sin(dc * 12 - time * 4 + layerPhase) * localE * zAmp * 0.45 * (1 + beatFreqBoost * 1.2);
+          const ripple = Math.sin(dc * 12 - time * 4 + cd * 2.2) * localE * zAmp * 0.40 * (1 + beatFreqBoost * 1.0);
 
-          // L3 — 腻子有机位移（软糯，极小扰动保持封面可读）
+          // 腻子有机位移（深层粒子扰动更大——更像松散的腻子碎屑）
           const clayWob = (Math.sin(u * 3 + time * 0.5 + clayPhaseX[i] * 6.2832) * 0.5
-                        + Math.sin(v * 4 - time * 0.4 + clayPhaseY[i] * 6.2832) * 0.3) * planeSize * 0.012;
+                        + Math.sin(v * 4 - time * 0.4 + clayPhaseY[i] * 6.2832) * 0.3)
+                        * planeSize * (0.008 + cd * 0.014);
 
-          // 鼓点前推（整层瞬间向前冲）
-          const beatPush = bpl * zAmp * 0.45;
+          // X/Y 极微扰（保持封面图案完整；深层略大但仍可读）
+          const microXY = Math.sin(u * 18 + time * 2 + cd * 3) * Math.cos(v * 15 + time * 1.8)
+                          * planeSize * (0.002 + cd * 0.003);
 
-          // X/Y 极微扰动（保持封面图案完整）
-          const microXY = Math.sin(u * 18 + time * 2 + layerPhase) * Math.cos(v * 15 + time * 1.8)
-                          * planeSize * 0.0025 * (hasData ? (0.5 + totalEnergy) : 1);
-
-          // 该层 squash（挤压回弹）：纵向压、横向鼓（围绕层中心 0,0）
-          const squashY = 1 - bpl * 0.16;
-          const squashXZ = 1 + bpl * 0.10;
-
-          x = bx * squashXZ + microXY;
-          y = by * squashY + microXY * 0.7;
-          z = bz + (breathe + beatFreqBoost * 0.05) * planeSize * 0.10 + ripple + clayWob + beatPush;
+          x = bx + microXY;
+          y = by + microXY * 0.7;
+          z = bz + layerZ + breathe * planeSize * 0.08 + ripple + clayWob;
         } else if (targetShape === 'liquidmetal') {
           // ═══ liquidmetal 待机：熔岩对流 ═══
           const band = bandArr[i]; // 0=赤道(最中间), 1=两极(两端)
@@ -1072,8 +1077,8 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
 
           const band = Math.min(63, Math.floor(rN * 63));
           const localE = spectrumSmooth[band];
-          let intensity = 0.45 + bassAttack * 1.2 + localE * 1.8 * (1 + beatFreqBoost * GALAXY_BEAT_FREQ_GAIN) + beatPulseRef.current * 1.8;
-          if (galaxyBulge[i]) intensity += 0.7 + bassAttack * 1.1; // 核心鼓点更亮 0.5/0.8 → 0.7/1.1
+          let intensity = 0.45 + bassAttack * 0.6 + localE * 2.4 * (1 + beatFreqBoost * GALAXY_BEAT_FREQ_GAIN); // 去掉beatPulse，增强频谱驱动
+          if (galaxyBulge[i]) intensity += 0.7 + bassAttack * 0.5; // 核心略亮（去掉鼓点冲击）
           if (isHaloNow) intensity *= 0.55;
 
           // 星星闪烁叠加
@@ -1163,8 +1168,8 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
           }
 
           const outFactor = 1 - dc * 0.25;
-          // 错层：后层更暗（即使无封面也呈现层次感）
-          const layerDim = [1.0, 0.82, 0.6, 0.4][coverLayer[i]];
+          // 错层：后层更暗（动态 clayDepth 驱动，即使无封面也呈现层次感）
+          const layerDim = 1.0 - clayDepth[i] * 0.75; // 深度0→亮1.0
           // 全息微闪：高频时粒子亮度随机微跳（仅 coverflow）
           const holoFlicker = (targetShape === 'coverflow') ? trebleSmooth * 0.12 * ((i * 0.13) % 1) : 0;
           colorAttr.array[i * 3]     = Math.min(1, ar_mod * intensity * outFactor * layerDim + bassPulse * 0.65 + holoFlicker);
