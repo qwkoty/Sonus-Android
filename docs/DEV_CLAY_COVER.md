@@ -3,7 +3,7 @@
 - 触发：用户要求「给我一个腻子封面的动画的方案」（随音频跳动的软体封面）
 - 目标文件：`frontend/src/components/Visualizer3D.jsx`（新增 `clay` 模式）、`frontend/src/store/*`、`frontend/src/pages/Player.jsx`（模式切换入口）
 - 关联：`docs/DEV_VISUALIZER_BEAT_RESPONSE.md`、三模式优化文档、`docs/AI_PROJECT_GUIDELINES.md`
-- 状态：**方案文档（待评审，未实现）**
+- 状态：**已实现（v1.9，已 `vite build` 验证）**
 
 ## 一、概念定义
 
@@ -170,3 +170,15 @@ const tremble = trebleSmooth * 0.03 * Math.sin(i * 0.7 + t * 30);
 5. 接入 `applyCoverColors()` 的封面纹理作为 `map`。
 6. 调参：`JIGGLE_K / JIGGLE_DAMP / squash 系数 / 噪声幅度`。
 7. `vite build` + 真机（Capacitor Android）验证帧率与观感。
+
+## 九、实施记录（v1.9）
+
+- 模式挂载：`Player.jsx` 的 `VIZ_3D_MODES` 新增 `{ key:'clay', label:'腻子封面' }`，`v3m` 合法列表加入 `'clay'`。
+- 网格：`IcosahedronGeometry(1,5)`（≈10242 顶点）单位球，`MeshStandardMaterial`（roughness 0.9 / metalness 0 / transparent）哑光。
+- 与粒子系统交叉淡入：`clayMix` 在 `[0,1]` 间 lerp；`points.material.opacity = 1-clayMix`、`points.visible = clayMix<0.995`；clay 网格 `visible = clayMix>0.01`、`material.opacity = clayMix`。
+- 软体形变：顶点沿单位球法线做「手捏」多频正弦 + 中频流动 + 高频微颤；法线不重算（形变小，省性能）。
+- 节拍反应：`beatPulse` 驱动 squash（纵 -18% / 横 +12%）；`clayJiggleVel -= 1.3` 冲量经弹簧阻尼（JIGGLE_K=60 / DAMP=0.90）产生二次余颤；clay 待机复用 galaxy 待机包络，始终「活着」。
+- 暖光布光：`DirectionalLight(暖,1.15)` + `DirectionalLight(冷补,0.45)` + `AmbientLight(0.5)`，**仅作用于 clay 网格**（Points/阴影盘为 unlit，零回归）。
+- 接触阴影：水平径向渐变圆盘置于球底，随 squash 压扁、随 jiggle 轻微下沉，opacity 随 clayMix。
+- 封面贴图：`coverTextureRef`（512² CanvasTexture，CORS 干净路径构建）同步给 `clayMat.map`；无封面时退化为主题色哑光球。
+- 风险收敛：`computeVertexNormals` 已省（用静态法线），形变循环仅在 clay 激活时运行。

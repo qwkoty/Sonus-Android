@@ -211,3 +211,4 @@
 | 2026-07-09 | v1.6 | 分析液态金属/星河漩涡/地形三可视化优化方案，新增 3 份 DEV 优化规范（暂无代码改动，待实施） | AI Assistant |
 | 2026-07-09 | v1.7 | 实施三模式节奏反应优化：共享包络提速（bassAttack attack 0.70/release 0.16、频谱非对称平滑）、SHOCK_GAIN 2.2→2.6；液态金属整球 squash + bassBoost 增强；星河 beatSpin 0.14→0.20 + 核心更亮；地形主峰脉冲 0.10/2.5→0.14/3.2 + 涟漪增强 | AI Assistant |
 | 2026-07-09 | v1.8 | 新增「腻子封面（Clay/Putty）」动画方案开发规范 DEV_CLAY_COVER.md：哑光软体球 + squash&stretch + jiggle 二次抖动 + 暖光接触阴影，待评审实施 | AI Assistant |
+| 2026-07-10 | v1.9 | 落地「腻子封面」模式：独立哑光软体球 + squash&stretch + jiggle 弹簧 + 暖光接触阴影，与粒子系统交叉淡入；Player 新增 clay 模式入口 | AI Assistant |

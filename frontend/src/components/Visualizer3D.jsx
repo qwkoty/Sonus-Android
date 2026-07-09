@@ -74,6 +74,22 @@ function createParticleTexture() {
   return tex;
 }
 
+// 由专辑图构建高分辨率 CanvasTexture（腻子封面网格贴图用）
+function buildCoverTexture(img) {
+  const S = 512;
+  const c = document.createElement('canvas');
+  c.width = S; c.height = S;
+  const cx = c.getContext('2d');
+  const iw = img.width, ih = img.height;
+  const s = Math.min(iw, ih);
+  const sx = (iw - s) / 2, sy = (ih - s) / 2;
+  cx.drawImage(img, sx, sy, s, s, 0, 0, S, S);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.needsUpdate = true;
+  return tex;
+}
+
 // 3D 粒子可视化：coverflow（粒子封面）/ liquidmetal（液态金属）/ galaxy（星河漩涡）
 // 手势驱动：单指/鼠标拖拽 = 偏航(360°)+俯仰(±85°)；双指捏合缩放+扭转；滚轮缩放
 function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPlaying = false, onReady }) {
@@ -82,6 +98,7 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
   const coverRef = useRef(cover);
   const isPlayingRef = useRef(isPlaying);
   const imageDataRef = useRef(null);  // 封面像素 RGBA
+  const coverTextureRef = useRef(null); // 腻子封面用：专辑图 CanvasTexture（WebGL 特效内同步给 clay 网格）
   const hasCoverRef = useRef(false);
   const coverVersionRef = useRef(0);
   const appliedCoverVersionRef = useRef(-1);
@@ -165,6 +182,7 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
             cx.drawImage(img, sx, sy, s, s, 0, 0, SIZE, SIZE);
             imageDataRef.current = cx.getImageData(0, 0, SIZE, SIZE).data;
             hasCoverRef.current = true;
+            coverTextureRef.current = buildCoverTexture(img); // 腻子封面纹理
           } catch {
             imageDataRef.current = null;
             hasCoverRef.current = false;
@@ -458,6 +476,44 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
     const points = new THREE.Points(geometry, material);
     scene.add(points);
 
+    // ═══ 腻子封面（clay）模式：哑光软体球 + squash/jiggle + 暖光接触阴影 ═══
+    // 与粒子系统并存，通过 clayMix 交叉淡入淡出，不改动既有四模式的粒子逻辑
+    const clayGeo = new THREE.IcosahedronGeometry(1, 5); // 单位球，半径由 mesh.scale 控制
+    const clayBase = Float32Array.from(clayGeo.attributes.position.array); // 缓存基础顶点（法线=归一化位置）
+    const clayMat = new THREE.MeshStandardMaterial({
+      color: new THREE.Color(accentRef.current || '#4FC3F7'),
+      roughness: 0.9,            // 哑光腻子（非金属）
+      metalness: 0.0,
+      emissive: new THREE.Color(accentRef.current || '#4FC3F7'),
+      emissiveIntensity: 0.05,   // 极弱自发光，避免暗部死黑
+      transparent: true,         // 用于与粒子系统交叉淡入淡出
+    });
+    const clayMesh = new THREE.Mesh(clayGeo, clayMat);
+    clayMesh.visible = false;
+    scene.add(clayMesh);
+
+    // 暖光布光（仅作用于 clay 网格；Points 与阴影盘为 unlit，不受影响）
+    const clayKey = new THREE.DirectionalLight(0xfff1e0, 1.15); clayKey.position.set(0.6, 1.0, 0.8);
+    const clayFill = new THREE.DirectionalLight(0x9bb8ff, 0.45); clayFill.position.set(-0.8, -0.2, -0.6);
+    const clayAmb = new THREE.AmbientLight(0xffffff, 0.5);
+    scene.add(clayKey, clayFill, clayAmb);
+
+    // 接触阴影：地面柔光圆盘（径向渐变 深→透明），随挤压压扁
+    const shadowTex = (() => {
+      const SC = 128; const cv = document.createElement('canvas'); cv.width = cv.height = SC;
+      const sctx = cv.getContext('2d');
+      const g = sctx.createRadialGradient(SC / 2, SC / 2, 0, SC / 2, SC / 2, SC / 2);
+      g.addColorStop(0, 'rgba(0,0,0,0.45)'); g.addColorStop(0.6, 'rgba(0,0,0,0.18)'); g.addColorStop(1, 'rgba(0,0,0,0)');
+      sctx.fillStyle = g; sctx.fillRect(0, 0, SC, SC);
+      return new THREE.CanvasTexture(cv);
+    })();
+    const clayShadow = new THREE.Mesh(
+      new THREE.PlaneGeometry(1, 1),
+      new THREE.MeshBasicMaterial({ map: shadowTex, transparent: true, depthWrite: false, opacity: 0 })
+    );
+    clayShadow.rotation.x = -Math.PI / 2; // 水平置于球底
+    scene.add(clayShadow);
+
     let raf;
     let lastTime = performance.now();
     const posAttr = geometry.attributes.position;
@@ -502,6 +558,13 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
     let bassRelease = 0;
     let midSmooth = 0;
     let trebleSmooth = 0;
+
+    // 腻子封面状态：交叉淡入比例 + 二次抖动弹簧
+    let clayMix = 0;        // 0=粒子系统, 1=腻子网格
+    let clayJigglePos = 0;  // jiggle 位移（弹簧）
+    let clayJiggleVel = 0;  // jiggle 速度（弹簧）
+    const JIGGLE_K = 60;    // 回中刚度
+    const JIGGLE_DAMP = 0.90; // 每帧阻尼（约 0.90^dt*60）
 
     const animate = () => {
       const { data, hasData } = getSpectrumBars(64);
@@ -712,6 +775,9 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
         } else if (modeRef.current === 'ocean') {
           // 鼓点给地形一个整体脉冲 + 中心涟漪增强
           beatFreqBoostRef.current = Math.min(1, beatFreqBoostRef.current + 0.45);
+        } else if (modeRef.current === 'clay') {
+          // 鼓点给腻子一记下砸冲量 → 二次 jiggle 余颤
+          clayJiggleVel -= 1.3;
         }
       }
       beatPulseRef.current *= Math.pow(BEAT_PULSE_DECAY, dt * 60);          // 帧率无关衰减
@@ -1138,6 +1204,67 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
 
       points.scale.set(1, 1, 1);
 
+      // ═══ 腻子封面（clay）更新 + 与粒子系统交叉淡入淡出 ═══
+      const clayActive = modeRef.current === 'clay';
+      clayMix += ((clayActive ? 1 : 0) - clayMix) * (1 - Math.pow(1 - 0.16, dt * 60));
+      // 粒子系统随 clayMix 淡出（腻子占主导时粒子隐藏）
+      material.opacity = Math.max(0, 1 - clayMix);
+      points.visible = clayMix < 0.995;
+
+      if (clayMix > 0.01) {
+        // 同步封面纹理（仅在变化时替换并释放旧纹理）
+        if (clayMat.map !== coverTextureRef.current) {
+          const oldMap = clayMat.map;
+          clayMat.map = coverTextureRef.current;
+          clayMat.needsUpdate = true;
+          if (oldMap && oldMap !== coverTextureRef.current) oldMap.dispose();
+        }
+        const accentC = hexToRGB(accentRef.current || '#4FC3F7');
+        if (coverTextureRef.current) clayMat.color.setRGB(1, 1, 1); // 有封面：白底乘图
+        else clayMat.color.setRGB(accentC.r, accentC.g, accentC.b);  // 无封面：主题色哑光球
+
+        const baseR = planeSize * 0.42;
+        const t = time;
+        const midA = midSmooth, trebA = trebleSmooth;
+        // 软体顶点形变：静态「手捏」起伏 + 中频流动 + 高频微颤（法线≈单位球法线，免重算）
+        const cpos = clayGeo.attributes.position.array;
+        for (let vi = 0; vi < cpos.length; vi += 3) {
+          const nx = clayBase[vi], ny = clayBase[vi + 1], nz = clayBase[vi + 2];
+          let wob = Math.sin(nx * 3 + t * 0.6) * 0.5 + Math.sin(ny * 5 - t * 0.4) * 0.3 + Math.sin(nz * 7 + t * 0.5) * 0.2;
+          wob *= (0.05 + midA * 0.6);
+          const trem = trebA * 0.03 * Math.sin(vi * 0.7 + t * 30);
+          const rr = 1 + wob + trem;
+          cpos[vi] = nx * rr; cpos[vi + 1] = ny * rr; cpos[vi + 2] = nz * rr;
+        }
+        clayGeo.attributes.position.needsUpdate = true;
+
+        // 节拍 squash & stretch（纵压横鼓，体积感近似守恒）
+        const bp = beatPulseRef.current;
+        const squashY = 1 - bp * 0.18;
+        const squashXZ = 1 + bp * 0.12;
+        // jiggle 弹簧积分（二次抖动余颤）
+        clayJiggleVel += -clayJigglePos * JIGGLE_K * dt;
+        clayJiggleVel *= Math.pow(JIGGLE_DAMP, dt * 60);
+        clayJigglePos += clayJiggleVel * dt;
+
+        clayMesh.scale.set(baseR * squashXZ, baseR * squashY, baseR * squashXZ);
+        clayMesh.position.y = clayJigglePos * planeSize * 0.10;
+        clayMesh.rotation.y = g.rotationY;
+        clayMesh.rotation.x = g.rotationX;
+        clayMesh.visible = true;
+        clayMat.opacity = clayMix;
+
+        // 接触阴影：置于球底，随挤压压扁、随 jiggle 轻微下沉
+        clayShadow.visible = true;
+        clayShadow.position.y = -baseR * squashY + clayJigglePos * planeSize * 0.05;
+        const shScale = baseR * 2.4 * (1 + bp * 0.15);
+        clayShadow.scale.set(shScale, shScale, 1);
+        clayShadow.material.opacity = 0.5 * clayMix;
+      } else {
+        clayMesh.visible = false;
+        clayShadow.visible = false;
+      }
+
       renderer.render(scene, camera);
 
       if (firstFrame) {
@@ -1260,6 +1387,11 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
       geometry.dispose();
       material.dispose();
       if (material.map) material.map.dispose();
+      clayGeo.dispose();
+      clayMat.dispose();
+      clayShadow.geometry.dispose();
+      clayShadow.material.dispose();
+      shadowTex.dispose();
       if (renderer.domElement.parentNode) {
         renderer.domElement.parentNode.removeChild(renderer.domElement);
       }
