@@ -29,7 +29,7 @@ const BEAT_THRESHOLD = 0.07;      // 鼓点触发阈值（越低越敏感）
 const BEAT_COOLDOWN = 0.05;       // 两次鼓点最小间隔（s）
 const SPRING_K = 0.05;            // 冲击波回弹弹簧系数
 const DAMPING = 0.88;             // 速度阻尼
-const SHOCK_GAIN = 2.2;           // 鼓点冲击波冲量增益（× bass）
+const SHOCK_GAIN = 2.6;           // 鼓点冲击波冲量增益（× bass）——提速后鼓点更"重"
 // —— 鼓点频率增强（与 beatPulse 平行的独立包络）——
 const BEAT_FREQ_BOOST_DECAY = 0.96; // 频率增强包络每帧衰减（鼓点后持续更久）
 const BEAT_PULSE_DECAY = 0.93;      // beatPulse 每帧衰减系数
@@ -644,13 +644,16 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
           treble = 0.035 + Math.sin(t * 0.28 + 2) * 0.015;
         }
       }
-      if (bass > bassAttack) bassAttack += (bass - bassAttack) * 0.55;
-      else bassAttack += (bass - bassAttack) * 0.28;
-      bassRelease += (bass - bassRelease) * 0.12;
-      midSmooth += (mid - midSmooth) * 0.22;
-      trebleSmooth += (treble - trebleSmooth) * 0.28;
+      // 节拍包络提速：攻击更快、释放更慢，让鼓点"砸"得更干脆，余韵更久
+      if (bass > bassAttack) bassAttack += (bass - bassAttack) * 0.70;
+      else bassAttack += (bass - bassAttack) * 0.16;
+      bassRelease += (bass - bassRelease) * 0.10;
+      midSmooth += (mid - midSmooth) * 0.30;
+      trebleSmooth += (treble - trebleSmooth) * 0.35;
       for (let i = 0; i < 64; i++) {
-        spectrumSmooth[i] += (data[i] - spectrumSmooth[i]) * 0.25;
+        const t = data[i];
+        const k = t > spectrumSmooth[i] ? 0.45 : 0.22; // 上升沿更快，下降沿更柔，凸显节拍跳动
+        spectrumSmooth[i] += (t - spectrumSmooth[i]) * k;
       }
 
       const bassPulse = Math.max(0, bassAttack - bassRelease);
@@ -832,7 +835,7 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
           x = rx; y = ry;
 
           // 鼓点切向冲击：让旋臂在鼓点时"甩"一下
-          const beatSpin = beatPulseRef.current * planeSize * 0.14 * (1 - rN * 0.5);
+          const beatSpin = beatPulseRef.current * planeSize * 0.20 * (1 - rN * 0.5); // 鼓点切向冲击 0.14→0.20
           x += -ny * beatSpin;
           y += nx * beatSpin;
 
@@ -899,8 +902,8 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
           for (let k = coarseBand * 8; k < (coarseBand + 1) * 8 && k < 64; k++) energy += spectrumSmooth[k];
           energy /= 8;
 
-          const localPulse = (energy * 1.25 * (1 + beatFreqBoost * LIQUID_BEAT_FREQ_GAIN) + bassAttack * 0.9 + midSmooth * 0.5) * activeFactor; // 鼓点增强频谱能量位移
-          const displacement = localPulse * planeSize * 0.10;
+          const localPulse = (energy * 1.25 * (1 + beatFreqBoost * LIQUID_BEAT_FREQ_GAIN) + bassAttack * 1.1 + midSmooth * 0.5) * activeFactor; // 鼓点增强频谱能量位移
+          const displacement = (localPulse + beatPulseRef.current * 0.5) * planeSize * 0.11; // 鼓点额外推动 + 整球脉冲
 
           // 整体呼吸脉动（待机时更明显）
           const breathe = hasData ? 1.0 : (0.97 + Math.sin(time * Math.PI / 4) * 0.03);
@@ -935,7 +938,7 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
           // 表面张力波：多波长沿法向振动，相位差营造流动感
           const wave = (midSmooth * 0.9 + bassAttack * 0.6) * Math.sin(u * 56 + time * 5 + i * 0.5) * planeSize * 0.008 * activeFactor;
           const equatorWave = (midSmooth * 0.8 + bassAttack * 0.6) * Math.sin(u * 48 + time * 4.5 + i * 0.5) * planeSize * 0.011 * activeFactor;
-          const bassBoost = bassPulse * planeSize * 0.18 * activeFactor; // 鼓点强度增强
+          const bassBoost = bassPulse * planeSize * 0.26 * activeFactor; // 鼓点强度增强（0.18→0.26）
 
           // 两端舒缓起伏（原有逻辑保留）
           const idleWave = idleFactor * Math.sin(v * 20 + time * 1.8 + i * 0.1) * Math.cos(u * 14 + time * 1.3) * planeSize * 0.06;
@@ -943,7 +946,9 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
           // 金属光泽漂移：高光区缓慢移动（通过微小的额外位移实现）
           const shimmer = !hasData ? Math.sin(time * 0.15 + u * 10 + v * 7) * Math.cos(time * 0.11 - u * 5) * planeSize * 0.004 : 0;
 
-          const r = baseR + displacement + wave + equatorWave + bassBoost + idleWave + hotDisp + dropletDisp + shimmer;
+          // 整球随拍一缩一放（squash）：赤道附近缩放更明显、两极收敛
+          const beatScale = 1 + beatPulseRef.current * 0.10 * (1 - band * 0.4);
+          const r = (baseR + displacement + wave + equatorWave + bassBoost + idleWave + hotDisp + dropletDisp + shimmer) * beatScale;
           x = nx * r;
           y = ny * r;
           z = nz * r;
@@ -961,12 +966,12 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
           const audioH = energy * planeSize * TERRAIN_GAIN * (0.35 + freqWeight * 1.9) * (1 + beatFreqBoost * 1.8);
           h += audioH;
 
-          // 低频鼓点：整体地形脉冲，中心(主峰)更强
-          const beatPulseH = bassAttack * planeSize * 0.10 * (1 + beatPulseRef.current * 2.5) * (0.4 + freqWeight);
+          // 低频鼓点：整体地形脉冲，中心(主峰)更强（0.10/2.5 → 0.14/3.2）
+          const beatPulseH = bassAttack * planeSize * 0.14 * (1 + beatPulseRef.current * 3.2) * (0.4 + freqWeight);
           h += beatPulseH;
 
-          // 中心涟漪：鼓点从中心向外扩散的低频波
-          const ripple = beatPulseRef.current * planeSize * 0.10 * Math.sin(rN * 16 - time * 7) * Math.exp(-rN * 2.2) * (1 + beatFreqBoost);
+          // 中心涟漪：鼓点从中心向外扩散的低频波（0.10 → 0.13）
+          const ripple = beatPulseRef.current * planeSize * 0.13 * Math.sin(rN * 16 - time * 7) * Math.exp(-rN * 2.2) * (1 + beatFreqBoost);
           h += ripple;
 
           // 待机缓慢地形呼吸（仅无音频时）
@@ -1012,8 +1017,8 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
 
           const band = Math.min(63, Math.floor(rN * 63));
           const localE = spectrumSmooth[band];
-          let intensity = 0.45 + bassAttack * 1.2 + localE * 1.8 * (1 + beatFreqBoost * GALAXY_BEAT_FREQ_GAIN) + beatPulseRef.current * 1.5;
-          if (galaxyBulge[i]) intensity += 0.5 + bassAttack * 0.8;
+          let intensity = 0.45 + bassAttack * 1.2 + localE * 1.8 * (1 + beatFreqBoost * GALAXY_BEAT_FREQ_GAIN) + beatPulseRef.current * 1.8;
+          if (galaxyBulge[i]) intensity += 0.7 + bassAttack * 1.1; // 核心鼓点更亮 0.5/0.8 → 0.7/1.1
           if (isHaloNow) intensity *= 0.55;
 
           // 星星闪烁叠加
