@@ -269,6 +269,10 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
 
     const buildBase = () => {
       const grng = mulberry32(0x9e3779b9); // 稳定种子 → 星系形态固定
+      // 地形 fBm 参数（确定性随机相位/频率 → buildBase 重建一致）
+      const trg = mulberry32(0x51ed270b);
+      const trPhase = [trg() * 6.2832, trg() * 6.2832, trg() * 6.2832, trg() * 6.2832];
+      const trFreq = [2.3 + trg(), 4.1 + trg() * 0.8, 7.7 + trg() * 1.2, 14.3 + trg() * 2.0];
       let idx = 0;
       const half = planeSize;
       const step = (planeSize * 2) / (GRID - 1);
@@ -377,7 +381,7 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
           galaxyArm[idx] = armIdx;
           galaxyBulge[idx] = isBulge ? 1 : 0;
 
-          // 地形：极坐标网格，中心=高频，外圈=低频
+          // 地形：极坐标网格 + fBm 静态山脉；中心=低频(大起伏主峰)，外圈=高频(细密细节)
           const terrainSize = planeSize * TERRAIN_SIZE_RATIO;
           // u -> 角度，v -> 半径；把平面映射成圆盘
           const tTheta = u * Math.PI * 2;
@@ -385,13 +389,19 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
           const tR = rN * terrainSize * 0.5;
           const tx = Math.cos(tTheta) * tR;
           const tz = Math.sin(tTheta) * tR;
-          // 基础待机地形：中心低、周围略有起伏的盆地
-          const idleH = Math.sin(tTheta * 3 + rN * 8) * 0.02 + Math.cos(rN * 12) * 0.015;
+          // 多倍频 fBm 山脉（确定性相位 → 重建一致），中心高、边缘沉入的悬浮山岛
+          let terH = 0;
+          terH += Math.sin(tTheta * trFreq[0] + rN * 5.0 + trPhase[0]) * 1.0;
+          terH += Math.sin(tTheta * trFreq[1] - rN * 9.0 + trPhase[1]) * 0.5;
+          terH += Math.sin(tTheta * trFreq[2] + rN * 15.0 + trPhase[2]) * 0.25;
+          terH += Math.sin(tTheta * trFreq[3] - rN * 24.0 + trPhase[3]) * 0.13;
+          const radial = Math.pow(Math.max(0, 1 - rN), 1.5); // 中心 1 → 边缘 0
+          const hN = (terH * 0.5 + 1) * radial; // ~[0, 1.3]
           basePositionsTerrain[idx * 3] = tx;
-          basePositionsTerrain[idx * 3 + 1] = idleH * planeSize;
+          basePositionsTerrain[idx * 3 + 1] = (hN - 0.30) * planeSize * 0.38; // 静态山体高度（含负谷）
           basePositionsTerrain[idx * 3 + 2] = tz;
-          // 频段：中心(半径小)对应高频索引大，外圈对应低频索引小
-          terrainBand[idx] = Math.min(63, Math.floor((1 - rN) * 63));
+          // 频段反转：中心(半径小)=低频(0)，外圈=高频(63) —— 中间低频、周围高频
+          terrainBand[idx] = Math.min(63, Math.floor(rN * 63));
 
           const initial = modeRef.current === 'liquidmetal' ? basePositionsLiquid
             : modeRef.current === 'galaxy' ? basePositionsGalaxy
@@ -938,32 +948,33 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
           y = ny * r;
           z = nz * r;
         } else if (targetShape === 'ocean') {
-          // ═══ terrain 地形：中心高频、周围低频 ═══
+          // ═══ terrain 地形：中心低频(大起伏主峰) / 外围高频(细密细节) ═══
           const rN = Math.sqrt(v); // 0=中心, 1=外圈
-          const band = terrainBand[i];
+          const band = terrainBand[i]; // 中心=低频(0)，外围=高频(63)
           const energy = spectrumSmooth[band];
+          const freqWeight = (1 - rN); // 中心(低频)权重高、外圈(高频)权重低
 
-          // 基础待机高度（buildBase 中已生成轻微起伏）
+          // 静态山体基础高度（已含山谷起伏）
           let h = by;
 
-          // 音频驱动高度：中心高频强、外圈低频弱，带鼓点增强
-          const audioH = energy * planeSize * TERRAIN_GAIN * (1 - rN * 0.35) * (1 + beatFreqBoost * 1.8);
+          // 音频驱动：低频(中心)大幅起伏、高频(外围)细密小幅
+          const audioH = energy * planeSize * TERRAIN_GAIN * (0.35 + freqWeight * 1.9) * (1 + beatFreqBoost * 1.8);
           h += audioH;
 
-          // 低频鼓点：整体地形脉冲
-          const beatPulseH = bassAttack * planeSize * 0.08 * (1 + beatPulseRef.current * 2.5) * (1 - rN * 0.4);
+          // 低频鼓点：整体地形脉冲，中心(主峰)更强
+          const beatPulseH = bassAttack * planeSize * 0.10 * (1 + beatPulseRef.current * 2.5) * (0.4 + freqWeight);
           h += beatPulseH;
 
-          // 中心涟漪：鼓点从中心向外扩散
-          const ripple = beatPulseRef.current * planeSize * 0.12 * Math.sin(rN * 18 - time * 8) * Math.exp(-rN * 2.5) * (1 + beatFreqBoost);
+          // 中心涟漪：鼓点从中心向外扩散的低频波
+          const ripple = beatPulseRef.current * planeSize * 0.10 * Math.sin(rN * 16 - time * 7) * Math.exp(-rN * 2.2) * (1 + beatFreqBoost);
           h += ripple;
 
-          // 待机缓慢地形呼吸
-          const idleBreathe = Math.sin(time * 0.25 + rN * 6) * planeSize * 0.012 * (hasData ? 0 : 1);
+          // 待机缓慢地形呼吸（仅无音频时）
+          const idleBreathe = Math.sin(time * 0.3 + rN * 5) * planeSize * 0.010 * (hasData ? 0 : 1);
           h += idleBreathe;
 
           // 严格限制振幅
-          h = Math.max(-planeSize * 0.22, Math.min(planeSize * 0.32, h));
+          h = Math.max(-planeSize * 0.28, Math.min(planeSize * 0.52, h));
 
           x = bx;
           y = h;
@@ -1024,38 +1035,49 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
           colorAttr.array[i * 3 + 1] = Math.min(1, g * intensity + twinkleBoost);
           colorAttr.array[i * 3 + 2] = Math.min(1, b * intensity + twinkleBoost);
         } else if (isTerrain) {
-          // 地形着色：低谷深色 → 中坡 accent → 峰顶泛白
+          // 地形着色：地形色带(谷底深→坡 accent→峰泛白) + 等高线 + 中心主峰更亮
           const rN = Math.sqrt(v); // 0=中心, 1=外圈
           const band = terrainBand[i];
           const energy = spectrumSmooth[band];
-          // 归一化高度 [-0.22, 0.32] -> [0, 1]
-          const normH = Math.max(0, Math.min(1, (y / planeSize + 0.22) / 0.54));
+          // 归一化高度 [-0.28, 0.52] -> [0, 1]
+          const normH = Math.max(0, Math.min(1, (y / planeSize + 0.28) / 0.80));
 
-          // 低谷深色
-          let r = accentRGB.r * 0.08 + 0.02;
-          let g = accentRGB.g * 0.08 + 0.02;
-          let b = accentRGB.b * 0.12 + 0.03;
+          // 谷底深色
+          let r = accentRGB.r * 0.06 + 0.015;
+          let g = accentRGB.g * 0.06 + 0.02;
+          let b = accentRGB.b * 0.10 + 0.03;
 
-          // 中坡 accent
-          const midLayer = Math.max(0, Math.min(1, normH * 1.3));
-          r += midLayer * accentRGB.r * 0.75;
-          g += midLayer * accentRGB.g * 0.75;
-          b += midLayer * accentRGB.b * 0.75;
+          // 坡面 accent
+          r += normH * accentRGB.r * 0.72;
+          g += normH * accentRGB.g * 0.72;
+          b += normH * accentRGB.b * 0.72;
 
           // 峰顶泛白
-          const crest = Math.max(0, Math.min(1, normH * 2.2 - 0.9));
-          r += crest * 0.45;
-          g += crest * 0.45;
-          b += crest * 0.48;
+          const crest = Math.max(0, (normH - 0.62) / 0.38);
+          r += crest * 0.5;
+          g += crest * 0.5;
+          b += crest * 0.52;
 
-          // 中心高频更亮、外圈低频更暗
-          const centerGlow = (1 - rN) * 0.25;
+          // 谷底压暗（增加纵深）
+          const vally = Math.max(0, (0.30 - normH) / 0.30);
+          r *= (1 - vally * 0.55);
+          g *= (1 - vally * 0.55);
+          b *= (1 - vally * 0.55);
+
+          // 等高线：每 1/11 高度一条亮线（地形图质感）
+          const N = 11;
+          const cf = Math.abs((normH * N - Math.floor(normH * N)) - 0.5);
+          const contour = Math.max(0, 0.045 - cf) / 0.045 * 0.16;
+          r += contour; g += contour; b += contour;
+
+          // 中心主峰(低频)更亮，外围(高频)略暗
+          const centerGlow = (1 - rN) * 0.22;
           r += centerGlow * accentRGB.r;
           g += centerGlow * accentRGB.g;
           b += centerGlow * accentRGB.b;
 
           // 音频能量点亮局部，控制上限
-          const intensity = 0.55 + energy * 1.2 * (1 + beatFreqBoost * 0.8) + bassAttack * 0.5 + beatPulseRef.current * 0.7;
+          const intensity = 0.6 + energy * 1.0 * (1 + beatFreqBoost * 0.8) + bassAttack * 0.4 + beatPulseRef.current * 0.6;
 
           colorAttr.array[i * 3]     = Math.min(1, r * intensity);
           colorAttr.array[i * 3 + 1] = Math.min(1, g * intensity);
