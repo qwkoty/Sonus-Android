@@ -165,8 +165,8 @@ function FloatPanel({ open, onClose, title, width = 360, children }) {
   if (!open) return null;
   return (
     <>
-      <div style={{ position: 'fixed', inset: 0, zIndex: 180 }} onClick={onClose} />
-      <div className="glass-panel" style={{ position: 'absolute', top: 70, right: 14, width: `min(${width}px, calc(100vw - 28px))`, maxHeight: '70vh', borderRadius: 20, zIndex: 190, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      <div className="animate-fadeIn" style={{ position: 'fixed', inset: 0, zIndex: 180 }} onClick={onClose} />
+      <div className="glass-panel animate-panelIn" style={{ position: 'absolute', top: 70, right: 14, width: `min(${width}px, calc(100vw - 28px))`, maxHeight: '70vh', borderRadius: 20, zIndex: 190, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', borderBottom: '1px solid rgba(255,255,255,0.06)', flexShrink: 0 }}>
           <span style={{ fontSize: 14, fontWeight: 760, letterSpacing: '.04em' }}>{title}</span>
           <button onClick={onClose} className="glass-button" style={{ width: 28, height: 28, borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><X size={14} color="var(--text-secondary)" /></button>
@@ -179,7 +179,7 @@ function FloatPanel({ open, onClose, title, width = 360, children }) {
 
 export default function Player({ onProfile }) {
   const { currentTrack, isPlaying, currentTime, duration, volume, playMode, playlist, togglePlay, next, prev, seek, setVolume, toggleMode, playTrack, lyrics, currentLyric, isLoadingUrl, error, clearError, setError } = usePlayerStore();
-  const { userInfo, isLoggedIn, getSourceCreds } = useAuthStore();
+  const { userInfo, isLoggedIn, nickname, getSourceCreds } = useAuthStore();
   const [sq, setSq] = useState(false); const [qo, setQo] = useState(false); const [viz, setViz] = useState(false);
   const [controlsExpanded, setControlsExpanded] = useState(() => { try { return localStorage.getItem('sonus_controls_expanded') !== 'false'; } catch { return true } });
   const [query, setQuery] = useState('');
@@ -291,12 +291,19 @@ export default function Player({ onProfile }) {
 
       {/* 顶部栏 */}
       <div style={{ position: 'absolute', top: 0, left: 0, right: 0, padding: 'calc(12px + var(--safe-top)) 14px 10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', zIndex: 50, gap: 10 }}>
-        <button onClick={onProfile} className="glass-button" style={{ width: 40, height: 40, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', padding: 0, background: 'rgba(255,255,255,0.08)', border: '2px solid rgba(255,255,255,0.12)' }}>
+        <button onClick={onProfile} className={`glass-button ${isLoggedIn && av ? 'avatar-pulse' : ''}`} style={{ width: 40, height: 40, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', padding: 0, background: 'rgba(255,255,255,0.08)', border: '2px solid rgba(255,255,255,0.12)' }}>
           {isLoggedIn && av ? <img src={av} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <span style={{ fontSize: 12, fontWeight: 760, color: 'var(--text-secondary)' }}>{isLoggedIn ? '我' : '登'}</span>}
         </button>
+        {isLoggedIn && nickname && (
+          <button onClick={onProfile} className="glass-button" style={{ maxWidth: 96, height: 32, padding: '0 12px', borderRadius: 16, fontSize: 12, fontWeight: 700, color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'flex', alignItems: 'center' }}>
+            {nickname}
+          </button>
+        )}
         <div style={{ flex: 1, textAlign: 'center', minWidth: 0 }}>
-          <div style={{ fontSize: 13.5, fontWeight: 760, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'rgba(255,255,255,0.95)' }}>{currentTrack?.title || 'Sonus'}</div>
-          <div style={{ fontSize: 10.5, color: 'var(--text-secondary)', marginTop: 2, letterSpacing: '.3px' }}>{currentTrack?.artist || '搜索开始播放'}</div>
+          <div key={currentTrack?.id || 'idle'} className="animate-fadeIn">
+            <div style={{ fontSize: 13.5, fontWeight: 760, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'rgba(255,255,255,0.95)' }}>{currentTrack?.title || 'Sonus'}</div>
+            <div style={{ fontSize: 10.5, color: 'var(--text-secondary)', marginTop: 2, letterSpacing: '.3px' }}>{currentTrack?.artist || '搜索开始播放'}</div>
+          </div>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
           <button onClick={() => setQo(true)} className={`glass-button ${qo ? 'is-active' : ''}`} style={{ width: 40, height: 40, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><ListMusic size={18} /></button>
