@@ -88,7 +88,7 @@
 | QQ 音乐 WebView 登录 | 打开 QQ 音乐页面扫码/密码登录 | `LoginWebViewActivity.java` / `Login.jsx` | WebView | ✅ | 否 | - | 自动读取 Cookie |
 | Cookie 读取与解析 | 从 Android CookieManager 读取并解析 uin/key | `CookieReaderPlugin.java` | CookieManager | ✅ | 否 | - | 多 key 优先级 |
 | 登录态持久化 | 登录信息保存到 localStorage | `useAuthStore.js` | localStorage | ✅ | 否 | - | 应用重启自动恢复 |
-| 用户信息获取 | 获取昵称、头像、VIP 等级 | `useAuthStore.js` / `Profile.jsx` | QQ API | ✅ | 否 | - | - |
+| 用户信息获取 | 获取昵称、头像、VIP 等级 | `useAuthStore.js` / `Profile.jsx` | QQ API | ✅ | 否 | - | v1.15 修复个人界面头像/昵称不显示（兼容多种响应结构 + qlogo 头像兜底） |
 | 用户歌单列表 | 拉取并展示用户创建/收藏歌单 | `Profile.jsx` | QQ API | ✅ | 否 | - | - |
 | 歌单详情与播放全部 | 查看歌单内歌曲并全部播放 | `Profile.jsx` | QQ API | ✅ | 否 | - | - |
 | 退出登录 | 清除状态与 Cookie | `Login.jsx` / `Profile.jsx` | CookieReader | ✅ | 否 | - | - |
@@ -217,3 +217,5 @@
 | 2026-07-10 | v1.12 | 三项精细调整：①粒子封面重写为「腻子脱落」动画（全部初始前层完整封面，播放时个别粒子掉到后层再浮回；弹簧积分平滑过渡+频谱驱动脱落+自动回弹）②地形平顶修复（线性归一化→tanh软饱和，山峰不再截断）③星河漩涡扩大音频响应范围×2~3（涟漪0.045→0.12/频谱柱0.10→0.24/核球0.08→0.18/Z波0.04→0.10/臂波0.012→0.03）并去除鼓点冲击波(SHOCK_GAIN)+切向冲击(beatSpin) | AI Assistant |
 | 2026-07-10 | v1.13 | 粒子封面「腻子脱落」增强：回弹衰减 0.997→0.972（脱落周期~3.3s→~0.8-1s，粒子持续起落而非掉一次冻结）；新增 MAX_CLAY_FALLEN=2000 硬上限约束同时脱落数(≤10%)保证封面始终完整；随机脱落系数 0.002→0.004 且完全随机位置；clayDepth 增加[0,1]钳制；稳态≈1500~2000 个粒子在随机位置连续起落、落了会回、回了又落 | AI Assistant |
 | 2026-07-10 | v1.14 | 粒子封面脱落「保持清晰可读」修正：applyCoverColors 脱落粒子亮度 0.25→0.80、主题色混合 90%→15%（保持封面色不洗图案）；待机着色脱落变暗 75%→20%；新增 CLAY_FALL_DEPTH_SCALE=0.6 把凹陷从 0.30 画幅收到≈0.18 画幅消除透视破洞；脱落动效与自动回弹不变。新增 DEV_COVERFLOW_READABLE.md | AI Assistant |
+| 2026-07-10 | v1.15 | 修复登录后个人界面不显示头像/昵称：userInfoAPK 兼容多种响应嵌套(data.data/data/req_0)与字段别名(nick/nickname/name 等)；头像缺失回退 qlogo(uin 拼接)保证必有图；Profile 头像/昵称双兜底。新增 DEV_PROFILE_AVATAR_FIX.md | AI Assistant |
+| 2026-07-10 | v1.16 | 播放器 UI 微交互增强：FloatPanel 搜索/队列/视觉面板进入动画(panelIn 下滑淡入+遮罩 fadeIn)；顶栏头像登录态脉冲环(avatar-pulse)；玻璃按钮按压下沉+微缩放；切歌标题/歌手淡入过渡。新增 DEV_PLAYER_UI_MICROINTERACTIONS.md | AI Assistant |
