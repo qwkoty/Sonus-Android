@@ -22,55 +22,77 @@
 初始状态：**全部 `clayDepth = 0`**（所有粒子在前层 → 完整清晰封面）
 
 播放时驱动：
-- **随机脱落**：每帧有极小概率选一些粒子开始"下沉"
+- **随机脱落**：每帧随机选一批粒子开始"下沉"（完全随机位置）
 - **频谱驱动脱落**：高频能量高的区域更容易"脱落"（像被音乐震松）
-- **自动回弹**：沉到底的粒子会缓慢浮回前层（腻子的"粘性"）
-- **平滑过渡**：用 ease-in-out 插值，不是瞬移
+- **自动回弹**：沉到后层的粒子会浮回前层（腻子的"粘性"）
+- **平滑过渡**：弹簧积分（非瞬移）
+- **硬上限保护**：同时处于"脱落"状态的粒子数封顶 → **无论怎么调，封面始终 ≥90% 完整**
 
 ```js
-// 新增缓冲区（替代静态 coverLayer）
+// 缓冲区（每粒子独立状态）
 const clayDepth = new Float32Array(COUNT);      // 每粒子当前深度 [0,1]
 const clayTarget = new Float32Array(COUNT);     // 每粒子目标深度 [0,1]
 const clayVel = new Float32Array(COUNT);         // 每粒子深度变化速度
-const CLAY_FALL_RATE = 0.002;                   // 每帧随机脱落概率（约0.2%/帧 ≈ 40粒子/秒）
-const CLAY_RETURN_SPEED = 0.15;                 // 回弹速度（每帧向0靠近的系数）
-const CLAY_SPECTRUM_TRIGGER = 0.6;              // 频谱超过此值触发该粒子脱落
+const CLAY_FALL_RATE = 0.004;                  // 每帧随机脱落尝试系数（≈79 次/帧）
+const CLAY_SPECTRUM_TRIGGER = 0.55;            // 频谱超过此值触发该粒子脱落
+const CLAY_RETURN_DECAY = 0.972;              // 目标回弹衰减（每帧）：越大→脱落挂得越久、回得越慢
+const MAX_CLAY_FALLEN = 2000;                 // 同时"脱落中"粒子硬上限（≈10%）→ 保证封面始终完整
+let clayFallenCount = 0;                       // 上一帧脱落中粒子数（用于上限约束）
 ```
 
-### 动画循环逻辑（每帧在 animate 中执行）
+### 为什么「每帧触发数」≠「可见运动粒子数」（v1.13 关键修正）
+
+> 用户反馈：之前每帧只看到约 40 个粒子在动（"不能只有 40 个"）。
+> 根因：上一版回弹极慢（`0.997` 衰减 → 单粒子脱落持续 ~200 帧 ≈ 3.3s 才浮回），
+> 导致粒子"掉一次就冻在后面"，只有每帧新触发的 40 个在动，其余 8000+ 静止堆积在后方 → 既显得少、封面又像被掏空。
+
+**正确做法**：让回弹变快（`0.972` → 单粒子脱落周期 ~0.8~1s），粒子**持续起落**；
+同时用 `MAX_CLAY_FALLEN` 硬上限把"同时脱落数"锁在 ~2000，**稳态下始终有 ≈1500~2000 个粒子在运动**（随机位置、封面仍完整、落了会回、回了又落）。
+
+稳态估算（弹簧+衰减模型）：触发通量 × 单粒子脱落时长 ≈ 同时脱落数。
+回弹加速后单粒子脱落时长 ≈ 25~50 帧，触发通量（随机+频谱）≈ 130/帧（播放时），
+理论 ≈ 3250 > 上限 2000 → 由上限钳到 2000；待机时通量 ≈ 79/帧 → 约 1580。
+两者均落在「≈1500+ 在动、封面 ≥90% 完整」目标区间内。
+
+### 动画循环逻辑（每帧在 animate 中执行，v1.13 实现）
 
 ```js
-// 1. 随机脱落（始终少量进行）
-if (!hasData || Math.random() < 0.3) {
-  for (let fi = 0; fi < COUNT * CLAY_FALL_RATE + 1; fi++) {
+const fallBudget = Math.max(0, MAX_CLAY_FALLEN - clayFallenCount); // 距上限还差多少名额
+
+// 1. 随机脱落（始终进行，完全随机位置；接近上限时自动收敛）
+if (hasData || Math.random() < 0.12) {        // 待机极少量"活"的呼吸，播放后大量脱落
+  const attempts = Math.floor(COUNT * CLAY_FALL_RATE) + 1;
+  for (let fi = 0; fi < attempts && fi < fallBudget; fi++) {
     const ri = Math.floor(Math.random() * COUNT);
-    if (clayDepth[ri] < 0.15) {
-      // 从前层脱落到随机后层深度
-      clayTarget[ri] = 0.5 + Math.random() * 0.5; // 掉到 0.5~1.0
-    }
+    if (clayDepth[ri] < 0.12) clayTarget[ri] = 0.5 + Math.random() * 0.5; // 掉到中后层
   }
 }
 
-// 2. 频谱驱动脱落（播放中：高频区域更易脱落）
-if (hasData) {
-  for (let di = 0; di < COUNT; di += 20) { // 每20个粒子抽检一次（性能）
-    const ri = (di + Math.floor(time * 30)) % COUNT;
-    const bandIdx = Math.min(63, Math.floor(distFromCenter[ri] * 63));
-    if (spectrumSmooth[bandIdx] > CLAY_SPECTRUM_TRIGGER && clayDepth[ri] < 0.2 && Math.random() < 0.08) {
+// 2. 频谱驱动脱落（播放中：能量高的区域更易脱落，与音乐联动）
+if (hasData && clayFallenCount < MAX_CLAY_FALLEN) {
+  const spOff = Math.floor(time * 60) % COUNT;
+  for (let di = 0; di < COUNT; di += 25) {
+    const ri = (di + spOff) % COUNT;
+    const bIdx = Math.min(63, Math.floor(distFromCenter[ri] * 63));
+    if (spectrumSmooth[bIdx] > CLAY_SPECTRUM_TRIGGER && clayDepth[ri] < 0.18 && Math.random() < 0.07) {
       clayTarget[ri] = 0.4 + Math.random() * 0.6;
     }
   }
 }
 
-// 3. 每粒子弹簧积分（深度过渡）
+// 3. 每粒子弹簧积分（平滑过渡 + 自动回弹）+ 统计脱落中粒子数
+let fc = 0;
 for (let ci = 0; ci < COUNT; ci++) {
   const diff = clayTarget[ci] - clayDepth[ci];
-  clayVel[ci] += diff * 8.0 * dt;           // 弹簧力
-  clayVel[ci] *= Math.pow(0.92, dt * 60);   // 阻尼
+  clayVel[ci] += diff * 8.0 * dt;
+  clayVel[ci] *= Math.pow(0.92, dt * 60);      // 阻尼
   clayDepth[ci] += clayVel[ci] * dt;
-  // 自动回弹：目标缓慢衰减回0
-  clayTarget[ci] *= Math.pow(0.995, dt * 60);
+  if (clayDepth[ci] < 0) clayDepth[ci] = 0;     // 钳制避免弹簧过冲
+  else if (clayDepth[ci] > 1) clayDepth[ci] = 1;
+  clayTarget[ci] *= Math.pow(CLAY_RETURN_DECAY, dt * 60); // 目标衰减回0 → 自动浮回前层
+  if (clayDepth[ci] > 0.12) fc++;
 }
+clayFallenCount = fc; // 供下一帧上限约束使用
 ```
 
 ### 在 coverflow 动画分支中使用 clayDepth
@@ -127,10 +149,11 @@ const layerDim = 1.0 - clayDepth[i] * 0.75;
 ## 四、验收标准
 
 - [ ] 初始状态（无播放/刚切歌）：所有粒子在同一平面，呈现**完整的专辑封面**（可辨认图案/文字）
-- [ ] 播放时有个别粒子逐渐"掉"到后方并浮回（腻子脱落感）
+- [ ] 播放时**大量（≈1500+）随机位置**的粒子持续"掉"到后方再浮回（腻子脱落感，不再是只有几十个在动）
+- [ ] 即便有粒子脱落，**封面始终完整**（同时脱落数被 `MAX_CLAY_FALLEN=2000` 限制，≤10%）
+- [ ] 脱落粒子会**自动浮回前层，随后又有新的落下去**，形成连续不断的循环
 - [ ] 高频能量强的区域脱落更多（与音乐关联）
-- [ ] 脱落过程是平滑过渡（非瞬跳）
-- [ ] 大部分粒子始终在前层（封面主体保持可读）
+- [ ] 脱落过程是平滑过渡（弹簧积分，非瞬跳）
 - [ ] `vite build` 通过
 
 ## 五、风险与回退

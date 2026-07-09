@@ -274,8 +274,11 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
     const clayVel = new Float32Array(COUNT);         // 深度变化速度
     const clayPhaseX = new Float32Array(COUNT);     // 有机位移相位 X
     const clayPhaseY = new Float32Array(COUNT);     // 有机位移相位 Y
-    const CLAY_FALL_RATE = 0.002;                   // 每帧随机脱落概率
+    const CLAY_FALL_RATE = 0.004;                  // 每帧随机脱落尝试系数（≈79 次/帧）
     const CLAY_SPECTRUM_TRIGGER = 0.55;            // 频谱触发脱落阈值
+    const CLAY_RETURN_DECAY = 0.972;               // 目标回弹衰减（每帧）：越大→脱落挂得越久、回得越慢
+    const MAX_CLAY_FALLEN = 2000;                  // 同时"脱落中"粒子硬上限（≈10%）→ 保证封面始终完整
+    let clayFallenCount = 0;                       // 上一帧脱落中粒子数（用于上限约束）
 
     const buildBase = () => {
       const grng = mulberry32(0x9e3779b9); // 稳定种子 → 星系形态固定
@@ -786,15 +789,21 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
       const invRmax = 1 / Rmax; // 预计算倒数，避免每粒子多次除法
 
       // ═══ 粒子封面「腻子脱落」模拟：每帧驱动 clayDepth ═══
-      // 1) 随机脱落（始终少量进行，营造"活"的感觉）
-      for (let fi = 0; fi < COUNT * CLAY_FALL_RATE + 1; fi++) {
-        const ri = Math.floor(Math.random() * COUNT);
-        if (clayDepth[ri] < 0.12) {
-          clayTarget[ri] = 0.5 + Math.random() * 0.5; // 掉到中后层
+      // 目标：让 ≈1500+ 粒子持续、随机地"掉到后层再浮回"，但封面始终完整
+      //      （靠 MAX_CLAY_FALLEN 硬上限约束同时脱落数 → 最多 ~10% 粒子在后层）
+      const fallBudget = Math.max(0, MAX_CLAY_FALLEN - clayFallenCount);
+      // 1) 随机脱落（始终进行，完全随机位置；接近上限时自动收敛）
+      if (hasData || Math.random() < 0.12) {       // 待机极少量"活"的呼吸，播放后大量脱落
+        const attempts = Math.floor(COUNT * CLAY_FALL_RATE) + 1;
+        for (let fi = 0; fi < attempts && fi < fallBudget; fi++) {
+          const ri = Math.floor(Math.random() * COUNT);
+          if (clayDepth[ri] < 0.12) {
+            clayTarget[ri] = 0.5 + Math.random() * 0.5; // 掉到中后层（随机深度）
+          }
         }
       }
-      // 2) 频谱驱动脱落（播放时：高频能量高的区域更易脱落）
-      if (hasData) {
+      // 2) 频谱驱动脱落（播放时：能量高的区域更易脱落，与音乐联动）
+      if (hasData && clayFallenCount < MAX_CLAY_FALLEN) {
         const spOff = Math.floor(time * 60) % COUNT; // 时间偏移避免每帧同一批粒子
         for (let di = 0; di < COUNT; di += 25) {
           const ri = (di + spOff) % COUNT;
@@ -804,14 +813,19 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
           }
         }
       }
-      // 3) 每粒子弹簧积分（平滑深度过渡 + 自动回弹）
+      // 3) 每粒子弹簧积分（平滑深度过渡 + 自动回弹）+ 统计脱落中粒子数
+      let fc = 0;
       for (let ci = 0; ci < COUNT; ci++) {
         const diff = clayTarget[ci] - clayDepth[ci];
         clayVel[ci] += diff * 8.0 * dt;
         clayVel[ci] *= Math.pow(0.92, dt * 60);   // 阻尼
         clayDepth[ci] += clayVel[ci] * dt;
-        clayTarget[ci] *= Math.pow(0.997, dt * 60); // 目标缓慢衰减回0 → 粒子自动浮回前层
+        if (clayDepth[ci] < 0) clayDepth[ci] = 0;  // 钳制，避免弹簧过冲变负
+        else if (clayDepth[ci] > 1) clayDepth[ci] = 1;
+        clayTarget[ci] *= Math.pow(CLAY_RETURN_DECAY, dt * 60); // 目标衰减回0 → 自动浮回前层
+        if (clayDepth[ci] > 0.12) fc++;
       }
+      clayFallenCount = fc;
 
       for (let i = 0; i < COUNT; i++) {
         const u = origUV[i * 2];
