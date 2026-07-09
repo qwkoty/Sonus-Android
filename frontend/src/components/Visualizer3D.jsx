@@ -278,6 +278,7 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
     const CLAY_SPECTRUM_TRIGGER = 0.55;            // 频谱触发脱落阈值
     const CLAY_RETURN_DECAY = 0.972;               // 目标回弹衰减（每帧）：越大→脱落挂得越久、回得越慢
     const MAX_CLAY_FALLEN = 2000;                  // 同时"脱落中"粒子硬上限（≈10%）→ 保证封面始终完整
+    const CLAY_FALL_DEPTH_SCALE = 0.6;             // 脱落凹陷深度缩放（1=原0.30画幅，0.6≈0.18画幅，避免破洞）
     let clayFallenCount = 0;                       // 上一帧脱落中粒子数（用于上限约束）
 
     const buildBase = () => {
@@ -505,10 +506,10 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
         const s = sampleCover(u, v);
         const boost = 1.45;
         const minBright = 0.35;
-        // 动态深度混合：clayDepth=0→纯封面，clayDepth=1→纯主题色光晕
+        // 动态深度混合：clayDepth 只做极轻微明暗/微染，脱落粒子仍保持封面色 → 封面始终清晰
         const cd = clayDepth[i]; // [0,1]
-        const li = 1.0 - cd * 0.75;       // 深度0→亮1.0, 深度1→暗0.25
-        const am = cd * 0.9;              // 深度0→纯封面, 深度1→90%主题色
+        const li = 1.0 - cd * 0.20;       // 深度0→亮1.0, 深度1→亮0.80（仍清晰可辨）
+        const am = cd * 0.15;             // 深度0→纯封面, 深度1→仅15%主题色微染（立体感，不洗图案）
         colorAttr.array[i * 3]     = Math.min(1, (Math.max(s[0] * boost, minBright * (0.8 + s[0])) * (1 - am) + accentRGB.r * am) * li);
         colorAttr.array[i * 3 + 1] = Math.min(1, (Math.max(s[1] * boost, minBright * (0.8 + s[1])) * (1 - am) + accentRGB.g * am) * li);
         colorAttr.array[i * 3 + 2] = Math.min(1, (Math.max(s[2] * boost, minBright * (0.8 + s[2])) * (1 - am) + accentRGB.b * am) * li);
@@ -939,7 +940,7 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
         } else if (targetShape === 'coverflow') {
           // ═══ 粒子封面「腻子脱落」动画：全部粒子初始在前层(完整封面)，播放时个别粒子掉到后层再浮回 ═══
           const cd = clayDepth[i];           // 当前深度 [0,1]
-          const layerZ = cd * planeSize * LAYER_GAP * (COVER_LAYERS - 1); // 深度→Z偏移
+          const layerZ = cd * planeSize * LAYER_GAP * (COVER_LAYERS - 1) * CLAY_FALL_DEPTH_SCALE; // 深度→Z偏移（收敛，避免破洞）
 
           // 呼吸（整体轻微深度起伏，深层粒子相位略不同）
           const breathe = hasData
@@ -1182,8 +1183,8 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
           }
 
           const outFactor = 1 - dc * 0.25;
-          // 错层：后层更暗（动态 clayDepth 驱动，即使无封面也呈现层次感）
-          const layerDim = 1.0 - clayDepth[i] * 0.75; // 深度0→亮1.0
+          // 错层：后层仅轻微变暗（动态 clayDepth 驱动，脱落粒子仍清晰可见）
+          const layerDim = 1.0 - clayDepth[i] * 0.20; // 深度0→亮1.0, 深度1→亮0.80
           // 全息微闪：高频时粒子亮度随机微跳（仅 coverflow）
           const holoFlicker = (targetShape === 'coverflow') ? trebleSmooth * 0.12 * ((i * 0.13) % 1) : 0;
           colorAttr.array[i * 3]     = Math.min(1, ar_mod * intensity * outFactor * layerDim + bassPulse * 0.65 + holoFlicker);
