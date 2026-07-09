@@ -208,10 +208,12 @@ export default function Player({ onProfile }) {
     setSearching(true);
     const initMap = Object.fromEntries(sources.map(s => [s.id, { list: [], loading: true, loggedIn: false, name: s.name }]));
     setSearchMap(initMap);
+    // 不需要登录即可搜索的音源（搜索接口是公开的）
+    const noAuthSources = ['netease'];
     try {
       await Promise.all(sources.map(async (s) => {
         const creds = getSourceCreds(s.id);
-        if (!creds.isLoggedIn) {
+        if (!creds.isLoggedIn && !noAuthSources.includes(s.id)) {
           setSearchMap(prev => ({ ...prev, [s.id]: { ...prev[s.id], loading: false, loggedIn: false } }));
           return;
         }
@@ -220,7 +222,7 @@ export default function Player({ onProfile }) {
           const list = await adapter.search(kw, 50);
           setSearchMap(prev => ({ ...prev, [s.id]: { ...prev[s.id], list: list || [], loading: false, loggedIn: true } }));
         } catch (e) {
-          setSearchMap(prev => ({ ...prev, [s.id]: { ...prev[s.id], list: [], loading: false, loggedIn: true } }));
+          setSearchMap(prev => ({ ...prev, [s.id]: { ...prev[s.id], list: [], loading: false, loggedIn: true, searchError: e.message || '搜索失败' } }));
         }
       }));
     } catch (e) {
@@ -423,12 +425,14 @@ export default function Player({ onProfile }) {
                 {SEARCH_SOURCE_TABS.map(tab => {
                   if (tab.id !== activeSearchSource) return null;
                   const entry = searchMap[tab.id] || { list: [], loading: false, loggedIn: false };
+                  const isNoAuth = tab.id === 'netease'; // 网易云搜索不需要登录
                   return (
                     <div key={tab.id}>
                       {entry.loading ? <div style={{ display: 'flex', justifyContent: 'center', padding: 14 }}><Loader2 size={16} className="spin-icon" color={tab.color} /></div>
-                        : !entry.loggedIn ? <div style={{ padding: '18px 6px', color: 'var(--text-muted)', fontSize: 12, textAlign: 'center' }}>未登录，无法显示 {tab.name} 的搜索结果</div>
-                          : entry.list.length === 0 ? <div style={{ padding: '18px 6px', color: 'var(--text-muted)', fontSize: 12, textAlign: 'center' }}>无结果</div>
-                            : entry.list.map(t => <Row key={t.id} track={t} active={currentTrack?.id === t.id} onPlay={tr => { playTrack(tr); setSq(false); }} />)}
+                        : !entry.loggedIn && !isNoAuth ? <div style={{ padding: '18px 6px', color: 'var(--text-muted)', fontSize: 12, textAlign: 'center' }}>未登录，无法显示 {tab.name} 的搜索结果</div>
+                          : entry.searchError ? <div style={{ padding: '18px 6px', color: 'var(--text-muted)', fontSize: 12, textAlign: 'center' }}>{entry.searchError}</div>
+                            : entry.list.length === 0 ? <div style={{ padding: '18px 6px', color: 'var(--text-muted)', fontSize: 12, textAlign: 'center' }}>无结果</div>
+                              : entry.list.map(t => <Row key={t.id} track={t} active={currentTrack?.id === t.id} onPlay={tr => { playTrack(tr); setSq(false); }} />)}
                     </div>
                   );
                 })}
