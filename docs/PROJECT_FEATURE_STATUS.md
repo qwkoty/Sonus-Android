@@ -219,3 +219,4 @@
 | 2026-07-10 | v1.14 | 粒子封面脱落「保持清晰可读」修正：applyCoverColors 脱落粒子亮度 0.25→0.80、主题色混合 90%→15%（保持封面色不洗图案）；待机着色脱落变暗 75%→20%；新增 CLAY_FALL_DEPTH_SCALE=0.6 把凹陷从 0.30 画幅收到≈0.18 画幅消除透视破洞；脱落动效与自动回弹不变。新增 DEV_COVERFLOW_READABLE.md | AI Assistant |
 | 2026-07-10 | v1.15 | 修复登录后个人界面不显示头像/昵称：userInfoAPK 兼容多种响应嵌套(data.data/data/req_0)与字段别名(nick/nickname/name 等)；头像缺失回退 qlogo(uin 拼接)保证必有图；Profile 头像/昵称双兜底。新增 DEV_PROFILE_AVATAR_FIX.md | AI Assistant |
 | 2026-07-10 | v1.16 | 播放器 UI 微交互增强：FloatPanel 搜索/队列/视觉面板进入动画(panelIn 下滑淡入+遮罩 fadeIn)；顶栏头像登录态脉冲环(avatar-pulse)；玻璃按钮按压下沉+微缩放；切歌标题/歌手淡入过渡。新增 DEV_PLAYER_UI_MICROINTERACTIONS.md | AI Assistant |
+| 2026-07-10 | v1.17 | 修复多源头像昵称交叉污染：Player 顶栏移除昵称按钮（用户要求不显示）；Profile 头像兜底按源区分（仅 QQ 用 qlogo，网易云/酷狗不跨用 QQ 头像服务）；neteaseSource.userInfo 增加多路径字段提取(nickname/name/userName 等)。新增 DEV_FIX_MULTI_SOURCE_AVATAR.md | AI Assistant |
