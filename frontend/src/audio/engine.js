@@ -83,11 +83,14 @@ export function getSpectrumBars(numBars = 64, gain = 1.04) { // gain 1.12→1.04
   const result = spectrumBuf;
   const logMin = 0;
   const logMax = Math.log(usableBins);
+  // 域B(v1.23)：凸形 warp → 低频段分配更多 bar（人耳/音乐低频信息更丰富，高频本就稀疏）；
+  // W(x)=x^p(p>1) 使低 bar 对应更窄的 log 频宽，低频被细分得更细，高频被压缩。
+  const LOW_FREQ_WARP = 1.35;
   let totalEnergy = 0;
 
   for (let i = 0; i < numBars; i++) {
-    const ratio0 = i / numBars;
-    const ratio1 = (i + 1) / numBars;
+    const ratio0 = Math.pow(i / numBars, LOW_FREQ_WARP);
+    const ratio1 = Math.pow((i + 1) / numBars, LOW_FREQ_WARP);
     const binStart = Math.floor(Math.exp(logMin + ratio0 * (logMax - logMin)));
     const binEnd = Math.max(binStart + 1, Math.floor(Math.exp(logMin + ratio1 * (logMax - logMin))));
     const clampedEnd = Math.min(binEnd, usableBins);

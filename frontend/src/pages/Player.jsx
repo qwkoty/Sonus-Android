@@ -172,7 +172,7 @@ function FloatPanel({ open, onClose, title, width = 360, children }) {
   return (
     <>
       <div className="animate-fadeIn" style={{ position: 'fixed', inset: 0, zIndex: 180 }} onClick={onClose} />
-      <div className="glass-panel animate-panelIn" style={{ position: 'absolute', top: 70, right: 14, width: `min(${width}px, calc(100vw - 28px))`, maxHeight: '70vh', borderRadius: 20, zIndex: 190, display: 'flex', flexDirection: 'column', overflow: 'hidden', transform: dragY ? `translateY(${dragY}px)` : undefined, transition: dragY ? 'none' : undefined }}>
+      <div className="glass-panel animate-panelIn" style={{ position: 'absolute', top: 70, right: 14, width: `min(${width}px, calc(100vw - 28px))`, maxHeight: '70vh', borderRadius: 20, zIndex: 190, display: 'flex', flexDirection: 'column', overflow: 'hidden', transform: dragY ? `translateY(${dragY}px)` : undefined, transition: dragY ? 'none' : undefined, opacity: dragY ? Math.max(0.4, 1 - dragY / 360) : 1, backdropFilter: dragY ? `blur(${Math.max(2, 16 - dragY / 16)}px)` : undefined, WebkitBackdropFilter: dragY ? `blur(${Math.max(2, 16 - dragY / 16)}px)` : undefined }}>
         <div onTouchStart={onDown} onTouchMove={onMove} onTouchEnd={onUp} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', borderBottom: '1px solid rgba(255,255,255,0.06)', flexShrink: 0, cursor: 'grab', touchAction: 'none' }}>
           <span style={{ fontSize: 14, fontWeight: 760, letterSpacing: '.04em' }}>{title}</span>
           <button onClick={onClose} className="glass-button" style={{ width: 28, height: 28, borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><X size={14} color="var(--text-secondary)" /></button>
@@ -307,14 +307,17 @@ export default function Player({ onProfile }) {
       {/* 可视化背景层（承载横向滑动切模式手势） */}
       <div style={{ position: 'absolute', inset: 0 }} onTouchStart={onVizTouchStart} onTouchEnd={onVizTouchEnd}>
         <FloatingLyrics lyrics={lyrics} isPlaying={isPlaying} />
-        {vm === '3d' ? <Suspense key={`${currentTrack?.cover || currentTrack?.id || 'none'}-${v3m}`}><Visualizer3D accent={ac} cover={currentTrack?.cover || ''} mode={v3m} isPlaying={isPlaying} /></Suspense> : <Visualizer isPlaying={isPlaying} mode={vm} accent={ac} />}
+        {/* 域C(v1.23)：模式切换 150ms 淡入，避免硬切 */}
+        <div key={`${vm}:${v3m}`} style={{ position: 'absolute', inset: 0, animation: 'vizFadeIn .15s ease both' }}>
+          {vm === '3d' ? <Suspense key={`${currentTrack?.cover || currentTrack?.id || 'none'}-${v3m}`}><Visualizer3D accent={ac} cover={currentTrack?.cover || ''} mode={v3m} isPlaying={isPlaying} /></Suspense> : <Visualizer isPlaying={isPlaying} mode={vm} accent={ac} />}
+        </div>
         {lyricPanel && <LyricScroll currentLyric={currentLyric || ''} accent={ac} />}
       </div>
 
       {/* 模式指示点：点击切换可视化模式，当前模式高亮 */}
       <div style={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)', top: 'calc(54px + var(--safe-top))', zIndex: 50, display: 'flex', gap: 9, alignItems: 'center', padding: '6px 12px', borderRadius: 999, background: 'rgba(5,6,8,0.35)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }}>
         {VIZ_MODES.map(m => (
-          <button key={m.key} onClick={() => switchVm(m.key)} aria-label={m.label} style={{ width: vm === m.key ? 20 : 7, height: 7, borderRadius: 999, border: 'none', padding: 0, background: vm === m.key ? ac : 'rgba(255,255,255,0.28)', boxShadow: vm === m.key ? `0 0 8px ${ac}` : 'none', transition: 'all .2s ease', cursor: 'pointer' }} />
+          <button key={m.key} onClick={() => switchVm(m.key)} aria-label={m.label} className={vm === m.key ? 'mode-dot-active' : 'mode-dot'} style={{ width: vm === m.key ? 20 : 7, height: 7, borderRadius: 999, border: 'none', padding: 0, background: vm === m.key ? ac : 'rgba(255,255,255,0.28)', boxShadow: vm === m.key ? `0 0 8px ${ac}` : 'none', transition: 'all .2s ease', cursor: 'pointer' }} />
         ))}
       </div>
 

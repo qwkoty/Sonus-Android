@@ -77,12 +77,17 @@ function Visualizer({ isPlaying, mode = 'ring', accent = '#4FC3F7' }) {
       const rect = canvas.getBoundingClientRect();
       const px = (tapStart.x - rect.left) * dpr;
       const py = (tapStart.y - rect.top) * dpr;
+      // 域D(v1.23)：涟漪颜色随落点处频谱能量变化（能量高→更亮）
+      const ang = Math.atan2(py - cy, px - cx);
+      const barIdx = Math.min(NUM_BARS - 1, Math.max(0, Math.floor(((ang + Math.PI) / (Math.PI * 2)) * NUM_BARS)));
+      const tapEnergy = smoothRef.current[barIdx] || 0;
       shockwavesRef.current.push({
         radius: minDim * 0.02,
         alpha: 0.6,
         speed: minDim * 0.012,
         width: Math.max(2, minDim * 0.0035),
         cx: px, cy: py,
+        e: tapEnergy, // 落点能量，用于着色
       });
       if (shockwavesRef.current.length > 4) {
         shockwavesRef.current.splice(0, shockwavesRef.current.length - 4);
@@ -117,12 +122,15 @@ function Visualizer({ isPlaying, mode = 'ring', accent = '#4FC3F7' }) {
     const drawRadialWave = (spectrum, hasData) => {
       const C = palette();
       const data = spectrum;
-      const [H, S] = hexToHsl(accentRef.current);
+      const [H, S, L] = hexToHsl(accentRef.current);
 
       const smooth = smoothRef.current;
       for (let i = 0; i < NUM_BARS; i++) {
         smooth[i] += (data[i] - smooth[i]) * 0.32;
       }
+
+      // 域C(v1.23)：待机时 accent 色相极慢漂移(~8s)，让待机也"活着"但不抢戏
+      const idleHueShift = hasData ? 0 : Math.sin(tNow * (Math.PI * 2 / 8)) * 8;
 
       // 频段提取：bass / mid / treble
       const tNow = Date.now() * 0.001;
@@ -135,10 +143,10 @@ function Visualizer({ isPlaying, mode = 'ring', accent = '#4FC3F7' }) {
         for (let i = 28; i < NUM_BARS; i++) treble += smooth[i];
         treble /= (NUM_BARS - 28);
       } else {
-        // 待机动画：缓慢呼吸
+        // 待机动画：缓慢呼吸（域C v1.23：统一 ~8s 周期，更"活"但不抢戏）
         bass = 0.08 + Math.sin(tNow * 0.8) * 0.04;
-        mid = 0.05 + Math.sin(tNow * 1.2 + 1) * 0.03;
-        treble = 0.03 + Math.sin(tNow * 1.6 + 2) * 0.02;
+        mid = 0.05 + Math.sin(tNow * 0.8 + 1) * 0.03;
+        treble = 0.03 + Math.sin(tNow * 0.8 + 2) * 0.02;
       }
       bassSmoothRef.current += (bass - bassSmoothRef.current) * 0.18;
       const bassSmooth = bassSmoothRef.current;
@@ -176,11 +184,14 @@ function Visualizer({ isPlaying, mode = 'ring', accent = '#4FC3F7' }) {
         const freqIdx = Math.min(NUM_BARS - 1, Math.floor(layerProgress * NUM_BARS * 0.8));
         const layerValue = hasData ? smooth[freqIdx] : (0.04 + Math.sin(tNow * 0.8 + layer * 0.3) * 0.03);
         const alpha = (1 - layerProgress) * 0.06 + 0.02;
-        const hue = H + layerProgress * 30;
-        const lightness = 60 - layerProgress * 15;
+        // 域A(v1.23)：双色混合（accent → 邻近色），峰部偏亮、谷部偏暗，层次更立体
+        const layerHue = H + layerProgress * 30 + idleHueShift;   // 由中心 accent 向邻近色偏移（含待机色相漂移）
+        const peakBoost = layerValue * 16;                       // 能量越高(峰)越亮
+        const layerLight = 56 - layerProgress * 14 + peakBoost;  // 谷部偏暗、峰部偏亮
+        const layerSat = S * (0.85 + layerProgress * 0.15);      // 外圈略饱和
 
         ctx.save();
-        ctx.fillStyle = `hsla(${hue}, ${S}%, ${lightness}%, ${alpha + layerValue * 0.15})`;
+        ctx.fillStyle = `hsla(${layerHue}, ${layerSat}%, ${layerLight}%, ${alpha + layerValue * 0.15})`;
         ctx.beginPath();
         for (let s = 0; s <= FILL_STEPS; s++) {
           const angle = (s / FILL_STEPS) * Math.PI * 2;
@@ -295,9 +306,14 @@ function Visualizer({ isPlaying, mode = 'ring', accent = '#4FC3F7' }) {
         ctx.restore();
       }
 
-      // === 4.5 频谱尖刺：外圈向外发射的声波刺，增强范围感与动感（开销低：64 条短线）===
+      // === 4.5 频谱尖刺：外圈向外发射的声波刺（域A v1.23：径向羽化渐变，根部 accent → 尖端透明，消除硬线）===
       ctx.save();
-      ctx.strokeStyle = `hsla(${H}, ${S}%, 82%, 0.5)`;
+      const maxSpikeLen = minDim * 0.05;
+      const spikeGrad = ctx.createRadialGradient(cx, cy, MAX_R, cx, cy, MAX_R + maxSpikeLen);
+      spikeGrad.addColorStop(0, `hsla(${H}, ${S}%, ${Math.min(92, (L || 70) + 22)}%, 0.62)`);
+      spikeGrad.addColorStop(0.45, `hsla(${H}, ${S}%, 82%, 0.34)`);
+      spikeGrad.addColorStop(1, `hsla(${H}, ${S}%, 82%, 0)`);
+      ctx.strokeStyle = spikeGrad;
       ctx.lineWidth = Math.max(1, minDim * 0.0016);
       ctx.shadowColor = C.glow;
       ctx.shadowBlur = minDim * 0.006;
@@ -321,13 +337,16 @@ function Visualizer({ isPlaying, mode = 'ring', accent = '#4FC3F7' }) {
       for (let i = shocks.length - 1; i >= 0; i--) {
         const sw = shocks[i];
         sw.radius += sw.speed;
+        sw.speed *= 0.985; // 域D(v1.23)：半径增速衰减 → 涟漪 ease-out（先快后慢）
         sw.alpha *= 0.955;
         if (sw.alpha < 0.015 || sw.radius > minDim * 0.55) {
           shocks.splice(i, 1);
           continue;
         }
+        const e = sw.e || 0;
+        const light = 62 + e * 32; // 能量越高越亮
         ctx.save();
-        ctx.strokeStyle = `hsla(${H}, ${S}%, 75%, ${sw.alpha})`;
+        ctx.strokeStyle = `hsla(${H}, ${S}%, ${light}%, ${sw.alpha})`;
         ctx.lineWidth = sw.width;
         ctx.beginPath();
         ctx.arc(sw.cx !== undefined ? sw.cx : cx, sw.cy !== undefined ? sw.cy : cy, sw.radius, 0, Math.PI * 2);
@@ -335,14 +354,16 @@ function Visualizer({ isPlaying, mode = 'ring', accent = '#4FC3F7' }) {
         ctx.restore();
       }
 
-      // === 6. 外圈光晕 ===
-      const outerGrad = ctx.createRadialGradient(cx, cy, MAX_R * 0.7, cx, cy, MAX_R);
-      outerGrad.addColorStop(0, `hsla(${H}, ${S}%, 55%, 0)`);
-      outerGrad.addColorStop(0.7, `hsla(${H}, ${S}%, 55%, ${0.03 + bassSmooth * 0.04})`);
-      outerGrad.addColorStop(1, `hsla(${H}, ${S}%, 55%, 0)`);
+      // === 6. 外圈光晕（域A v1.23：径向羽化，多 stop 无硬边，扩散至边缘外）===
+      const outerGrad = ctx.createRadialGradient(cx, cy, MAX_R * 0.55, cx, cy, MAX_R * 1.06);
+      outerGrad.addColorStop(0, `hsla(${H + idleHueShift}, ${S}%, 55%, 0)`);
+      outerGrad.addColorStop(0.45, `hsla(${H + idleHueShift}, ${S}%, 55%, 0)`);
+      outerGrad.addColorStop(0.7, `hsla(${H + idleHueShift}, ${S}%, 58%, ${0.04 + bassSmooth * 0.05})`);
+      outerGrad.addColorStop(0.86, `hsla(${H + idleHueShift}, ${S}%, 62%, ${0.025 + bassSmooth * 0.03})`);
+      outerGrad.addColorStop(1, `hsla(${H + idleHueShift}, ${S}%, 55%, 0)`);
       ctx.fillStyle = outerGrad;
       ctx.beginPath();
-      ctx.arc(cx, cy, MAX_R, 0, Math.PI * 2);
+      ctx.arc(cx, cy, MAX_R * 1.06, 0, Math.PI * 2);
       ctx.fill();
 
       // === 7. 待机时的扩散涟漪（性能：3→2）===
@@ -409,19 +430,19 @@ function Visualizer({ isPlaying, mode = 'ring', accent = '#4FC3F7' }) {
         pointsUp.push({ x, y: yUp });
         pointsDown.push({ x, y: yDown });
 
-        // 每一根细柱：从中心向两侧由浅到深
+        // 每一根细柱：从中心向两侧由浅到深（域B v1.23：圆角加大+顶/底羽化，消除锯齿硬边）
         const colAlpha = 0.25 + value * 0.55;
         const gUp = ctx.createLinearGradient(0, midY, 0, yUp);
         gUp.addColorStop(0, hslaWithAlpha(C.inner, colAlpha));
-        gUp.addColorStop(1, hslaWithAlpha(C.outer, colAlpha * 0.6));
+        gUp.addColorStop(1, hslaWithAlpha(C.outer, colAlpha * 0.42));
         ctx.fillStyle = gUp;
-        roundRectFill(ctx, x - innerW / 2, yUp, innerW, midY - yUp, innerW * 0.2);
+        roundRectFill(ctx, x - innerW / 2, yUp, innerW, midY - yUp, innerW * 0.45);
 
         const gDown = ctx.createLinearGradient(0, midY, 0, yDown);
         gDown.addColorStop(0, hslaWithAlpha(C.inner, colAlpha));
-        gDown.addColorStop(1, hslaWithAlpha(C.outer, colAlpha * 0.45));
+        gDown.addColorStop(1, hslaWithAlpha(C.outer, colAlpha * 0.35));
         ctx.fillStyle = gDown;
-        roundRectFill(ctx, x - innerW / 2, midY, innerW, yDown - midY, innerW * 0.2);
+        roundRectFill(ctx, x - innerW / 2, midY, innerW, yDown - midY, innerW * 0.45);
       }
 
       // 顶部的发光描边（让镜像频谱更连贯柔和）

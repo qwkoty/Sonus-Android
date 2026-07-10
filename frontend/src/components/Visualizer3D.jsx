@@ -32,7 +32,7 @@ const DAMPING = 0.88;             // 速度阻尼
 const SHOCK_GAIN = 2.2;           // 2.6→2.2：冲击力稍减（v1.22）
 // —— 鼓点频率增强（与 beatPulse 平行的独立包络）——
 const BEAT_FREQ_BOOST_DECAY = 0.96; // 频率增强包络每帧衰减（鼓点后持续更久）
-const BEAT_PULSE_DECAY = 0.93;      // beatPulse 每帧衰减系数
+const BEAT_PULSE_DECAY = 0.90;      // beatPulse 每帧衰减系数（0.93→0.90：脉冲更"脆"、收得更快，v1.23）
 const GALAXY_BEAT_FREQ_GAIN = 2.6;  // galaxy：鼓点时频谱响应放大倍数
 const LIQUID_BEAT_FREQ_GAIN = 2.4;  // liquidmetal：鼓点时频谱响应放大倍数
 const COVER_LAYERS = 4;             // 粒子封面错层层数（前清后糊）
@@ -46,6 +46,12 @@ function mulberry32(a) {
     t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
+}
+
+// 平滑插值（色带/雾气过渡用，避免色带断层）
+function smoothstep(edge0, edge1, x) {
+  const t = Math.max(0, Math.min(1, (x - edge0) / (edge1 - edge0)));
+  return t * t * (3 - 2 * t);
 }
 
 function hexToRGB(hex) {
@@ -1091,7 +1097,7 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
           const tTheta = u * Math.PI * 2;
           const band = terrainBand[i];
           const energy = spectrumSmooth[band];
-          const freqWeight = (1 - rN);
+          const freqWeight = Math.pow(1 - rN, 1.3); // 域B(v1.23)：低频主峰更突出、外圈高频更收敛（视觉重心稳）
 
           // 运行时重新计算 fBm 山高（与 buildBase 同算法、同参数 → 形态一致）
           let terH = 0;
@@ -1138,12 +1144,15 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
           // 星河着色：内核=主题色(炽热)，外圈=封面平均色(冷)，加色混合辉光
           const rN = Math.min(1, galaxyR[i] * invRmax);
           const isHaloNow = galaxyArm[i] < 0 && !galaxyBulge[i];
-          const coreMix = Math.pow(1 - rN, 1.6);
+          const coreMix = Math.pow(1 - rN, 2.4); // 域A(v1.23)：更非线性 → 炽热内核更聚拢、外晕更冷
           const cr = accentRGB.r, cg = accentRGB.g, cb = accentRGB.b;
           const ar = cavg.r, ag = cavg.g, ab = cavg.b;
           let r = cr * coreMix + ar * (1 - coreMix);
           let g = cg * coreMix + ag * (1 - coreMix);
           let b = cb * coreMix + ab * (1 - coreMix);
+          // 域A(v1.23)：炽热内核偏暖（r↑、b↓），色温梯度更明显
+          r += coreMix * 0.28;
+          b -= coreMix * 0.10;
 
           // 弥散晕偏冷、偏暗，形成背景星尘
           if (isHaloNow) {
@@ -1183,53 +1192,49 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
           colorAttr.array[i * 3 + 1] = Math.min(1, g * intensity + twinkleBoost);
           colorAttr.array[i * 3 + 2] = Math.min(1, b * intensity + twinkleBoost);
         } else if (isTerrain) {
-          // 地形着色：色带 + 雾气 + 峰顶辉光 + 动态等高线 + 音频点亮
+          // 地形着色(v1.23 域A)：3-4 段平滑色带(深蓝紫谷底→accent山腰→雪顶近白) + 坡度受光 + 指数雾 + 峰顶辉光
           const rN = Math.sqrt(v); // 0=中心, 1=外圈
           const band = terrainBand[i];
           const energy = spectrumSmooth[band];
           const normH = Math.max(0, Math.min(1, (y / planeSize + 0.30) / 0.98));
 
-          // 谷底深色
-          let r = accentRGB.r * 0.06 + 0.015;
-          let g = accentRGB.g * 0.06 + 0.02;
-          let b = accentRGB.b * 0.10 + 0.03;
+          // 平滑色带：谷底深蓝紫 → 山腰 accent → 雪顶近白（smoothstep 过渡，无断层）
+          const tLo = smoothstep(0.0, 0.42, normH);  // 谷底 → 山腰
+          const tHi = smoothstep(0.42, 1.0, normH);  // 山腰 → 雪顶
+          const vr = 0.04, vg = 0.06, vb = 0.15;     // 谷底深蓝紫（独立于 accent，保证冷调纵深）
+          let r = vr + (accentRGB.r - vr) * tLo;
+          let g = vg + (accentRGB.g - vg) * tLo;
+          let b = vb + (accentRGB.b - vb) * tLo;
+          // 山腰 → 雪顶（仅上半段叠加）
+          r += (0.92 - accentRGB.r) * tHi;
+          g += (0.96 - accentRGB.g) * tHi;
+          b += (1.0  - accentRGB.b) * tHi;
 
-          // 坡面 accent
-          r += normH * accentRGB.r * 0.72;
-          g += normH * accentRGB.g * 0.72;
-          b += normH * accentRGB.b * 0.72;
-
-          // 峰顶泛白（雪顶）
-          const crest = Math.max(0, (normH - 0.62) / 0.38);
-          r += crest * 0.58;   // 0.7→0.58：雪顶回调（v1.22）
-          g += crest * 0.58;
-          b += crest * 0.6;
-
-          // 谷底压暗（增加纵深）
-          const vally = Math.max(0, (0.30 - normH) / 0.30);
-          r *= (1 - vally * 0.55);
-          g *= (1 - vally * 0.55);
-          b *= (1 - vally * 0.55);
+          // 坡度受光（陡坡/山脊更亮，像受光面）：用 ridged 项近似坡度
+          const ridgeNow = Math.abs(Math.sin(tTheta * trFreq[0] * 0.7 + rN * 11.0 + trPhase[0] * 1.3));
+          const slopeGlow = ridgeNow * Math.max(0, normH - 0.08) * 0.22;
+          r += slopeGlow * 0.5; g += slopeGlow * 0.5; b += slopeGlow * 0.62;
 
           // 伪漫反射：固定光源(右上)方向，用高度坡度近似法线 → 立体感
           const slopeProxy = Math.abs(rN - 0.35) * 1.6 + Math.sin(u * 50 + i * 0.03) * 0.2;
           const diffuse = 0.55 + 0.45 * Math.max(0, Math.cos(slopeProxy * Math.PI * 0.8 + 0.4));
           r *= diffuse; g *= diffuse; b *= diffuse;
 
-          // —— 低处流动雾（平坦时雾浓，升起后雾散；雾随时间缓慢漂移，更"活"）——
-          const fogDensity = Math.max(0, (0.20 - normH) / 0.20) * 0.50 * (1 - terrainRise * 0.7)
+          // —— 低处指数雾（平坦时雾浓，升起后雾散；随时间缓慢漂移，更"活"）——
+          const fogDensity = Math.pow(Math.max(0, (0.22 - normH) / 0.22), 1.6) * 0.55 * (1 - terrainRise * 0.6)
                              * (0.8 + 0.2 * Math.sin(time * 0.25 + u * 5 + v * 3)); // 流动相位（v1.21）
           r += fogDensity * 0.12;
           g += fogDensity * 0.15;
           b += fogDensity * 0.22;
 
           // —— 峰顶音频辉光（播放时山峰发光）——
+          const crest = Math.max(0, (normH - 0.62) / 0.38);
           const audioGlow = energy * 0.55 * terrainRise * crest; // 0.40→0.55（v1.21）
           r += audioGlow * accentRGB.r * 0.5;
           g += audioGlow * accentRGB.g * 0.5;
           b += audioGlow * accentRGB.b * 0.6;
 
-          // 等高线：全高时亮度 ×2（更惊艳）
+          // 等高线：全高时更明显
           const N = 11;
           const cf = Math.abs((normH * N - Math.floor(normH * N)) - 0.5);
           const contourBoost = 1 + terrainRise * 1.6; // 1.0→1.6：等高线更明显（v1.21）
