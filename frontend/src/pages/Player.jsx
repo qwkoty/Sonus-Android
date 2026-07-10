@@ -162,12 +162,18 @@ function Sheet({ open, onClose, title, children, h = '78vh' }) {
 }
 
 function FloatPanel({ open, onClose, title, width = 360, children }) {
+  const [dragY, setDragY] = useState(0);
+  const dragRef = useRef(null);
   if (!open) return null;
+  // 表头下拉关闭：向下拖拽超过阈值即关闭
+  const onDown = (e) => { const t = e.touches ? e.touches[0] : e; dragRef.current = { y: t.clientY, active: true }; };
+  const onMove = (e) => { if (!dragRef.current?.active) return; const t = e.touches ? e.touches[0] : e; const dy = Math.max(0, t.clientY - dragRef.current.y); setDragY(dy); };
+  const onUp = () => { if (!dragRef.current?.active) return; dragRef.current.active = false; if (dragY > 120) onClose(); setDragY(0); };
   return (
     <>
       <div className="animate-fadeIn" style={{ position: 'fixed', inset: 0, zIndex: 180 }} onClick={onClose} />
-      <div className="glass-panel animate-panelIn" style={{ position: 'absolute', top: 70, right: 14, width: `min(${width}px, calc(100vw - 28px))`, maxHeight: '70vh', borderRadius: 20, zIndex: 190, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', borderBottom: '1px solid rgba(255,255,255,0.06)', flexShrink: 0 }}>
+      <div className="glass-panel animate-panelIn" style={{ position: 'absolute', top: 70, right: 14, width: `min(${width}px, calc(100vw - 28px))`, maxHeight: '70vh', borderRadius: 20, zIndex: 190, display: 'flex', flexDirection: 'column', overflow: 'hidden', transform: dragY ? `translateY(${dragY}px)` : undefined, transition: dragY ? 'none' : undefined }}>
+        <div onTouchStart={onDown} onTouchMove={onMove} onTouchEnd={onUp} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', borderBottom: '1px solid rgba(255,255,255,0.06)', flexShrink: 0, cursor: 'grab', touchAction: 'none' }}>
           <span style={{ fontSize: 14, fontWeight: 760, letterSpacing: '.04em' }}>{title}</span>
           <button onClick={onClose} className="glass-button" style={{ width: 28, height: 28, borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><X size={14} color="var(--text-secondary)" /></button>
         </div>
@@ -255,6 +261,33 @@ export default function Player({ onProfile }) {
   const openSearch = () => { setSq(true); setViz(false); };
   const openViz = () => { setViz(true); setSq(false); };
 
+  // 触觉反馈（Web 标准，Android WebView 支持；iOS 静默降级）
+  const buzz = (ms) => { try { if (navigator.vibrate) navigator.vibrate(ms); } catch { } };
+
+  // 横向滑动切换可视化模式（快扫触发，避免与 3D 旋转拖拽冲突）
+  const swipeRef = useRef({ x: 0, y: 0, t: 0, active: false });
+  const onVizTouchStart = (e) => {
+    const t = e.touches ? e.touches[0] : e;
+    swipeRef.current = { x: t.clientX, y: t.clientY, t: Date.now(), active: true };
+  };
+  const onVizTouchEnd = (e) => {
+    const s = swipeRef.current;
+    if (!s.active) return;
+    s.active = false;
+    const t = e.changedTouches ? e.changedTouches[0] : e;
+    const dx = t.clientX - s.x, dy = t.clientY - s.y;
+    const dt = Date.now() - s.t;
+    if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5 && dt < 400) {
+      const idx = VIZ_MODES.findIndex(m => m.key === vm);
+      const dir = dx < 0 ? 1 : VIZ_MODES.length - 1; // 左滑=下一个，右滑=上一个
+      const nm = VIZ_MODES[(idx + dir) % VIZ_MODES.length].key;
+      setVm(nm);
+      try { localStorage.setItem('sonus_viz_mode', nm); } catch { }
+      buzz(12);
+    }
+  };
+  const switchVm = (key) => { setVm(key); try { localStorage.setItem('sonus_viz_mode', key); } catch { } buzz(10); };
+
   // 内嵌进度条（mini 不显示时间，full 显示时间）—— 复用于统一 Now-Playing 栏
   const ProgressStrip = ({ showTimes }) => (
     <div style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%' }}>
@@ -271,11 +304,18 @@ export default function Player({ onProfile }) {
 
   return (
     <div style={{ height: '100%', position: 'relative', overflow: 'hidden', background: '#000' }}>
-      {/* 可视化背景层 */}
-      <div style={{ position: 'absolute', inset: 0 }}>
+      {/* 可视化背景层（承载横向滑动切模式手势） */}
+      <div style={{ position: 'absolute', inset: 0 }} onTouchStart={onVizTouchStart} onTouchEnd={onVizTouchEnd}>
         <FloatingLyrics lyrics={lyrics} isPlaying={isPlaying} />
         {vm === '3d' ? <Suspense key={`${currentTrack?.cover || currentTrack?.id || 'none'}-${v3m}`}><Visualizer3D accent={ac} cover={currentTrack?.cover || ''} mode={v3m} isPlaying={isPlaying} /></Suspense> : <Visualizer isPlaying={isPlaying} mode={vm} accent={ac} />}
         {lyricPanel && <LyricScroll currentLyric={currentLyric || ''} accent={ac} />}
+      </div>
+
+      {/* 模式指示点：点击切换可视化模式，当前模式高亮 */}
+      <div style={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)', top: 'calc(54px + var(--safe-top))', zIndex: 50, display: 'flex', gap: 9, alignItems: 'center', padding: '6px 12px', borderRadius: 999, background: 'rgba(5,6,8,0.35)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }}>
+        {VIZ_MODES.map(m => (
+          <button key={m.key} onClick={() => switchVm(m.key)} aria-label={m.label} style={{ width: vm === m.key ? 20 : 7, height: 7, borderRadius: 999, border: 'none', padding: 0, background: vm === m.key ? ac : 'rgba(255,255,255,0.28)', boxShadow: vm === m.key ? `0 0 8px ${ac}` : 'none', transition: 'all .2s ease', cursor: 'pointer' }} />
+        ))}
       </div>
 
       {/* 暗角遮罩 */}
@@ -336,7 +376,7 @@ export default function Player({ onProfile }) {
             <button onClick={togglePlay} className={`glass-button-accent${isPlaying ? ' pulsing' : ''}`} style={{ width: 36, height: 36, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: ac, boxShadow: `0 0 16px ${ac}44, inset 0 1px 0 rgba(255,255,255,0.25)` }}>
               {isPlaying ? <Pause size={18} fill="#050608" /> : <Play size={18} fill="#050608" style={{ marginLeft: 2 }} />}
             </button>
-            <button onClick={next} className="glass-button" style={{ width: 32, height: 32, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.78)' }}><SkipForward size={18} fill="currentColor" /></button>
+            <button onClick={() => { next(); buzz(10); }} className="glass-button" style={{ width: 32, height: 32, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.78)' }}><SkipForward size={18} fill="currentColor" /></button>
             <button onClick={() => setControlsExpanded(true)} className="glass-button" style={{ width: 28, height: 28, borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-secondary)' }}><ChevronUp size={16} /></button>
           </div>
         </div>
@@ -360,11 +400,11 @@ export default function Player({ onProfile }) {
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-              <button onClick={prev} className="glass-button" style={{ width: 28, height: 28, borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.78)' }}><SkipBack size={17} fill="currentColor" /></button>
+              <button onClick={() => { prev(); buzz(10); }} className="glass-button" style={{ width: 28, height: 28, borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.78)' }}><SkipBack size={17} fill="currentColor" /></button>
               <button onClick={togglePlay} className={`glass-button-accent${isPlaying ? ' pulsing' : ''}`} style={{ width: 38, height: 38, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: ac, boxShadow: `0 0 18px ${ac}44, 0 4px 12px rgba(0,0,0,0.28), inset 0 1px 0 rgba(255,255,255,0.25)` }}>
                 {isPlaying ? <Pause size={18} fill="#050608" /> : <Play size={18} fill="#050608" style={{ marginLeft: 2 }} />}
               </button>
-              <button onClick={next} className="glass-button" style={{ width: 28, height: 28, borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.78)' }}><SkipForward size={17} fill="currentColor" /></button>
+              <button onClick={() => { next(); buzz(10); }} className="glass-button" style={{ width: 28, height: 28, borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.78)' }}><SkipForward size={17} fill="currentColor" /></button>
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexShrink: 0 }}>
@@ -469,7 +509,7 @@ export default function Player({ onProfile }) {
               <div>
                 <div style={{ fontSize: 10, fontWeight: 760, letterSpacing: '.14em', color: 'var(--fc-muted)', textTransform: 'uppercase', marginBottom: 10 }}>可视化</div>
                 <div style={{ display: 'flex', gap: 8 }}>
-                  {VIZ_MODES.map(m => <button key={m.key} onClick={() => { setVm(m.key); try { localStorage.setItem('sonus_viz_mode', m.key); } catch { } }} className={`glass-button${vm === m.key ? ' is-active' : ''}`} style={{ flex: 1, padding: '14px 4px', borderRadius: 14, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, fontSize: 11, transition: 'all .2s' }}><span style={{ fontSize: 20 }}>{m.icon}</span>{m.label}</button>)}
+                  {VIZ_MODES.map(m => <button key={m.key} onClick={() => switchVm(m.key)} className={`glass-button${vm === m.key ? ' is-active' : ''}`} style={{ flex: 1, padding: '14px 4px', borderRadius: 14, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, fontSize: 11, transition: 'all .2s' }}><span style={{ fontSize: 20 }}>{m.icon}</span>{m.label}</button>)}
                 </div>
               </div>
               {vm === '3d' && (
@@ -477,7 +517,7 @@ export default function Player({ onProfile }) {
                   <div style={{ fontSize: 10, fontWeight: 760, letterSpacing: '.14em', color: 'var(--fc-muted)', textTransform: 'uppercase', marginBottom: 10 }}>3D 形态</div>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
                     {VIZ_3D_MODES.map(m => (
-                      <button key={m.key} onClick={() => { setV3m(m.key); try { localStorage.setItem('sonus_3d_mode', m.key); } catch { } }} className={`glass-button${v3m === m.key ? ' is-active' : ''}`} style={{ padding: '10px 4px', borderRadius: 12, fontSize: 11 }}>{m.label}</button>
+                      <button key={m.key} onClick={() => { setV3m(m.key); try { localStorage.setItem('sonus_3d_mode', m.key); } catch { } buzz(10); }} className={`glass-button${v3m === m.key ? ' is-active' : ''}`} style={{ padding: '10px 4px', borderRadius: 12, fontSize: 11 }}>{m.label}</button>
                     ))}
                   </div>
                 </div>

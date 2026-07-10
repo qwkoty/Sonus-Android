@@ -61,6 +61,38 @@ function Visualizer({ isPlaying, mode = 'ring', accent = '#4FC3F7' }) {
     canvas.addEventListener('touchstart', preventTouch, { passive: false });
     canvas.addEventListener('touchmove', preventTouch, { passive: false });
 
+    // 触摸涟漪反馈：轻点可视化产生扩散涟漪（复用冲击波池，任意落点）
+    let tapStart = null;
+    const onTapStart = (e) => {
+      const t = e.touches ? e.touches[0] : e;
+      tapStart = { x: t.clientX, y: t.clientY, moved: false };
+    };
+    const onTapMove = (e) => {
+      if (!tapStart) return;
+      const t = e.touches ? e.touches[0] : e;
+      if (Math.hypot(t.clientX - tapStart.x, t.clientY - tapStart.y) > 10) tapStart.moved = true;
+    };
+    const onTapEnd = () => {
+      if (!tapStart || tapStart.moved) { tapStart = null; return; }
+      const rect = canvas.getBoundingClientRect();
+      const px = (tapStart.x - rect.left) * dpr;
+      const py = (tapStart.y - rect.top) * dpr;
+      shockwavesRef.current.push({
+        radius: minDim * 0.02,
+        alpha: 0.6,
+        speed: minDim * 0.012,
+        width: Math.max(2, minDim * 0.0035),
+        cx: px, cy: py,
+      });
+      if (shockwavesRef.current.length > 4) {
+        shockwavesRef.current.splice(0, shockwavesRef.current.length - 4);
+      }
+      tapStart = null;
+    };
+    canvas.addEventListener('touchstart', onTapStart, { passive: true });
+    canvas.addEventListener('touchmove', onTapMove, { passive: true });
+    canvas.addEventListener('touchend', onTapEnd, { passive: true });
+
     const palette = () => {
       const [H, S, L] = hexToHsl(accentRef.current);
       // 完全基于用户选中的颜色做层次感：
@@ -114,28 +146,29 @@ function Visualizer({ isPlaying, mode = 'ring', accent = '#4FC3F7' }) {
       // ===== bass 峰值检测 → 生成冲击波（手机限 3 个，避免堆积）=====
       const bassDelta = bass - bassPrevRef.current;
       bassPrevRef.current = bass;
-      if (hasData && bass > 0.4 && bassDelta > 0.1) {
+      if (hasData && bass > 0.32 && bassDelta > 0.08) { // 阈值放宽（v1.21）：更易触发冲击波，范围感更强
         shockwavesRef.current.push({
           radius: minDim * 0.05,
           alpha: 0.7,
           speed: minDim * 0.01,
           width: Math.max(2, minDim * 0.003),
+          cx, cy, // 默认中心，触摸涟漪可自定义落点
         });
       }
-      if (shockwavesRef.current.length > 3) {
-        shockwavesRef.current.splice(0, shockwavesRef.current.length - 3);
+      if (shockwavesRef.current.length > 4) { // 3→4：兼容触摸涟漪（v1.21）
+        shockwavesRef.current.splice(0, shockwavesRef.current.length - 4);
       }
 
       // ===== 整体呼吸缩放（表现力增强，待机也活）=====
-      const breathScale = 1 + Math.sin(tNow * 0.9) * 0.03 + bassSmooth * 0.14;
+      const breathScale = 1 + Math.sin(tNow * 0.9) * 0.03 + bassSmooth * 0.20; // bass 项 0.14→0.20（v1.21 范围更大）
 
       const INNER_R = minDim * 0.04 * breathScale;
-      const MAX_R = minDim * 0.5 * 0.88 * breathScale;
+      const MAX_R = minDim * 0.5 * 0.94 * breathScale; // 0.88→0.94：外圈更贴近边缘，范围更大
 
       // === 1. 中心填充：径向频谱（低频在中心，向外渐变到高频）===
       // 性能优化：层数 24→10，步数 120→64，手机带得动
       const FILL_STEPS = 64;
-      const FILL_RINGS = 10;
+      const FILL_RINGS = 12; // 10→12：层次更密（v1.21）
       for (let layer = FILL_RINGS - 1; layer >= 0; layer--) {
         const layerProgress = layer / FILL_RINGS; // 0=中心, 1=边缘
         const layerR = INNER_R + (MAX_R * 0.65 - INNER_R) * layerProgress;
@@ -152,7 +185,7 @@ function Visualizer({ isPlaying, mode = 'ring', accent = '#4FC3F7' }) {
         for (let s = 0; s <= FILL_STEPS; s++) {
           const angle = (s / FILL_STEPS) * Math.PI * 2;
           const angleWave = Math.sin(tNow * 1.5 + angle * 3 + layer * 0.4) * 0.08;
-          const amp = layerValue * minDim * 0.04 * (1 - layerProgress * 0.3);
+          const amp = layerValue * minDim * 0.06 * (1 - layerProgress * 0.3); // 0.04→0.06（v1.21）
           const r = layerR + amp + angleWave * minDim * 0.01;
           const x = cx + Math.cos(angle) * r;
           const y = cy + Math.sin(angle) * r;
@@ -219,7 +252,7 @@ function Visualizer({ isPlaying, mode = 'ring', accent = '#4FC3F7' }) {
 
       // === 4. 辐射波浪环：内圈=低频，外圈=高频 ===
       // 性能优化：环数 5→3，步数 180→96，shadowBlur 减半
-      const NUM_RINGS = 3;
+      const NUM_RINGS = 4; // 3→4：多一圈高频环（v1.21）
       for (let ring = 0; ring < NUM_RINGS; ring++) {
         const ringProgress = (ring + 1) / NUM_RINGS;
         const baseR = MAX_R * 0.35 + (MAX_R - MAX_R * 0.35) * ringProgress;
@@ -250,7 +283,7 @@ function Visualizer({ isPlaying, mode = 'ring', accent = '#4FC3F7' }) {
           // 行波：从中心向外扩散
           const waveOffset = Math.sin(tNow * 2.2 - ring * 0.7 + angle * 4) * 0.1;
           const ampScale = (1 - ringProgress * 0.3);
-          const amp = value * (MAX_R - INNER_R) * 0.14 * ampScale * (hasData ? 1 : 0.35);
+          const amp = value * (MAX_R - INNER_R) * 0.20 * ampScale * (hasData ? 1 : 0.35); // 0.14→0.20（v1.21 范围更大）
           const r = baseR + amp + waveOffset * minDim * 0.005;
           const x = cx + Math.cos(angle) * r;
           const y = cy + Math.sin(angle) * r;
@@ -261,6 +294,27 @@ function Visualizer({ isPlaying, mode = 'ring', accent = '#4FC3F7' }) {
         ctx.stroke();
         ctx.restore();
       }
+
+      // === 4.5 频谱尖刺：外圈向外发射的声波刺，增强范围感与动感（开销低：64 条短线）===
+      ctx.save();
+      ctx.strokeStyle = `hsla(${H}, ${S}%, 82%, 0.5)`;
+      ctx.lineWidth = Math.max(1, minDim * 0.0016);
+      ctx.shadowColor = C.glow;
+      ctx.shadowBlur = minDim * 0.006;
+      ctx.lineCap = 'round';
+      for (let s = 0; s < NUM_BARS; s++) {
+        const angle = (s / NUM_BARS) * Math.PI * 2;
+        const v = hasData ? smooth[s] : (0.03 + Math.sin(tNow * 2 + s) * 0.02);
+        const len = v * minDim * 0.06;
+        if (len < 1) continue;
+        const r0 = MAX_R;
+        const r1 = MAX_R + len;
+        ctx.beginPath();
+        ctx.moveTo(cx + Math.cos(angle) * r0, cy + Math.sin(angle) * r0);
+        ctx.lineTo(cx + Math.cos(angle) * r1, cy + Math.sin(angle) * r1);
+        ctx.stroke();
+      }
+      ctx.restore();
 
       // === 5. bass 冲击波（扩散环，表现力增强）===
       const shocks = shockwavesRef.current;
@@ -276,7 +330,7 @@ function Visualizer({ isPlaying, mode = 'ring', accent = '#4FC3F7' }) {
         ctx.strokeStyle = `hsla(${H}, ${S}%, 75%, ${sw.alpha})`;
         ctx.lineWidth = sw.width;
         ctx.beginPath();
-        ctx.arc(cx, cy, sw.radius, 0, Math.PI * 2);
+        ctx.arc(sw.cx !== undefined ? sw.cx : cx, sw.cy !== undefined ? sw.cy : cy, sw.radius, 0, Math.PI * 2);
         ctx.stroke();
         ctx.restore();
       }
@@ -329,7 +383,7 @@ function Visualizer({ isPlaying, mode = 'ring', accent = '#4FC3F7' }) {
       }
 
       const midY = cy;
-      const maxAmp = h * 0.40;
+      const maxAmp = h * 0.48; // 0.40→0.48：镜像上下各 48%≈96%，范围更大且不溢出（v1.21）
       const barW = w / NUM_BARS;
       // 细条：只留 1px 间距，形成一条连续的镜像频谱带
       const gap = Math.max(0.5, barW * 0.08);
@@ -462,6 +516,9 @@ function Visualizer({ isPlaying, mode = 'ring', accent = '#4FC3F7' }) {
       window.removeEventListener('resize', resize);
       canvas.removeEventListener('touchstart', preventTouch);
       canvas.removeEventListener('touchmove', preventTouch);
+      canvas.removeEventListener('touchstart', onTapStart);
+      canvas.removeEventListener('touchmove', onTapMove);
+      canvas.removeEventListener('touchend', onTapEnd);
     };
   }, [isPlaying, mode]);
 
