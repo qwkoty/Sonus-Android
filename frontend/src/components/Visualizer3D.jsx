@@ -287,13 +287,15 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
     const TERRAIN_FALL_SPEED = 0.5;                // 停播时回落速度/秒
     const TERRAIN_IDLE_RISE = 0.18;                // 待机时自然微隆起（让待机也有轻微起伏感）
 
+    // 地形 fBm 参数（确定性随机相位/频率 → buildBase 与动画循环共享）
+    const trg = mulberry32(0x51ed270b);
+    const trPhase = [trg() * 6.2832, trg() * 6.2832, trg() * 6.2832, trg() * 6.2832];
+    const trFreq = [2.3 + trg(), 4.1 + trg() * 0.8, 7.7 + trg() * 1.2, 14.3 + trg() * 2.0];
+
     const buildBase = () => {
       const grng = mulberry32(0x9e3779b9); // 稳定种子 → 星系形态固定
       const cph = mulberry32(0xC0FFEE);    // 错层黏土封面：每粒子有机位移相位（确定性）
-      // 地形 fBm 参数（确定性随机相位/频率 → buildBase 重建一致）
-      const trg = mulberry32(0x51ed270b);
-      const trPhase = [trg() * 6.2832, trg() * 6.2832, trg() * 6.2832, trg() * 6.2832];
-      const trFreq = [2.3 + trg(), 4.1 + trg() * 0.8, 7.7 + trg() * 1.2, 14.3 + trg() * 2.0];
+      // 地形 fBm 参数已提升到外层作用域（trg/trPhase/trFreq），此处直接使用
       let idx = 0;
       const half = planeSize;
       const step = (planeSize * 2) / (GRID - 1);
