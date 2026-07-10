@@ -214,21 +214,58 @@ async function userInfoAPK(uin, cookie = '') {
     comm: { uin: String(uin), format: 'json', ct: 24, cv: 0 },
     req_0: { module: 'music.UserInfo.userInfoServer', method: 'GetLoginUserInfo', param: {} },
   }), cookie);
-  // 兼容多种响应嵌套：data.data / data / req_0 自身
-  const raw = d?.req_0?.data?.data ?? d?.req_0?.data ?? d?.req_0 ?? {};
-  const pick = (...keys) =>
-    keys.map((k) => raw?.[k]).find((v) => v !== undefined && v !== null && v !== '');
-  const nick = pick('nick', 'nickname', 'name', 'user_name', 'usrName');
-  const avatar = pick('headpic', 'headimg', 'avatar', 'face', 'headPic', 'pic', 'picurl', 'headpic_url', 'icon');
-  const qlogo = uin ? `https://q1.qlogo.cn/g?b=qq&nk=${String(uin)}&s=640` : ''; // 稳定兜底头像（按 uin 拼）
+
+  // 排查日志：打印响应 key 树（仅路径，不含敏感值）
+  function logKeys(obj, prefix = '', depth = 0) {
+    if (depth > 5 || !obj || typeof obj !== 'object') return;
+    for (const k of Object.keys(obj).slice(0, 40)) {
+      console.log(`[userInfo] ${prefix}${k} : ${typeof obj[k]}${Array.isArray(obj[k]) ? `[${obj[k].length}]` : ''}`);
+      logKeys(obj[k], `${prefix}${k}.`, depth + 1);
+    }
+  }
+  console.log('[userInfo] === response key tree (uin=' + uin + ') ===');
+  logKeys(d);
+
+  // 多层嵌套深层 pick（覆盖 info/result/data/accountInfo 等常见嵌套）
+  const deepPick = (obj, ...paths) => {
+    for (const path of paths) {
+      let cur = obj;
+      for (const seg of path) { if (cur && typeof cur === 'object') cur = cur[seg]; else { cur = undefined; break; } }
+      if (cur !== undefined && cur !== null && cur !== '' && typeof cur !== 'object') return cur;
+    }
+    return undefined;
+  };
+
+  const rawBase = d?.req_0?.data ?? d?.req_0 ?? {};
+  const nick = deepPick(rawBase,
+    ['nick'], ['nickname'], ['name'], ['user_name'], ['usrName'],
+    // 一层嵌套
+    ['info', 'nick'], ['info', 'nickname'], ['info', 'name'],
+    ['result', 'nick'], ['result', 'nickname'],
+    ['data', 'nick'], ['data', 'nickname'],
+    ['base_info', 'nick'],
+    // 两层嵌套
+    ['info', 'base_info', 'nick'], ['accountInfo', 'nick'],
+    ['data', 'info', 'nick'], ['data', 'result', 'nick'],
+  );
+  const avatar = deepPick(rawBase,
+    ['headpic'], ['headimg'], ['avatar'], ['face'], ['headPic'],
+    ['pic'], ['picurl'], ['headpic_url'], ['icon'],
+    ['info', 'headpic'], ['info', 'avatar'], ['info', 'headimg'],
+    ['result', 'avatar'], ['result', 'headpic'],
+    ['data', 'avatar'], ['data', 'headpic'],
+  );
+  const qlogo = uin ? `https://q1.qlogo.cn/g?b=qq&nk=${String(uin)}&s=640` : '';
+  console.log('[userInfo] resolved:', { nick: nick || '(fallback)', hasAvatar: !!avatar, useQlogo: !!(!avatar && qlogo) });
+
   return {
     nickname: nick || 'QQ音乐用户',
-    avatar: avatar || qlogo,           // 接口头像缺失时回退 qlogo，保证必有图
+    avatar: avatar || qlogo,
     uin: String(uin),
-    vipLevel: raw?.vipLevel || 0,
-    isVip: !!(raw?.isVip || raw?.vip || raw?.vipStatus || raw?.svipLevel || raw?.payPackId),
-    follow: raw?.follow || 0,
-    fans: raw?.fans || 0,
+    vipLevel: deepPick(rawBase, ['vipLevel']) || 0,
+    isVip: !!(deepPick(rawBase, ['isVip']) || deepPick(rawBase, ['vip']) || deepPick(rawBase, ['vipStatus'])),
+    follow: deepPick(rawBase, ['follow']) || 0,
+    fans: deepPick(rawBase, ['fans']) || 0,
   };
 }
 
