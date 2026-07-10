@@ -34,7 +34,7 @@ export function initAudioSystem() {
   if (!analyser) {
     analyser = audioCtx.createAnalyser();
     analyser.fftSize = 1024;
-    analyser.smoothingTimeConstant = 0.65; // 0.75→0.65：更跟手、低声段也出反应（v1.21 全局范围放大）
+    analyser.smoothingTimeConstant = 0.72; // 0.65→0.72：折中（比原 0.75 略跟手，但不抖）（v1.22）
     analyser.minDecibels = -100;           // -90→-100：安静段也能看到起伏
     analyser.maxDecibels = -10;            // -15→-10：峰值不再被压平
   }
@@ -59,7 +59,7 @@ export function getAnalyser() {
   return analyser;
 }
 
-export function getSpectrumBars(numBars = 64, gain = 1.12) {
+export function getSpectrumBars(numBars = 64, gain = 1.04) { // gain 1.12→1.04：微提亮即可，不过曝（v1.22）
   if (!spectrumBuf || spectrumBuf.length !== numBars) {
     spectrumBuf = new Float32Array(numBars);
   }
@@ -104,7 +104,7 @@ export function getSpectrumBars(numBars = 64, gain = 1.12) {
     const avg = count > 0 ? sum / count : 0;
     const combined = peak * 0.7 + avg * 0.3;
     const normalized = combined / 255;
-    const corrected = Math.min(1, Math.pow(normalized, 0.55) * gain); // 0.6→0.55 提亮 + 全局增益，范围更宽（v1.21）
+    const corrected = Math.min(1, Math.pow(normalized, 0.58) * gain); // 0.55→0.58：安静段更暗、对比更强（v1.22）
     result[i] = corrected;
     totalEnergy += normalized;
   }

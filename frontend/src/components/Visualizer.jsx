@@ -146,7 +146,7 @@ function Visualizer({ isPlaying, mode = 'ring', accent = '#4FC3F7' }) {
       // ===== bass 峰值检测 → 生成冲击波（手机限 3 个，避免堆积）=====
       const bassDelta = bass - bassPrevRef.current;
       bassPrevRef.current = bass;
-      if (hasData && bass > 0.32 && bassDelta > 0.08) { // 阈值放宽（v1.21）：更易触发冲击波，范围感更强
+      if (hasData && bass > 0.45 && bassDelta > 0.14) { // 阈值调高（v1.22）：仅真·重低音才出冲击波，不连发
         shockwavesRef.current.push({
           radius: minDim * 0.05,
           alpha: 0.7,
@@ -160,10 +160,10 @@ function Visualizer({ isPlaying, mode = 'ring', accent = '#4FC3F7' }) {
       }
 
       // ===== 整体呼吸缩放（表现力增强，待机也活）=====
-      const breathScale = 1 + Math.sin(tNow * 0.9) * 0.03 + bassSmooth * 0.20; // bass 项 0.14→0.20（v1.21 范围更大）
+      const breathScale = 1 + Math.sin(tNow * 0.9) * 0.03 + bassSmooth * 0.14; // 0.20→0.14：呼吸收敛（v1.22）
 
       const INNER_R = minDim * 0.04 * breathScale;
-      const MAX_R = minDim * 0.5 * 0.94 * breathScale; // 0.88→0.94：外圈更贴近边缘，范围更大
+      const MAX_R = minDim * 0.5 * 0.90 * breathScale; // 0.94→0.90：留 10% 边距，外圈不再贴边（v1.22）
 
       // === 1. 中心填充：径向频谱（低频在中心，向外渐变到高频）===
       // 性能优化：层数 24→10，步数 120→64，手机带得动
@@ -185,7 +185,7 @@ function Visualizer({ isPlaying, mode = 'ring', accent = '#4FC3F7' }) {
         for (let s = 0; s <= FILL_STEPS; s++) {
           const angle = (s / FILL_STEPS) * Math.PI * 2;
           const angleWave = Math.sin(tNow * 1.5 + angle * 3 + layer * 0.4) * 0.08;
-          const amp = layerValue * minDim * 0.06 * (1 - layerProgress * 0.3); // 0.04→0.06（v1.21）
+          const amp = layerValue * minDim * 0.045 * (1 - layerProgress * 0.3); // 0.06→0.045：中心填充收敛（v1.22）
           const r = layerR + amp + angleWave * minDim * 0.01;
           const x = cx + Math.cos(angle) * r;
           const y = cy + Math.sin(angle) * r;
@@ -283,7 +283,7 @@ function Visualizer({ isPlaying, mode = 'ring', accent = '#4FC3F7' }) {
           // 行波：从中心向外扩散
           const waveOffset = Math.sin(tNow * 2.2 - ring * 0.7 + angle * 4) * 0.1;
           const ampScale = (1 - ringProgress * 0.3);
-          const amp = value * (MAX_R - INNER_R) * 0.20 * ampScale * (hasData ? 1 : 0.35); // 0.14→0.20（v1.21 范围更大）
+          const amp = value * (MAX_R - INNER_R) * 0.15 * ampScale * (hasData ? 1 : 0.35); // 0.20→0.15：辐射环振幅收敛（v1.22）
           const r = baseR + amp + waveOffset * minDim * 0.005;
           const x = cx + Math.cos(angle) * r;
           const y = cy + Math.sin(angle) * r;
@@ -305,7 +305,7 @@ function Visualizer({ isPlaying, mode = 'ring', accent = '#4FC3F7' }) {
       for (let s = 0; s < NUM_BARS; s++) {
         const angle = (s / NUM_BARS) * Math.PI * 2;
         const v = hasData ? smooth[s] : (0.03 + Math.sin(tNow * 2 + s) * 0.02);
-        const len = v * minDim * 0.06;
+        const len = v * minDim * 0.04; // 0.06→0.04：频谱尖刺收敛（v1.22）
         if (len < 1) continue;
         const r0 = MAX_R;
         const r1 = MAX_R + len;
@@ -383,7 +383,7 @@ function Visualizer({ isPlaying, mode = 'ring', accent = '#4FC3F7' }) {
       }
 
       const midY = cy;
-      const maxAmp = h * 0.48; // 0.40→0.48：镜像上下各 48%≈96%，范围更大且不溢出（v1.21）
+      const maxAmp = h * 0.36; // 0.48→0.36：留出动态空间，安静段明显更低（v1.22）
       const barW = w / NUM_BARS;
       // 细条：只留 1px 间距，形成一条连续的镜像频谱带
       const gap = Math.max(0.5, barW * 0.08);

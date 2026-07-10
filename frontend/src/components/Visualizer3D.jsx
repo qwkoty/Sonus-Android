@@ -24,12 +24,12 @@ const GALAXY_ARM_WIDTH_OUTER = 0.55; // 外圈臂宽（rad）
 const RIPPLE_FREQ = 10;           // 径向涟漪空间频率
 const RIPPLE_SPEED = 2.2;         // 涟漪向外传播速度
 const TERRAIN_SIZE_RATIO = 1.35;  // 地形平面相对画面尺寸
-const TERRAIN_GAIN = 0.30;        // 地形音频驱动高度增益（v1.21：0.22→0.30，动态更猛）
-const BEAT_THRESHOLD = 0.07;      // 鼓点触发阈值（越低越敏感）
-const BEAT_COOLDOWN = 0.05;       // 两次鼓点最小间隔（s）
+const TERRAIN_GAIN = 0.22;        // 地形音频驱动高度增益（0.30→0.22：回调，山不疯长，v1.22）
+const BEAT_THRESHOLD = 0.12;      // 0.07→0.12：鼓点检测更严格（v1.22）
+const BEAT_COOLDOWN = 0.08;       // 0.05→0.08：两拍间隔更长，避免连击（v1.22）
 const SPRING_K = 0.05;            // 冲击波回弹弹簧系数
 const DAMPING = 0.88;             // 速度阻尼
-const SHOCK_GAIN = 2.6;           // 鼓点冲击波冲量增益（× bass）——提速后鼓点更"重"
+const SHOCK_GAIN = 2.2;           // 2.6→2.2：冲击力稍减（v1.22）
 // —— 鼓点频率增强（与 beatPulse 平行的独立包络）——
 const BEAT_FREQ_BOOST_DECAY = 0.96; // 频率增强包络每帧衰减（鼓点后持续更久）
 const BEAT_PULSE_DECAY = 0.93;      // beatPulse 每帧衰减系数
@@ -275,7 +275,7 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
     const clayPhaseX = new Float32Array(COUNT);     // 有机位移相位 X
     const clayPhaseY = new Float32Array(COUNT);     // 有机位移相位 Y
     const CLAY_FALL_RATE = 0.004;                  // 每帧随机脱落尝试系数（≈79 次/帧）
-    const CLAY_SPECTRUM_TRIGGER = 0.55;            // 频谱触发脱落阈值
+    const CLAY_SPECTRUM_TRIGGER = 0.62;            // 0.55→0.62：封面粒子脱落更难触发（v1.22）
     const CLAY_RETURN_DECAY = 0.972;               // 目标回弹衰减（每帧）：越大→脱落挂得越久、回得越慢
     const MAX_CLAY_FALLEN = 2000;                  // 同时"脱落中"粒子硬上限（≈10%）→ 保证封面始终完整
     const CLAY_FALL_DEPTH_SCALE = 0.6;             // 脱落凹陷深度缩放（1=原0.30画幅，0.6≈0.18画幅，避免破洞）
@@ -497,24 +497,10 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
     const points = new THREE.Points(geometry, material);
     scene.add(points);
 
-    // ═══ 发光湖面（倒影感）：悬浮山岛下方水面，随音频脉动发光 ═══
-    const lakeGeo = new THREE.CircleGeometry(planeSize * TERRAIN_SIZE_RATIO * 0.55, 64);
-    const lakeMat = new THREE.MeshBasicMaterial({
-      color: new THREE.Color(accentRef.current || '#4FC3F7'),
-      transparent: true,
-      opacity: 0,
-      depthWrite: false,
-      blending: THREE.AdditiveBlending,
-      side: THREE.DoubleSide,
-    });
-    const lakeMesh = new THREE.Mesh(lakeGeo, lakeMat);
-    lakeMesh.rotation.x = -Math.PI / 2;        // 平铺成水面
-    lakeMesh.position.y = -planeSize * 0.32;   // 贴着平盘基准（水面线）
-    lakeMesh.visible = false;
-    scene.add(lakeMesh);
+    // （v1.22：发光湖面底座 lakeMesh 已删除——用户反馈无作用）
 
     // ═══ 灵气悬浮光点：山峰上方漂浮的发光粒子，随低频上浮 ═══
-    const SPIRIT_COUNT = 420;
+    const SPIRIT_COUNT = 280; // 420→280：密度降级（v1.22）
     const spiritPos = new Float32Array(SPIRIT_COUNT * 3);
     const spiritBaseY = new Float32Array(SPIRIT_COUNT);
     const spiritSeed = new Float32Array(SPIRIT_COUNT);
@@ -893,9 +879,9 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
         const targetRise = (hasData ? 1.0 : TERRAIN_IDLE_RISE) + riseKick;
         const speed = hasData ? TERRAIN_RISE_SPEED : TERRAIN_FALL_SPEED;
         terrainRise += (targetRise - terrainRise) * Math.min(1, dt * speed);
-        if (terrainRise > 1.2) terrainRise = 1.2; // 过冲上限，避免穿帮
+        if (terrainRise > 1.06) terrainRise = 1.06; // 过冲上限回调 1.2→1.06（v1.22）
         // 播放开始边沿：给一次衰减过冲，让山脉"弹出来"
-        if (hasData && !wasHasData) riseKick = 0.18;
+        if (hasData && !wasHasData) riseKick = 0.08; // 0.18→0.08：过冲收敛（v1.22）
         wasHasData = hasData;
         riseKick *= Math.pow(0.92, dt * 60); // 过冲缓慢收敛
       }
@@ -918,7 +904,7 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
           const radialSpectrum = spectrumSmooth[band] * planeSize * 0.24 * (1 + beatFreqBoost * GALAXY_BEAT_FREQ_GAIN);
 
           // 低频推核球呼吸（越靠中心越强——大幅增强）
-          const bassPush = bassAttack * planeSize * 0.18 * Math.pow(1 - rN, 1.4);
+          const bassPush = bassAttack * planeSize * 0.13 * Math.pow(1 - rN, 1.4); // 0.18→0.13：核球呼吸收敛（v1.22）
 
           // 臂波动：沿半径方向螺旋波，让旋臂像流体一样起伏——大幅增强
           const armWave = (hasData ? 1.0 : 0.7) * Math.sin(rN * 16 - time * 2.2 + (galaxyArm[i] >= 0 ? galaxyArm[i] : 0) * 1.1) * planeSize * 0.03 * (1 + beatFreqBoost * 0.6);
@@ -1085,7 +1071,7 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
           // 表面张力波：多波长沿法向振动，相位差营造流动感
           const wave = (midSmooth * 0.9 + bassAttack * 0.6) * Math.sin(u * 56 + time * 5 + i * 0.5) * planeSize * 0.008 * activeFactor;
           const equatorWave = (midSmooth * 0.8 + bassAttack * 0.6) * Math.sin(u * 48 + time * 4.5 + i * 0.5) * planeSize * 0.011 * activeFactor;
-          const bassBoost = bassPulse * planeSize * 0.26 * activeFactor; // 鼓点强度增强（0.18→0.26）
+          const bassBoost = bassPulse * planeSize * 0.20 * activeFactor; // 0.26→0.20：液态金属鼓点膨胀收敛（v1.22）
 
           // 两端舒缓起伏（原有逻辑保留）
           const idleWave = idleFactor * Math.sin(v * 20 + time * 1.8 + i * 0.1) * Math.cos(u * 14 + time * 1.3) * planeSize * 0.06;
@@ -1119,7 +1105,7 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
           const hN = (Math.tanh(terH * 0.4) * 0.5 + 0.5) * radial;
 
           // 静态山高 × 激活度（terrainRise=0→平坦, =1→全高山脉）
-          const staticH = (hN - 0.35) * planeSize * 0.95 * terrainRise; // 0.70→0.95：山更高（v1.21）
+          const staticH = (hN - 0.35) * planeSize * 0.72 * terrainRise; // 0.95→0.72：山高回调（v1.22）
 
           // 音频驱动高度（播放时即时响应，不受 terrainRise 限制）
           const audioH = hasData
@@ -1127,19 +1113,18 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
             : 0;
 
           // 鼓点脉冲（有山时才明显）
-          const beatPulseH = bassAttack * planeSize * 0.22 * (1 + beatPulseRef.current * 3.0) // 0.16→0.22（v1.21）
+          const beatPulseH = bassAttack * planeSize * 0.14 * (1 + beatPulseRef.current * 3.0) // 0.22→0.14：鼓点抬升收敛（v1.22）
                               * (0.4 + freqWeight) * terrainRise;
 
-          // 涟漪波（鼓点从中心向外扩散）
-          const ripple = beatPulseRef.current * planeSize * 0.07
-            * Math.sin(rN * 14 - time * 6) * Math.exp(-rN * 2.8) * (1 + beatFreqBoost * 0.6);
+          // 涟漪波（鼓点从中心向外扩散）0.07→0.045：幅度收敛（v1.22）
+          const ripple = beatPulseRef.current * planeSize * 0.045 * Math.sin(rN * 14 - time * 6) * Math.exp(-rN * 2.8) * (1 + beatFreqBoost * 0.6);
 
           // 待机呼吸（比原来明显 ~3 倍；播放时也保留微量呼吸让山"活"）
           const idleBreathe = Math.sin(time * 0.35 + rN * 6 + u * 3) * planeSize * 0.028
                                * (hasData ? 0.25 : 1);
 
           let h = by + staticH + audioH + beatPulseH + ripple + idleBreathe;
-          h = Math.max(-planeSize * 0.30, Math.min(planeSize * 0.95, h)); // 钳制上限 0.72→0.95（v1.21）
+          h = Math.max(-planeSize * 0.30, Math.min(planeSize * 0.76, h)); // 钳制上限 0.95→0.76（v1.22）
 
           x = bx; y = h; z = bz;
           nx = 0; ny = 1; nz = 0;
@@ -1216,9 +1201,9 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
 
           // 峰顶泛白（雪顶）
           const crest = Math.max(0, (normH - 0.62) / 0.38);
-          r += crest * 0.7;   // 0.5→0.7：雪顶更亮（v1.21）
-          g += crest * 0.7;
-          b += crest * 0.72;
+          r += crest * 0.58;   // 0.7→0.58：雪顶回调（v1.22）
+          g += crest * 0.58;
+          b += crest * 0.6;
 
           // 谷底压暗（增加纵深）
           const vally = Math.max(0, (0.30 - normH) / 0.30);
@@ -1318,21 +1303,16 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
 
       points.scale.set(1, 1, 1);
 
-      // ═══ 湖面 + 灵气光点（仅地形模式显现）═══
+      // ═══ 灵气光点（仅地形模式显现）═══
       if (isTerrain) {
-        lakeMesh.visible = true;
-        lakeMat.color.setRGB(accentRGB.r, accentRGB.g, accentRGB.b);
-        lakeMat.opacity = terrainRise * (0.06 + bassAttack * 0.18); // 随音频脉动发光
-        const lakeScale = 1 + bassAttack * 0.04;
-        lakeMesh.scale.set(lakeScale, lakeScale, 1);
         spiritPoints.visible = true;
         spiritMat.color.setRGB(accentRGB.r, accentRGB.g, accentRGB.b);
-        spiritMat.opacity = terrainRise * 0.5;
+        spiritMat.opacity = terrainRise * 0.32; // 0.5→0.32：更克制（v1.22）
         for (let i = 0; i < SPIRIT_COUNT; i++) {
           const ph = spiritSeed[i];
           spiritPos[i * 3 + 1] = spiritBaseY[i]
             + Math.sin(time * 0.6 + ph) * planeSize * 0.03
-            + bassAttack * planeSize * 0.06 * (0.5 + 0.5 * Math.sin(time * 1.3 + ph));
+            + bassAttack * planeSize * 0.035 * (0.5 + 0.5 * Math.sin(time * 1.3 + ph)); // 0.06→0.035（v1.22）
           // 缓慢径向漂移，让灵气"流动"
           const dx = spiritPos[i * 3], dz = spiritPos[i * 3 + 2];
           const ang = Math.atan2(dz, dx) + dt * 0.05;
@@ -1342,7 +1322,6 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
         }
         spiritGeo.attributes.position.needsUpdate = true;
       } else {
-        lakeMesh.visible = false;
         spiritPoints.visible = false;
       }
 
