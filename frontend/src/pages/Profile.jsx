@@ -269,8 +269,11 @@ export default function Profile({ onBack }) {
               <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                 <div style={{ width: 46, height: 46, borderRadius: '50%', overflow: 'hidden', flexShrink: 0, background: 'rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: `2px solid ${SOURCE_COLOR[selectedSourceId]}55` }}>
                   {(() => {
-                    const qlogo = selectedCreds.uin ? `https://q1.qlogo.cn/g?b=qq&nk=${selectedCreds.uin}&s=640` : '';
-                    const src = selectedCreds.userInfo?.avatar || qlogo;
+                    // 按源分别兜底：QQ 用 qlogo，其他源不跨用 QQ 头像服务（避免网易云显示 QQ 头像）
+                    const fallback = (selectedSourceId === 'qq' && selectedCreds.uin)
+                      ? `https://q1.qlogo.cn/g?b=qq&nk=${selectedCreds.uin}&s=640`
+                      : '';
+                    const src = selectedCreds.userInfo?.avatar || fallback;
                     return src ? <img src={src} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <UserIcon size={20} color="var(--text-muted)" />;
                   })()}
                 </div>

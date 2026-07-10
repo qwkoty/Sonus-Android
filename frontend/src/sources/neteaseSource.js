@@ -76,7 +76,15 @@ export const neteaseSource = {
   },
   userInfo: async (cookie) => {
     const j = await getJSON('/user/netease/info', { cookie });
-    return j?.data || { uid: '', nickname: '网易云用户', avatar: '' };
+    const raw = j?.data ?? {};
+    // 兼容多种响应结构（与 qqSource.userInfoAPK 同理的多路径提取）
+    const pick = (...keys) =>
+      keys.map((k) => raw?.[k]).find((v) => v !== undefined && v !== null && v !== '');
+    return {
+      uid: raw?.uid || raw?.account?.id || raw?.userId || '',
+      nickname: pick('nickname', 'name', 'userName', 'profileNickname') || '网易云用户',
+      avatar: pick('avatar', 'profileImageUrl', 'headImgUrl', 'icon'),
+    };
   },
   userPlaylists: async (cookie, uid) => {
     const j = await getJSON('/user/netease/playlists', { cookie, uid });

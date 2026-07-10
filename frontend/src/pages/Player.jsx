@@ -179,7 +179,7 @@ function FloatPanel({ open, onClose, title, width = 360, children }) {
 
 export default function Player({ onProfile }) {
   const { currentTrack, isPlaying, currentTime, duration, volume, playMode, playlist, togglePlay, next, prev, seek, setVolume, toggleMode, playTrack, lyrics, currentLyric, isLoadingUrl, error, clearError, setError } = usePlayerStore();
-  const { userInfo, isLoggedIn, nickname, getSourceCreds } = useAuthStore();
+  const { userInfo, isLoggedIn, getSourceCreds } = useAuthStore();
   const [sq, setSq] = useState(false); const [qo, setQo] = useState(false); const [viz, setViz] = useState(false);
   const [controlsExpanded, setControlsExpanded] = useState(() => { try { return localStorage.getItem('sonus_controls_expanded') !== 'false'; } catch { return true } });
   const [query, setQuery] = useState('');
@@ -294,11 +294,6 @@ export default function Player({ onProfile }) {
         <button onClick={onProfile} className={`glass-button ${isLoggedIn && av ? 'avatar-pulse' : ''}`} style={{ width: 40, height: 40, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', padding: 0, background: 'rgba(255,255,255,0.08)', border: '2px solid rgba(255,255,255,0.12)' }}>
           {isLoggedIn && av ? <img src={av} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <span style={{ fontSize: 12, fontWeight: 760, color: 'var(--text-secondary)' }}>{isLoggedIn ? '我' : '登'}</span>}
         </button>
-        {isLoggedIn && nickname && (
-          <button onClick={onProfile} className="glass-button" style={{ maxWidth: 96, height: 32, padding: '0 12px', borderRadius: 16, fontSize: 12, fontWeight: 700, color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'flex', alignItems: 'center' }}>
-            {nickname}
-          </button>
-        )}
         <div style={{ flex: 1, textAlign: 'center', minWidth: 0 }}>
           <div key={currentTrack?.id || 'idle'} className="animate-fadeIn">
             <div style={{ fontSize: 13.5, fontWeight: 760, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'rgba(255,255,255,0.95)' }}>{currentTrack?.title || 'Sonus'}</div>
