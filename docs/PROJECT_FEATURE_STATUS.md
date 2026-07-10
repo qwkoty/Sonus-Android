@@ -220,3 +220,5 @@
 | 2026-07-10 | v1.15 | 修复登录后个人界面不显示头像/昵称：userInfoAPK 兼容多种响应嵌套(data.data/data/req_0)与字段别名(nick/nickname/name 等)；头像缺失回退 qlogo(uin 拼接)保证必有图；Profile 头像/昵称双兜底。新增 DEV_PROFILE_AVATAR_FIX.md | AI Assistant |
 | 2026-07-10 | v1.16 | 播放器 UI 微交互增强：FloatPanel 搜索/队列/视觉面板进入动画(panelIn 下滑淡入+遮罩 fadeIn)；顶栏头像登录态脉冲环(avatar-pulse)；玻璃按钮按压下沉+微缩放；切歌标题/歌手淡入过渡。新增 DEV_PLAYER_UI_MICROINTERACTIONS.md | AI Assistant |
 | 2026-07-10 | v1.17 | 修复多源头像昵称交叉污染：Player 顶栏移除昵称按钮（用户要求不显示）；Profile 头像兜底按源区分（仅 QQ 用 qlogo，网易云/酷狗不跨用 QQ 头像服务）；neteaseSource.userInfo 增加多路径字段提取(nickname/name/userName 等)。新增 DEV_FIX_MULTI_SOURCE_AVATAR.md | AI Assistant |
+| 2026-07-11 | v1.18 | QQ 昵称深度排查：新增 logKeys() 响应结构日志（仅 key 路径不含敏感值）；deepPick() 覆盖 20+ 条多层嵌套字段路径(info/result/data/base_info/accountInfo)；nick/avatar/vipLevel 全部改用深层探测。新增 DEV_QQ_NICKNAME_DEBUG.md | AI Assistant |
+| 2026-07-11 | v1.19 | 地形可视化重设计「平坦→山脉」：buildBase 从 fBm 山峰改为近乎平坦圆盘；terrainRise[0,1] 驱动（播放1.2/s升起/停播0.5s回落/待机微隆0.18）；运行时重算fBm×激活度+音频驱动(增益+20%)；待机呼吸增强3倍；着色增加雾气+峰顶辉光+等高线动态亮度。新增 DEV_TERRAIN_FLAT_TO_PEAKS.md | AI Assistant |
