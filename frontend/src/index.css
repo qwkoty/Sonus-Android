@@ -288,13 +288,6 @@ input[type="range"]::-webkit-slider-thumb {
 /* 可视化模式切换淡入（域C v1.23：避免 2D↔3D 硬切） */
 @keyframes vizFadeIn { from { opacity: 0; } to { opacity: 1; } }
 
-/* 模式指示点：当前模式点带呼吸光晕（域D v1.23） */
-.mode-dot-active { animation: modeDotBreathe 2.4s ease-in-out infinite; }
-@keyframes modeDotBreathe {
-  0%, 100% { box-shadow: 0 0 6px var(--accent-dynamic); }
-  50%      { box-shadow: 0 0 14px var(--accent-dynamic); }
-}
-
 .vignette-overlay {
   position: fixed;
   inset: 0;

@@ -314,13 +314,6 @@ export default function Player({ onProfile }) {
         {lyricPanel && <LyricScroll currentLyric={currentLyric || ''} accent={ac} />}
       </div>
 
-      {/* 模式指示点：点击切换可视化模式，当前模式高亮 */}
-      <div style={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)', top: 'calc(54px + var(--safe-top))', zIndex: 50, display: 'flex', gap: 9, alignItems: 'center', padding: '6px 12px', borderRadius: 999, background: 'rgba(5,6,8,0.35)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }}>
-        {VIZ_MODES.map(m => (
-          <button key={m.key} onClick={() => switchVm(m.key)} aria-label={m.label} className={vm === m.key ? 'mode-dot-active' : 'mode-dot'} style={{ width: vm === m.key ? 20 : 7, height: 7, borderRadius: 999, border: 'none', padding: 0, background: vm === m.key ? ac : 'rgba(255,255,255,0.28)', boxShadow: vm === m.key ? `0 0 8px ${ac}` : 'none', transition: 'all .2s ease', cursor: 'pointer' }} />
-        ))}
-      </div>
-
       {/* 暗角遮罩 */}
       <div className="vignette-overlay" />
 

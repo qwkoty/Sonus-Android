@@ -129,11 +129,12 @@ function Visualizer({ isPlaying, mode = 'ring', accent = '#4FC3F7' }) {
         smooth[i] += (data[i] - smooth[i]) * 0.32;
       }
 
-      // 域C(v1.23)：待机时 accent 色相极慢漂移(~8s)，让待机也"活着"但不抢戏
-      const idleHueShift = hasData ? 0 : Math.sin(tNow * (Math.PI * 2 / 8)) * 8;
-
       // 频段提取：bass / mid / treble
       const tNow = Date.now() * 0.001;
+
+      // 域C(v1.23)：待机时 accent 色相极慢漂移(~8s)，让待机也"活着"但不抢戏
+      // 注意：tNow 必须在此行之前声明（否则 TDZ 抛错导致 ring 模式渲染失败，v1.24 修复）
+      const idleHueShift = hasData ? 0 : Math.sin(tNow * (Math.PI * 2 / 8)) * 8;
       let bass = 0, mid = 0, treble = 0;
       if (hasData) {
         for (let i = 0; i < 8; i++) bass += smooth[i];
