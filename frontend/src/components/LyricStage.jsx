@@ -16,7 +16,7 @@ function mixColor(hex, t) {
   const r = Math.round(((bigint >> 16) & 255) * (1 - t) + 255 * t);
   const g = Math.round(((bigint >> 8) & 255) * (1 - t) + 255 * t);
   const b = Math.round((bigint & 255) * (1 - t) + 255 * t);
-  return `rgba(${r},${g},${b}`;
+  return `${r},${g},${b}`; // 返回 RGB 三元组，由调用方拼 rgba(...,alpha)（v1.25 B3 修复畸形 rgba）
 }
 
 // 歌词舞台：MineRadio 风格
@@ -114,8 +114,8 @@ export default function LyricStage({ accent = '#00F5D4', isPlaying = false }) {
       const halo = ctx.createRadialGradient(cx, cy, 0, cx, cy, haloR);
       halo.addColorStop(0, hexToRgba('#ffffff', 0.10 + beat * 0.18));
       halo.addColorStop(0.22, hexToRgba(ac, 0.10 + solar * 0.16));
-      halo.addColorStop(0.55, `${baseA},${0.05 + energy * 0.10})`);
-      halo.addColorStop(0.85, `${baseA},${0.015 + energy * 0.03})`);
+      halo.addColorStop(0.55, `rgba(${baseA},${0.05 + energy * 0.10})`);
+      halo.addColorStop(0.85, `rgba(${baseA},${0.015 + energy * 0.03})`);
       halo.addColorStop(1, 'rgba(0,0,0,0)');
       ctx.fillStyle = halo;
       ctx.beginPath();
@@ -124,9 +124,9 @@ export default function LyricStage({ accent = '#00F5D4', isPlaying = false }) {
 
       // 3) 地板反射
       const floorGrad = ctx.createRadialGradient(cx, h * 0.92, 0, cx, h * 0.92, w * 0.55);
-      floorGrad.addColorStop(0, `${hotA},${0.10 + energy * 0.22})`);
-      floorGrad.addColorStop(0.4, `${baseA},${0.05 + energy * 0.08})`);
-      floorGrad.addColorStop(0.78, `${baseA},${0.015 + energy * 0.025})`);
+      floorGrad.addColorStop(0, `rgba(${hotA},${0.10 + energy * 0.22})`);
+      floorGrad.addColorStop(0.4, `rgba(${baseA},${0.05 + energy * 0.08})`);
+      floorGrad.addColorStop(0.78, `rgba(${baseA},${0.015 + energy * 0.025})`);
       floorGrad.addColorStop(1, 'rgba(0,0,0,0)');
       ctx.fillStyle = floorGrad;
       ctx.beginPath();
@@ -171,7 +171,7 @@ export default function LyricStage({ accent = '#00F5D4', isPlaying = false }) {
         const y = cy + t * h * 0.35;
         const r = (0.5 + (i % 5) * 0.25) * dpr * (0.8 + beat);
         ctx.globalAlpha = (1 - t) * (0.12 + energy * 0.28);
-        ctx.fillStyle = `${hotA},${0.8})`;
+        ctx.fillStyle = `rgba(${hotA},${0.8})`;
         ctx.beginPath();
         ctx.arc(x, y, r, 0, Math.PI * 2);
         ctx.fill();

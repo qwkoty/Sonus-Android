@@ -55,16 +55,8 @@ export const usePlayerStore = create((set, get) => {
     }
   });
 
-  // 歌词高亮需要比 timeupdate 更平滑的时间，用 RAF 单独更新 lyricTime
-  let lyricRaf = 0;
-  const updateLyricTime = () => {
-    const { isPlaying } = get();
-    if (isPlaying && audio) {
-      set({ lyricTime: audio.currentTime || 0 });
-    }
-    lyricRaf = requestAnimationFrame(updateLyricTime);
-  };
-  lyricRaf = requestAnimationFrame(updateLyricTime);
+  // 注：lyricTime 此前由永久 requestAnimationFrame 每帧 set，会触发整库订阅的 Player 每帧重渲染（播放时 60fps 卡顿）。
+  // 现改为依赖原生 timeupdate 事件驱动歌词时间（4~10Hz 足够平滑），移除该 rAF 循环（v1.25）。
 
   // 原生通知栏/锁屏控制事件
   MediaControl.onMediaControlEvent((action) => {

@@ -178,6 +178,14 @@ function Visualizer({ isPlaying, mode = 'ring', accent = '#4FC3F7' }) {
       // 性能优化：层数 24→10，步数 120→64，手机带得动
       const FILL_STEPS = 64;
       const FILL_RINGS = 12; // 10→12：层次更密（v1.21）
+      // O6(v1.25)：填充环角度 cos/sin 与层无关，帧内预计算查表，12 层共享免去重复三角函数
+      const cosF = new Float32Array(FILL_STEPS + 1);
+      const sinF = new Float32Array(FILL_STEPS + 1);
+      for (let s = 0; s <= FILL_STEPS; s++) {
+        const a = (s / FILL_STEPS) * Math.PI * 2;
+        cosF[s] = Math.cos(a);
+        sinF[s] = Math.sin(a);
+      }
       for (let layer = FILL_RINGS - 1; layer >= 0; layer--) {
         const layerProgress = layer / FILL_RINGS; // 0=中心, 1=边缘
         const layerR = INNER_R + (MAX_R * 0.65 - INNER_R) * layerProgress;
@@ -199,8 +207,8 @@ function Visualizer({ isPlaying, mode = 'ring', accent = '#4FC3F7' }) {
           const angleWave = Math.sin(tNow * 1.5 + angle * 3 + layer * 0.4) * 0.08;
           const amp = layerValue * minDim * 0.045 * (1 - layerProgress * 0.3); // 0.06→0.045：中心填充收敛（v1.22）
           const r = layerR + amp + angleWave * minDim * 0.01;
-          const x = cx + Math.cos(angle) * r;
-          const y = cy + Math.sin(angle) * r;
+          const x = cx + cosF[s] * r;
+          const y = cy + sinF[s] * r;
           if (s === 0) ctx.moveTo(x, y);
           else ctx.lineTo(x, y);
         }
@@ -212,11 +220,12 @@ function Visualizer({ isPlaying, mode = 'ring', accent = '#4FC3F7' }) {
       // === 2. 中心发光核心（跟随低频脉动，增强脉冲范围）===
       const coreR = INNER_R * (3.0 + bassSmooth * 5.5);
       const coreGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, coreR);
-      coreGrad.addColorStop(0, `hsla(${H}, ${S}%, 92%, ${0.8 + bassSmooth * 0.2})`);
-      coreGrad.addColorStop(0.2, `hsla(${H}, ${S}%, 70%, ${0.5 + bassSmooth * 0.3})`);
-      coreGrad.addColorStop(0.5, `hsla(${H}, ${S}%, 55%, ${0.25 + bassSmooth * 0.15})`);
-      coreGrad.addColorStop(0.8, `hsla(${H}, ${S}%, 50%, 0.08)`);
-      coreGrad.addColorStop(1, `hsla(${H}, ${S}%, 50%, 0)`);
+      // O9(v1.25)：核心光 hue 加 idleHueShift，待机时整片环形场统一缓慢呼吸（纯着色）
+      coreGrad.addColorStop(0, `hsla(${H + idleHueShift}, ${S}%, 92%, ${0.8 + bassSmooth * 0.2})`);
+      coreGrad.addColorStop(0.2, `hsla(${H + idleHueShift}, ${S}%, 70%, ${0.5 + bassSmooth * 0.3})`);
+      coreGrad.addColorStop(0.5, `hsla(${H + idleHueShift}, ${S}%, 55%, ${0.25 + bassSmooth * 0.15})`);
+      coreGrad.addColorStop(0.8, `hsla(${H + idleHueShift}, ${S}%, 50%, 0.08)`);
+      coreGrad.addColorStop(1, `hsla(${H + idleHueShift}, ${S}%, 50%, 0)`);
       ctx.fillStyle = coreGrad;
       ctx.beginPath();
       ctx.arc(cx, cy, coreR, 0, Math.PI * 2);
@@ -241,8 +250,8 @@ function Visualizer({ isPlaying, mode = 'ring', accent = '#4FC3F7' }) {
           const idx = Math.floor(s * step) % wave.length;
           const v = (wave[idx] - 128) / 128;
           const r = waveR + v * minDim * 0.03;
-          const x = cx + Math.cos(angle) * r;
-          const y = cy + Math.sin(angle) * r;
+          const x = cx + cosF[s] * r;
+          const y = cy + sinF[s] * r;
           if (s === 0) ctx.moveTo(x, y);
           else ctx.lineTo(x, y);
         }
@@ -252,8 +261,8 @@ function Visualizer({ isPlaying, mode = 'ring', accent = '#4FC3F7' }) {
           const angle = (s / FILL_STEPS) * Math.PI * 2;
           const v = Math.sin(angle * 3 + tNow * 0.8) * 0.15 + Math.sin(angle * 5 - tNow * 1.2) * 0.1;
           const r = waveR + v * minDim * 0.02;
-          const x = cx + Math.cos(angle) * r;
-          const y = cy + Math.sin(angle) * r;
+          const x = cx + cosF[s] * r;
+          const y = cy + sinF[s] * r;
           if (s === 0) ctx.moveTo(x, y);
           else ctx.lineTo(x, y);
         }
@@ -265,6 +274,15 @@ function Visualizer({ isPlaying, mode = 'ring', accent = '#4FC3F7' }) {
       // === 4. 辐射波浪环：内圈=低频，外圈=高频 ===
       // 性能优化：环数 5→3，步数 180→96，shadowBlur 减半
       const NUM_RINGS = 4; // 3→4：多一圈高频环（v1.21）
+      const STEPS = 96; // 移到环循环外（O6 v1.25：cos/sin 预计算只需一次）
+      // O6(v1.25)：辐射环角度 cos/sin 与环/相位无关，帧内预计算查表，4 环共享免去重复三角函数
+      const cosR = new Float32Array(STEPS + 1);
+      const sinR = new Float32Array(STEPS + 1);
+      for (let s = 0; s <= STEPS; s++) {
+        const a = (s / STEPS) * Math.PI * 2;
+        cosR[s] = Math.cos(a);
+        sinR[s] = Math.sin(a);
+      }
       for (let ring = 0; ring < NUM_RINGS; ring++) {
         const ringProgress = (ring + 1) / NUM_RINGS;
         const baseR = MAX_R * 0.35 + (MAX_R - MAX_R * 0.35) * ringProgress;
@@ -285,7 +303,6 @@ function Visualizer({ isPlaying, mode = 'ring', accent = '#4FC3F7' }) {
         ctx.lineJoin = 'round';
 
         ctx.beginPath();
-        const STEPS = 96;
         for (let s = 0; s <= STEPS; s++) {
           const angle = (s / STEPS) * Math.PI * 2;
           const angleFreq = Math.abs(Math.sin(angle)) * freqRange;
@@ -297,8 +314,8 @@ function Visualizer({ isPlaying, mode = 'ring', accent = '#4FC3F7' }) {
           const ampScale = (1 - ringProgress * 0.3);
           const amp = value * (MAX_R - INNER_R) * 0.15 * ampScale * (hasData ? 1 : 0.35); // 0.20→0.15：辐射环振幅收敛（v1.22）
           const r = baseR + amp + waveOffset * minDim * 0.005;
-          const x = cx + Math.cos(angle) * r;
-          const y = cy + Math.sin(angle) * r;
+          const x = cx + cosR[s] * r;
+          const y = cy + sinR[s] * r;
           if (s === 0) ctx.moveTo(x, y);
           else ctx.lineTo(x, y);
         }
@@ -311,9 +328,10 @@ function Visualizer({ isPlaying, mode = 'ring', accent = '#4FC3F7' }) {
       ctx.save();
       const maxSpikeLen = minDim * 0.05;
       const spikeGrad = ctx.createRadialGradient(cx, cy, MAX_R, cx, cy, MAX_R + maxSpikeLen);
-      spikeGrad.addColorStop(0, `hsla(${H}, ${S}%, ${Math.min(92, (L || 70) + 22)}%, 0.62)`);
-      spikeGrad.addColorStop(0.45, `hsla(${H}, ${S}%, 82%, 0.34)`);
-      spikeGrad.addColorStop(1, `hsla(${H}, ${S}%, 82%, 0)`);
+      // O9(v1.25)：尖刺 hue 加 idleHueShift，与外圈光晕待机色相一致
+      spikeGrad.addColorStop(0, `hsla(${H + idleHueShift}, ${S}%, ${Math.min(92, (L || 70) + 22)}%, 0.62)`);
+      spikeGrad.addColorStop(0.45, `hsla(${H + idleHueShift}, ${S}%, 82%, 0.34)`);
+      spikeGrad.addColorStop(1, `hsla(${H + idleHueShift}, ${S}%, 82%, 0)`);
       ctx.strokeStyle = spikeGrad;
       ctx.lineWidth = Math.max(1, minDim * 0.0016);
       ctx.shadowColor = C.glow;
@@ -397,6 +415,7 @@ function Visualizer({ isPlaying, mode = 'ring', accent = '#4FC3F7' }) {
 
     const drawWave = (spectrum, hasData) => {
       const C = palette();
+      const [H, S, L] = hexToHsl(accentRef.current); // O4(v1.25)：渐变端点直构，免 hslaWithAlpha 正则+split
       const data = spectrum;
 
       const smooth = smoothRef.current;
@@ -434,14 +453,14 @@ function Visualizer({ isPlaying, mode = 'ring', accent = '#4FC3F7' }) {
         // 每一根细柱：从中心向两侧由浅到深（域B v1.23：圆角加大+顶/底羽化，消除锯齿硬边）
         const colAlpha = 0.25 + value * 0.55;
         const gUp = ctx.createLinearGradient(0, midY, 0, yUp);
-        gUp.addColorStop(0, hslaWithAlpha(C.inner, colAlpha));
-        gUp.addColorStop(1, hslaWithAlpha(C.outer, colAlpha * 0.42));
+        gUp.addColorStop(0, `hsla(${H}, ${S}%, ${L + 6}%, ${0.78 * colAlpha})`);        // O4(v1.25)：原 C.inner 基底 0.78 × colAlpha
+        gUp.addColorStop(1, `hsla(${H}, ${S}%, ${L + 24}%, ${0.42 * colAlpha * 0.42})`); // 原 C.outer 基底 0.42 × 0.42
         ctx.fillStyle = gUp;
         roundRectFill(ctx, x - innerW / 2, yUp, innerW, midY - yUp, innerW * 0.45);
 
         const gDown = ctx.createLinearGradient(0, midY, 0, yDown);
-        gDown.addColorStop(0, hslaWithAlpha(C.inner, colAlpha));
-        gDown.addColorStop(1, hslaWithAlpha(C.outer, colAlpha * 0.35));
+        gDown.addColorStop(0, `hsla(${H}, ${S}%, ${L + 6}%, ${0.78 * colAlpha})`);
+        gDown.addColorStop(1, `hsla(${H}, ${S}%, ${L + 24}%, ${0.42 * colAlpha * 0.35})`); // 原 C.outer 基底 0.42 × 0.35
         ctx.fillStyle = gDown;
         roundRectFill(ctx, x - innerW / 2, midY, innerW, yDown - midY, innerW * 0.45);
       }
@@ -494,15 +513,6 @@ function Visualizer({ isPlaying, mode = 'ring', accent = '#4FC3F7' }) {
       }
       ctx.stroke();
       ctx.restore();
-    };
-
-    // 辅助：从 hsla(...) 字符串中替换 alpha
-    const hslaWithAlpha = (color, alpha) => {
-      return color.replace(/hsla?\(([^)]+)\)/, (_, body) => {
-        const parts = body.split(',').map(s => s.trim());
-        const a = parts.length >= 4 ? parseFloat(parts[3]) : 1;
-        return `hsla(${parts[0]}, ${parts[1]}, ${parts[2]}, ${a * alpha})`;
-      });
     };
 
     const roundRectFill = (c, x, y, bw, bh, r) => {

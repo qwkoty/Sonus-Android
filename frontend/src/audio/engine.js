@@ -116,21 +116,13 @@ export function getSpectrumBars(numBars = 64, gain = 1.04) { // gain 1.12→1.04
   return { data: result, hasData };
 }
 
-export function readFrequencyData() {
-  if (!analyser) return new Uint8Array(0);
-  const bufferLength = analyser.frequencyBinCount;
-  const dataArray = new Uint8Array(bufferLength);
-  analyser.getByteFrequencyData(dataArray);
-  return dataArray;
-}
-
+// 时间域数据复用缓冲（v1.25 O8：避免每帧 new Uint8Array 的 GC 抖动，同 spectrumBuf 做法；
+// 同时删除未使用的 readFrequencyData / readFrequencyDataLog 导出，B5 死代码清理）
+let timeDomainBuf = null;
 export function readTimeDomainData() {
   if (!analyser) return new Uint8Array(0);
-  const arr = new Uint8Array(analyser.fftSize);
-  analyser.getByteTimeDomainData(arr);
-  return arr;
-}
-
-export function readFrequencyDataLog(numBars = 64) {
-  return getSpectrumBars(numBars);
+  const len = analyser.fftSize;
+  if (!timeDomainBuf || timeDomainBuf.length !== len) timeDomainBuf = new Uint8Array(len);
+  analyser.getByteTimeDomainData(timeDomainBuf);
+  return timeDomainBuf;
 }

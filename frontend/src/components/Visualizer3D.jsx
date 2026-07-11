@@ -97,13 +97,13 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
   // 星河漩涡跨渲染状态（必须置于组件顶层，遵守 hooks 规则）
   const albumBuiltRef = useRef(-1);
   const prevBassRef = useRef(0);
-  const prevMidRef = useRef(0);
   const lastBeatRef = useRef(0);
   const beatPulseRef = useRef(0);
   const beatFreqBoostRef = useRef(0); // 鼓点频率增强包络（与 beatPulse 平行，独立衰减）
   // ====== 待机动画专用状态 ======
   const idleWindRef = useRef({ phase: 0, lastGust: 0, gustDir: 1, gustAmp: 0 });
   const idleHotspotsRef = useRef(null);        // 液态金属：对流热点 [{cx,cy,period,phase}]
+  const hotspotFalloffRef = useRef(null);      // O3(v1.25)：每粒子×每热点高斯衰减预存 Float32Array(COUNT*8)
   const idleDropletRef = useRef({ idx: -1, phase: 0, life: 0 }); // 液态金属：液滴粒子
   const idleTwinkleRef = useRef(null);         // 星河：闪烁亮度数组 Float32Array(COUNT)
   const idleMeteorRef = useRef({ active: false, idx: -1, prog: 0, sx: 0, sy: 0, ex: 0, ey: 0, nextT: 3 + Math.random() * 7 });
@@ -266,6 +266,8 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
     const galaxyArm = new Int8Array(COUNT);                  // 所属旋臂索引（-1=弥散晕）
     const galaxyBulge = new Float32Array(COUNT);             // 1=核球粒子
     const basePositionsTerrain = new Float32Array(COUNT * 3);  // 地形基础坐标
+    const terrainHN = new Float32Array(COUNT);                  // 预计算静态山高 hN（O2 v1.25：避免动画每帧重算 fBm）
+    const terrainRidge = new Float32Array(COUNT);               // 预计算 ridged 噪声（O2 v1.25：地形着色坡度受光复用）
       const terrainBand = new Uint8Array(COUNT);                 // 每粒子对应频段（中心=高频，外圈=低频）
     const coverColors = new Float32Array(COUNT * 3);         // 封面 RGB（取平均色用）
     const explodeVel = new Float32Array(COUNT * 3);          // 冲击波速度
@@ -440,6 +442,8 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
           // tanh 软饱和归一化（避免高值区截断导致平顶，永远平滑）
           // 注意：fBm 高度不再写入静态坐标（初始平坦），仅在 animate 中运行时计算
           const hN = (Math.tanh(terH * 0.4) * 0.5 + 0.5) * radial;
+          terrainHN[idx] = hN;   // O2(v1.25)：预存静态山高，动画分支直接读取，免每帧重算 fBm
+          terrainRidge[idx] = ridge; // O2(v1.25)：预存 ridged，地形着色坡度受光复用
           basePositionsTerrain[idx * 3] = tx;
           // 平坦圆盘 + 极微噪防 z-fighting：初始近乎平面，山脉由 terrainRise 驱动升起
           const microNoise = (Math.sin(u * 37 + v * 53) + Math.sin(u * 71 - v * 19)) * 0.0008;
@@ -622,6 +626,17 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
               period: 3 + Math.random() * 4, phase: Math.random() * Math.PI * 2, amp: 0.9 + Math.random() * 0.9 });
           }
           idleHotspotsRef.current = hs;
+          // O3(v1.25)：预计算每粒子 × 每热点的高斯衰减（法线=baseNormalsLiquid 静态球面方向，与缩放无关），免每帧 acos+exp
+          const fall = new Float32Array(COUNT * 8);
+          for (let h = 0; h < 8; h++) {
+            const sp = hs[h];
+            for (let i = 0; i < COUNT; i++) {
+              const dot = baseNormalsLiquid[i * 3] * sp.cx + baseNormalsLiquid[i * 3 + 1] * sp.cy + baseNormalsLiquid[i * 3 + 2] * sp.cz;
+              const heatDist = Math.acos(Math.max(-1, Math.min(1, dot)));
+              fall[i * 8 + h] = Math.exp(-heatDist * heatDist * 3);
+            }
+          }
+          hotspotFalloffRef.current = fall;
         }
 
         if (modeIdle === 'coverflow') {
@@ -839,7 +854,7 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
         }
       }
 
-      const invRmax = 1 / Rmax; // 预计算倒数，避免每粒子多次除法
+      const invRmax = Rmax > 0 ? 1 / Rmax : 0; // 预计算倒数（v1.25 B4：容器 0×0 时避免 Infinity/NaN 传播）
 
       // ═══ 粒子封面「腻子脱落」模拟：每帧驱动 clayDepth ═══
       // 目标：让 ≈1500+ 粒子持续、随机地"掉到后层再浮回"，但封面始终完整
@@ -892,15 +907,20 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
         riseKick *= Math.pow(0.92, dt * 60); // 过冲缓慢收敛
       }
 
+      // O7(v1.25)：morph 期间源形态基础坐标固定，提升到循环外只算一次（原每粒子调用 baseFor 分配对象）
+      const morphFromPos = tr.active ? baseFor(tr.from).pos : null;
+
       for (let i = 0; i < COUNT; i++) {
         const u = origUV[i * 2];
         const v = origUV[i * 2 + 1];
         const dc = distFromCenter[i];
 
+        // O5(v1.25)：循环顶部统一计算 rN（galaxy=归一化半径, 其余=sqrt(v)），位置/动画/着色三处复用，免重复 Math.sqrt/pow
+        const rN = isGalaxy ? Math.min(1, galaxyR[i] * invRmax) : Math.sqrt(v);
+
         let bx, by, bz, nx, ny, nz;
         if (isGalaxy) {
-          const rN = Math.min(1, galaxyR[i] * invRmax);
-          // 频谱映射：中心=高频，外圈=低频，把 64 段频谱绕成同心环
+          // 频谱映射：中心=高频，外圈=低频，把 64 段频谱绕成同心环（rN 已在循环顶部统一计算）
           const band = Math.min(63, Math.floor((1 - rN) * 63));
 
           // 由内向外的径向涟漪波（频段能量驱动——大幅增强可见度）
@@ -925,7 +945,7 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
 
           if (tr.active) {
             // 跨模式进入星河时，从源形态基础坐标平滑过渡到星河基础坐标
-            const fb = baseFor(tr.from).pos;
+            const fb = morphFromPos; // O7(v1.25)：复用循环外预取的源形态坐标
             const mt = morphT;
             sx = fb[i * 3] * (1 - mt) + sx * mt;
             sy = fb[i * 3 + 1] * (1 - mt) + sy * mt;
@@ -1053,12 +1073,11 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
           let hotDisp = 0;
           if (!hasData || idleHotspotsRef.current) {
             const hotspots = idleHotspotsRef.current || [];
+            const fall = hotspotFalloffRef.current;
             for (let h = 0; h < hotspots.length; h++) {
               const sp = hotspots[h];
-              // 粒子到热点的球面距离
-              const dot = nx * sp.cx + ny * sp.cy + nz * sp.cz;
-              const heatDist = Math.acos(Math.max(-1, Math.min(1, dot))); // 0=同点, π=对跖
-              const heatFalloff = Math.exp(-heatDist * heatDist * 3); // 高斯衰减
+              // O3(v1.25)：直接读取预存高斯衰减（与 nx,ny,nz=baseNormalsLiquid 同法线、同热点方向 → 数值一致）
+              const heatFalloff = fall ? fall[i * 8 + h] : 0;
               const pulse = (Math.sin(time / sp.period * Math.PI * 2 + sp.phase) * 0.5 + 0.5) * sp.amp;
               hotDisp += pulse * heatFalloff * planeSize * (hasData ? 0.03 : 0.07);
             }
@@ -1092,23 +1111,13 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
           y = ny * r;
           z = nz * r;
         } else if (targetShape === 'ocean') {
-          // ═══ 地形：初始平坦圆盘 → 播放时从音频能量中生长出山脉 ═══
-          const rN = Math.sqrt(v);
-          const tTheta = u * Math.PI * 2;
+          // ═══ 地形：初始平坦圆盘 → 播放时从音频能量中生长出山脉 ═══（rN 已在循环顶部统一计算）
           const band = terrainBand[i];
           const energy = spectrumSmooth[band];
           const freqWeight = Math.pow(1 - rN, 1.3); // 域B(v1.23)：低频主峰更突出、外圈高频更收敛（视觉重心稳）
 
-          // 运行时重新计算 fBm 山高（与 buildBase 同算法、同参数 → 形态一致）
-          let terH = 0;
-          terH += Math.sin(tTheta * trFreq[0] + rN * 4.0 + trPhase[0]) * 1.6;
-          terH += Math.sin(tTheta * trFreq[1] - rN * 7.0 + trPhase[1]) * 0.9;
-          terH += Math.sin(tTheta * trFreq[2] + rN * 13.0 + trPhase[2]) * 0.45;
-          terH += Math.sin(tTheta * trFreq[3] - rN * 21.0 + trPhase[3]) * 0.22;
-          const ridge = Math.abs(Math.sin(tTheta * trFreq[0] * 0.7 + rN * 11.0 + trPhase[0] * 1.3));
-          terH += (ridge * 2.0 - 1.0) * 0.6;
-          const radial = Math.pow(Math.max(0, 1 - rN), 1.2);
-          const hN = (Math.tanh(terH * 0.4) * 0.5 + 0.5) * radial;
+          // O2(v1.25)：直接读取 buildBase 预存的静态山高，免每帧重算 fBm（形态与 buildBase 完全一致）
+          const hN = terrainHN[idx];
 
           // 静态山高 × 激活度（terrainRise=0→平坦, =1→全高山脉）
           const staticH = (hN - 0.35) * planeSize * 0.72 * terrainRise; // 0.95→0.72：山高回调（v1.22）
@@ -1141,8 +1150,7 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
         posAttr.array[i * 3 + 2] = z;
 
         if (isGalaxy) {
-          // 星河着色：内核=主题色(炽热)，外圈=封面平均色(冷)，加色混合辉光
-          const rN = Math.min(1, galaxyR[i] * invRmax);
+          // 星河着色：内核=主题色(炽热)，外圈=封面平均色(冷)，加色混合辉光（rN 已在循环顶部统一计算）
           const isHaloNow = galaxyArm[i] < 0 && !galaxyBulge[i];
           const coreMix = Math.pow(1 - rN, 2.4); // 域A(v1.23)：更非线性 → 炽热内核更聚拢、外晕更冷
           const cr = accentRGB.r, cg = accentRGB.g, cb = accentRGB.b;
@@ -1192,8 +1200,7 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
           colorAttr.array[i * 3 + 1] = Math.min(1, g * intensity + twinkleBoost);
           colorAttr.array[i * 3 + 2] = Math.min(1, b * intensity + twinkleBoost);
         } else if (isTerrain) {
-          // 地形着色(v1.23 域A)：3-4 段平滑色带(深蓝紫谷底→accent山腰→雪顶近白) + 坡度受光 + 指数雾 + 峰顶辉光
-          const rN = Math.sqrt(v); // 0=中心, 1=外圈
+          // 地形着色(v1.23 域A)：3-4 段平滑色带(深蓝紫谷底→accent山腰→雪顶近白) + 坡度受光 + 指数雾 + 峰顶辉光（rN 已在循环顶部统一计算）
           const band = terrainBand[i];
           const energy = spectrumSmooth[band];
           const normH = Math.max(0, Math.min(1, (y / planeSize + 0.30) / 0.98));
@@ -1210,8 +1217,8 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
           g += (0.96 - accentRGB.g) * tHi;
           b += (1.0  - accentRGB.b) * tHi;
 
-          // 坡度受光（陡坡/山脊更亮，像受光面）：用 ridged 项近似坡度
-          const ridgeNow = Math.abs(Math.sin(tTheta * trFreq[0] * 0.7 + rN * 11.0 + trPhase[0] * 1.3));
+          // 坡度受光（陡坡/山脊更亮，像受光面）：复用 buildBase 预存的 ridged 项（O2 v1.25：免每帧 sin 重算，并消除越界 tTheta 引用）
+          const ridgeNow = terrainRidge[idx];
           const slopeGlow = ridgeNow * Math.max(0, normH - 0.08) * 0.22;
           r += slopeGlow * 0.5; g += slopeGlow * 0.5; b += slopeGlow * 0.62;
 
@@ -1452,6 +1459,10 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
       geometry.dispose();
       material.dispose();
       if (material.map) material.map.dispose();
+      // 灵气光点资源一并释放（v1.25 B2：否则每次 remount 泄漏 BufferGeometry/材质/纹理）
+      spiritGeo.dispose();
+      spiritMat.dispose();
+      if (spiritMat.map) spiritMat.map.dispose();
       if (renderer.domElement.parentNode) {
         renderer.domElement.parentNode.removeChild(renderer.domElement);
       }
