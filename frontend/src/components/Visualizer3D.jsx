@@ -1117,7 +1117,7 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
           const freqWeight = Math.pow(1 - rN, 1.3); // 域B(v1.23)：低频主峰更突出、外圈高频更收敛（视觉重心稳）
 
           // O2(v1.25)：直接读取 buildBase 预存的静态山高，免每帧重算 fBm（形态与 buildBase 完全一致）
-          const hN = terrainHN[idx];
+          const hN = terrainHN[i]; // v1.26 修复：动画循环粒子索引为 i（idx 仅 buildBase 局部变量，此处未声明会抛 ReferenceError 导致卡死）
 
           // 静态山高 × 激活度（terrainRise=0→平坦, =1→全高山脉）
           const staticH = (hN - 0.35) * planeSize * 0.72 * terrainRise; // 0.95→0.72：山高回调（v1.22）
@@ -1218,7 +1218,7 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
           b += (1.0  - accentRGB.b) * tHi;
 
           // 坡度受光（陡坡/山脊更亮，像受光面）：复用 buildBase 预存的 ridged 项（O2 v1.25：免每帧 sin 重算，并消除越界 tTheta 引用）
-          const ridgeNow = terrainRidge[idx];
+          const ridgeNow = terrainRidge[i]; // v1.26 修复：动画循环粒子索引为 i（idx 未声明会抛 ReferenceError 导致卡死）
           const slopeGlow = ridgeNow * Math.max(0, normH - 0.08) * 0.22;
           r += slopeGlow * 0.5; g += slopeGlow * 0.5; b += slopeGlow * 0.62;
 
