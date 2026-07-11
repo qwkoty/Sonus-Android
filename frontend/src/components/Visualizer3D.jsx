@@ -1347,51 +1347,49 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
     };
     animate();
 
-    // 手势控制
-    const dom = renderer.domElement;
-    const dist = (t1, t2) => Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
-    const angle = (t1, t2) => Math.atan2(t2.clientY - t1.clientY, t2.clientX - t1.clientX);
-    const onTouchStart = (e) => {
+    // 手势控制（Pointer Events：统一鼠标/触摸/笔，移动端最可靠；setPointerCapture 防止 WebView 吞事件）
+    const surface = containerRef.current;
+    const pointers = new Map(); // pointerId -> { x, y }
+    const pDist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+    const onPointerDown = (e) => {
       const g = gestureRef.current;
       g.lastInteractTime = performance.now();
-      if (e.touches.length === 1) {
-        g.dragging = true;
-        g.startX = e.touches[0].clientX;
-        g.startY = e.touches[0].clientY;
-        g.startRotX = g.targetRotationX;
-        g.startRotY = g.targetRotationY;
-      } else if (e.touches.length === 2) {
-        g.pinching = true;
-        g.dragging = false;
-        g.startDist = dist(e.touches[0], e.touches[1]);
-        g.startAngle = angle(e.touches[0], e.touches[1]);
-        g.startZoom = g.targetZoom;
-        g.startRotY = g.targetRotationY;
+      try { surface.setPointerCapture(e.pointerId); } catch { }
+      pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (pointers.size === 1) {
+        g.dragging = true; g.pinching = false;
+        g.startX = e.clientX; g.startY = e.clientY;
+        g.startRotX = g.targetRotationX; g.startRotY = g.targetRotationY;
+      } else if (pointers.size === 2) {
+        g.pinching = true; g.dragging = false;
+        const p = [...pointers.values()];
+        g.startDist = pDist(p[0], p[1]); g.startZoom = g.targetZoom; g.startRotY = g.targetRotationY;
       }
     };
-    const onTouchMove = (e) => {
+    const onPointerMove = (e) => {
+      if (!pointers.has(e.pointerId)) return;
       const g = gestureRef.current;
       g.lastInteractTime = performance.now();
-      if (g.pinching && e.touches.length === 2) {
+      pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (g.pinching && pointers.size >= 2) {
         e.preventDefault();
-        const d = dist(e.touches[0], e.touches[1]);
-        const a = angle(e.touches[0], e.touches[1]);
-        const scale = d / Math.max(1, g.startDist);
+        const p = [...pointers.values()];
+        const scale = pDist(p[0], p[1]) / Math.max(1, g.startDist);
         g.targetZoom = Math.max(0.4, Math.min(3.0, g.startZoom * scale));
-        g.targetRotationY = g.startRotY + (a - g.startAngle);
-      } else if (g.dragging && e.touches.length === 1) {
+      } else if (g.dragging && pointers.size === 1) {
         e.preventDefault();
-        const dx = e.touches[0].clientX - g.startX;
-        const dy = e.touches[0].clientY - g.startY;
+        const dx = e.clientX - g.startX, dy = e.clientY - g.startY;
         // 水平滑动 → 偏航（360°）；垂直滑动 → 俯仰（限制在 ±85° 防翻转）
         g.targetRotationY = g.startRotY + dx * ROTATE_SENSITIVITY;
         g.targetRotationX = Math.max(-PITCH_LIMIT, Math.min(PITCH_LIMIT, g.startRotX + dy * ROTATE_SENSITIVITY));
       }
     };
-    const onTouchEnd = (e) => {
+    const onPointerUp = (e) => {
       const g = gestureRef.current;
-      if (e.touches.length < 2) g.pinching = false;
-      if (e.touches.length < 1) g.dragging = false;
+      pointers.delete(e.pointerId);
+      try { surface.releasePointerCapture(e.pointerId); } catch { }
+      if (pointers.size < 2) g.pinching = false;
+      if (pointers.size === 0) g.dragging = false;
       g.lastInteractTime = performance.now();
     };
     const onWheel = (e) => {
@@ -1399,41 +1397,13 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
       g.lastInteractTime = performance.now();
       g.targetZoom = Math.max(0.4, Math.min(3.0, g.targetZoom * (e.deltaY > 0 ? 0.92 : 1.08)));
     };
-    // 桌面端鼠标拖拽（便于开发预览，行为同单指滑动）
-    let mouseDown = false;
-    const onMouseDown = (e) => {
-      const g = gestureRef.current;
-      g.lastInteractTime = performance.now();
-      mouseDown = true;
-      g.dragging = true;
-      g.startX = e.clientX;
-      g.startY = e.clientY;
-      g.startRotX = g.targetRotationX;
-      g.startRotY = g.targetRotationY;
-    };
-    const onMouseMove = (e) => {
-      if (!mouseDown || !gestureRef.current.dragging) return;
-      const g = gestureRef.current;
-      g.lastInteractTime = performance.now();
-      const dx = e.clientX - g.startX;
-      const dy = e.clientY - g.startY;
-      g.targetRotationY = g.startRotY + dx * ROTATE_SENSITIVITY;
-      g.targetRotationX = Math.max(-PITCH_LIMIT, Math.min(PITCH_LIMIT, g.startRotX + dy * ROTATE_SENSITIVITY));
-    };
-    const onMouseUp = () => {
-      mouseDown = false;
-      gestureRef.current.dragging = false;
-      gestureRef.current.lastInteractTime = performance.now();
-    };
-    dom.style.touchAction = 'none';
-    dom.style.cursor = 'grab';
-    dom.addEventListener('touchstart', onTouchStart, { passive: false });
-    dom.addEventListener('touchmove', onTouchMove, { passive: false });
-    dom.addEventListener('touchend', onTouchEnd);
-    dom.addEventListener('wheel', onWheel, { passive: true });
-    dom.addEventListener('mousedown', onMouseDown);
-    window.addEventListener('mousemove', onMouseMove);
-    window.addEventListener('mouseup', onMouseUp);
+    surface.style.touchAction = 'none';
+    surface.style.cursor = 'grab';
+    surface.addEventListener('pointerdown', onPointerDown, { passive: false });
+    surface.addEventListener('pointermove', onPointerMove, { passive: false });
+    surface.addEventListener('pointerup', onPointerUp);
+    surface.addEventListener('pointercancel', onPointerUp);
+    surface.addEventListener('wheel', onWheel, { passive: true });
 
     const handleResize = () => {
       computeLayout();
@@ -1448,13 +1418,11 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
     return () => {
       cancelAnimationFrame(raf);
       window.removeEventListener('resize', handleResize);
-      dom.removeEventListener('touchstart', onTouchStart);
-      dom.removeEventListener('touchmove', onTouchMove);
-      dom.removeEventListener('touchend', onTouchEnd);
-      dom.removeEventListener('wheel', onWheel);
-      dom.removeEventListener('mousedown', onMouseDown);
-      window.removeEventListener('mousemove', onMouseMove);
-      window.removeEventListener('mouseup', onMouseUp);
+      surface.removeEventListener('pointerdown', onPointerDown);
+      surface.removeEventListener('pointermove', onPointerMove);
+      surface.removeEventListener('pointerup', onPointerUp);
+      surface.removeEventListener('pointercancel', onPointerUp);
+      surface.removeEventListener('wheel', onWheel);
       renderer.dispose();
       geometry.dispose();
       material.dispose();
