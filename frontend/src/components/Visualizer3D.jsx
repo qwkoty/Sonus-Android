@@ -1478,6 +1478,7 @@ function Visualizer3D({ accent = '#4FC3F7', cover = '', mode = 'coverflow', isPl
         width: '100%',
         height: '100%',
         zIndex: 2,
+        touchAction: 'none',
       }}
     />
   );

@@ -71,6 +71,9 @@ public class MainActivity extends BridgeActivity {
             settings.setDatabaseEnabled(true);
             settings.setAllowFileAccess(true);
             settings.setAllowContentAccess(true);
+            // 关闭 WebView 内置缩放，避免 3D 可视化拖拽/缩放手势被系统当成页面缩放（修复 360° 旋转失效）
+            settings.setSupportZoom(false);
+            settings.setBuiltInZoomControls(false);
             // 透明背景，避免启动时白屏/黑屏闪烁
             webView.setBackgroundColor(Color.TRANSPARENT);
             webView.setLayerType(View.LAYER_TYPE_HARDWARE, null);
