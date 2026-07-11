@@ -308,10 +308,9 @@ export default function Player({ onProfile }) {
       <div style={{ position: 'absolute', inset: 0 }} onTouchStart={onVizTouchStart} onTouchEnd={onVizTouchEnd}>
         <FloatingLyrics lyrics={lyrics} isPlaying={isPlaying} />
         {/* 域C(v1.23)：模式切换 150ms 淡入，避免硬切。
-            O1(v1.25)：外层 key 仅按 2D/3D 分组，避免每次 3D 子模式/换封面都整树 remount
-            （此前每次切换都重建 ~20k 粒子 + 新建 WebGL 上下文，且 Visualizer3D 内置 morph 形变因此永不触发）。
-            内层 Suspense 不再设 key：封面由 Visualizer3D 内部 coverRef + useEffect 自行重载，3D 子模式切换走内部 morph。 */}
-        <div key={vm === '3d' ? '3d' : '2d'} style={{ position: 'absolute', inset: 0, animation: 'vizFadeIn .15s ease both' }}>
+            v1.27：回退 O1 外层 key 到 v1.24 策略（修复 3D 360° 旋转失效），
+            保留内层 Suspense 无 key（封面由 Visualizer3D 内部 useEffect 重载，不触发整树 remount）。 */}
+        <div key={`${vm}:${v3m}`} style={{ position: 'absolute', inset: 0, animation: 'vizFadeIn .15s ease both' }}>
           {vm === '3d' ? <Suspense><Visualizer3D accent={ac} cover={currentTrack?.cover || ''} mode={v3m} isPlaying={isPlaying} /></Suspense> : <Visualizer isPlaying={isPlaying} mode={vm} accent={ac} />}
         </div>
         {lyricPanel && <LyricScroll currentLyric={currentLyric || ''} accent={ac} />}
