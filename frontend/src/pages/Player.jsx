@@ -264,28 +264,8 @@ export default function Player({ onProfile }) {
   // 触觉反馈（Web 标准，Android WebView 支持；iOS 静默降级）
   const buzz = (ms) => { try { if (navigator.vibrate) navigator.vibrate(ms); } catch { } };
 
-  // 横向滑动切换可视化模式（快扫触发，避免与 3D 旋转拖拽冲突）
-  const swipeRef = useRef({ x: 0, y: 0, t: 0, active: false });
-  const onVizTouchStart = (e) => {
-    const t = e.touches ? e.touches[0] : e;
-    swipeRef.current = { x: t.clientX, y: t.clientY, t: Date.now(), active: true };
-  };
-  const onVizTouchEnd = (e) => {
-    const s = swipeRef.current;
-    if (!s.active) return;
-    s.active = false;
-    const t = e.changedTouches ? e.changedTouches[0] : e;
-    const dx = t.clientX - s.x, dy = t.clientY - s.y;
-    const dt = Date.now() - s.t;
-    if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5 && dt < 400) {
-      const idx = VIZ_MODES.findIndex(m => m.key === vm);
-      const dir = dx < 0 ? 1 : VIZ_MODES.length - 1; // 左滑=下一个，右滑=上一个
-      const nm = VIZ_MODES[(idx + dir) % VIZ_MODES.length].key;
-      setVm(nm);
-      try { localStorage.setItem('sonus_viz_mode', nm); } catch { }
-      buzz(12);
-    }
-  };
+  // 模式切换仅保留「视觉设置面板」按钮入口（见 switchVm）；
+  // 已移除「横向滑动切模式」手势，避免与 3D 可视化 360° 拖拽旋转抢占横向手势。
   const switchVm = (key) => { setVm(key); try { localStorage.setItem('sonus_viz_mode', key); } catch { } buzz(10); };
 
   // 内嵌进度条（mini 不显示时间，full 显示时间）—— 复用于统一 Now-Playing 栏
@@ -304,8 +284,8 @@ export default function Player({ onProfile }) {
 
   return (
     <div style={{ height: '100%', position: 'relative', overflow: 'hidden', background: '#000' }}>
-      {/* 可视化背景层（承载横向滑动切模式手势） */}
-      <div style={{ position: 'absolute', inset: 0 }} onTouchStart={onVizTouchStart} onTouchEnd={onVizTouchEnd}>
+      {/* 可视化背景层 */}
+      <div style={{ position: 'absolute', inset: 0 }}>
         <FloatingLyrics lyrics={lyrics} isPlaying={isPlaying} />
         {/* 域C(v1.23)：模式切换 150ms 淡入，避免硬切。
             v1.27：回退 O1 外层 key 到 v1.24 策略（修复 3D 360° 旋转失效），
