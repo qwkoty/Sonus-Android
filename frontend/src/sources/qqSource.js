@@ -192,6 +192,18 @@ async function urlAPK(id, cookie = '', uin = '0', _key = '', mediaMid = '') {
   return '';
 }
 
+// 后端 /stream 代理取链（与网易云保持一致）：
+// 由后端请求 QQ vkey 接口并代理音频流，规避前端原生直连(CookieReader) + 本地 NanoHTTPD 代理
+// 在真机上不稳定 / 被风控导致整类歌曲放不出的问题。登录态(qm_keyst)随 query 透传，VIP 歌曲仍可播放。
+async function qqUrlBackend(id, cookie = '', uin = '0') {
+  const params = new URLSearchParams({ platform: 'qq', id: String(id) });
+  if (cookie) {
+    params.set('cookie', cookie);
+    params.set('uin', String(uin || '0'));
+  }
+  return apiUrl(`/stream?${params.toString()}`);
+}
+
 // ==================== 歌词 ====================
 async function lyricAPK(id) {
   const rawId = String(id).replace(/^qq_/, '');
@@ -433,8 +445,9 @@ export const qqSource = {
 
   // —— 音源访问（沿用原 music 对象方法签名，保证播放器调用方零改动）——
   search: searchAPK,
-  url: urlAPK,
-  stream: urlAPK,
+  // QQ 播放改走后端 /stream 代理（与网易云一致），绕开前端原生直连 + 本地 NanoHTTPD 代理
+  url: qqUrlBackend,
+  stream: qqUrlBackend,
   cover: (url) => url,
   lyric: lyricAPK,
   loginByCookie: loginByCookieAPK,
