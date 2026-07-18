@@ -204,6 +204,22 @@ async function qqUrlBackend(id, cookie = '', uin = '0') {
   return apiUrl(`/stream?${params.toString()}`);
 }
 
+// 混合取链：原生设备链路优先（设备真实 IP + 设备 Cookie，最不易被 QQ 服务端风控），
+// 失败兜底走后端 /stream 代理（与网易云一致）。
+// 背景：v1.32 曾把 QQ 整条改走后端，但 QQ 对服务端 IP 的 vkey 接口有风控(500003)，
+// 后端在云服务器上几乎必败；原生 urlAPK 正是为绕开该风控而设计。故恢复原生优先，仅保留后端作兜底。
+// 详见 docs/DEV_FIX_QQ_PLAYBACK_HYBRID_v1.33.md
+async function qqUrlHybrid(id, cookie = '', uin = '0', _key = '', _mediaMid = '') {
+  try {
+    const nativeUrl = await urlAPK(id, cookie, uin, _key, _mediaMid);
+    if (nativeUrl) return nativeUrl;
+    console.warn('[qqUrlHybrid] 原生取链为空，兜底走后端 /stream');
+  } catch (e) {
+    console.warn('[qqUrlHybrid] 原生取链失败，兜底走后端 /stream：', e?.message || e);
+  }
+  return qqUrlBackend(id, cookie, uin);
+}
+
 // ==================== 歌词 ====================
 async function lyricAPK(id) {
   const rawId = String(id).replace(/^qq_/, '');
@@ -445,9 +461,10 @@ export const qqSource = {
 
   // —— 音源访问（沿用原 music 对象方法签名，保证播放器调用方零改动）——
   search: searchAPK,
-  // QQ 播放改走后端 /stream 代理（与网易云一致），绕开前端原生直连 + 本地 NanoHTTPD 代理
-  url: qqUrlBackend,
-  stream: qqUrlBackend,
+  // QQ 播放：原生设备链路优先（绕开 QQ 服务端风控），失败兜底走后端 /stream 代理（与网易云一致）。
+  // 详见 docs/DEV_FIX_QQ_PLAYBACK_HYBRID_v1.33.md
+  url: qqUrlHybrid,
+  stream: qqUrlHybrid,
   cover: (url) => url,
   lyric: lyricAPK,
   loginByCookie: loginByCookieAPK,

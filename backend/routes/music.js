@@ -87,7 +87,7 @@ async function getQQUrl(songmid, cookie = '', uin = '0') {
     req_0: {
       module: 'music.vkey.GetVkeyServer',
       method: 'CgiGetVkey',
-      param: { guid: '10000', songmid: rawId, songtype: 0, uin: String(uin), loginflag, platform: '23', h5to: 'speed' },
+      param: { guid: String(1000000000 + Math.floor(Math.random() * 9000000000)), songmid: rawId, songtype: 0, uin: String(uin), loginflag, platform: '23', h5to: 'speed' },
     },
     comm: { uin: String(uin), format: 'json', ct: 24, cv: 0 },
   };
