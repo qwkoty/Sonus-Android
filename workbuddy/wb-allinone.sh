@@ -36,7 +36,7 @@ resolve_rootfs() {
              "$HOME/.local/share/proot-distro/installed-rootfs/$DISTRO"; do
     if [ -d "$c/etc" ]; then ROOTFS="$c"; set_paths; return 0; fi
   done
-  c=$(find "$PREFIX_DIR/var/lib/proot-distro" "$HOME" -maxdepth 4 -type d \
+  c=$(find "$PREFIX_DIR" "$HOME" -maxdepth 6 -type d \
         -name "$DISTRO" 2>/dev/null | head -1)
   if [ -n "$c" ] && [ -d "$c/etc" ]; then ROOTFS="$c"; set_paths; return 0; fi
   return 1
@@ -356,9 +356,9 @@ install_all() {
       mv "$ROOTFS" "$ROOTFS.broken.$(date +%s)" 2>/dev/null || true
     fi
     if ! proot-distro install "$DISTRO"; then
-      warn "同名容器已存在但不是坏的旧目录，交给 reset 重建"
-      printf 'y\n' | proot-distro reset "$DISTRO" >/dev/null 2>&1 || true
-      resolve_rootfs || { bad "容器重建后仍找不到目录，请把 'proot-distro info $DISTRO' 的输出发给我"; exit 1; }
+      warn "同名容器已存在，先 remove 再重新装"
+      printf 'y\n' | proot-distro remove "$DISTRO" || true
+      proot-distro install "$DISTRO" || { bad "容器安装失败，请把 'proot-distro info $DISTRO' 的输出发给我"; exit 1; }
     fi
     resolve_rootfs || { bad "容器安装失败，没有找到 rootfs"; exit 1; }
   fi
