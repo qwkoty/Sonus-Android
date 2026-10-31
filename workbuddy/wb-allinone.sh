@@ -328,7 +328,14 @@ install_all() {
   fi
 
   step "2/6 准备 Debian 容器"
-  if [ ! -d "$ROOTFS/etc" ]; then
+  if [ -d "$ROOTFS/etc" ]; then
+    info "已有可用的 Debian 容器，直接复用（不会重装）"
+  else
+    if [ -e "$ROOTFS" ]; then
+      warn "检测到不完整的 debian 容器（缺少 /etc），改名备份后重装"
+      mv "$ROOTFS" "$ROOTFS.broken.$(date +%s)" 2>/dev/null \
+        || { bad "清理旧容器失败"; exit 1; }
+    fi
     proot-distro install "$DISTRO" || { bad "容器安装失败"; exit 1; }
   fi
   mkdir -p "$ROOTFS/root"
