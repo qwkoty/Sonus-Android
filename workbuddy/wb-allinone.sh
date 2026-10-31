@@ -23,7 +23,27 @@ info() { printf "%s\n" "$1"; }
 warn() { printf "\033[1;33m[提示] %s\033[0m\n" "$1"; }
 bad()  { printf "\033[1;31m[失败] %s\033[0m\n" "$1"; }
 
+set_paths() {
+  MARK="$ROOTFS/root/.wb-ok"
+  INFO_FILE="$ROOTFS/root/.config/CodeBuddyExtension/Data/Public/auth/workbuddy-desktop.info"
+}
+
+# 不同版本的 proot-distro 放的容器目录不一样，这里自动找一遍
+resolve_rootfs() {
+  local c
+  for c in "$PREFIX_DIR/var/lib/proot-distro/installed-rootfs/$DISTRO" \
+             "$HOME/.proot-distro/installed-rootfs/$DISTRO" \
+             "$HOME/.local/share/proot-distro/installed-rootfs/$DISTRO"; do
+    if [ -d "$c/etc" ]; then ROOTFS="$c"; set_paths; return 0; fi
+  done
+  c=$(find "$PREFIX_DIR/var/lib/proot-distro" "$HOME" -maxdepth 4 -type d \
+        -name "$DISTRO" 2>/dev/null | head -1)
+  if [ -n "$c" ] && [ -d "$c/etc" ]; then ROOTFS="$c"; set_paths; return 0; fi
+  return 1
+}
+
 mkdir -p "$APP"
+resolve_rootfs || true
 
 # ---------- 内嵌: 取 token 的 JS（在客户端进程内运行） ----------
 cat > "$APP/wb-token.js" <<'JS'
@@ -328,15 +348,19 @@ install_all() {
   fi
 
   step "2/6 准备 Debian 容器"
-  if [ -d "$ROOTFS/etc" ]; then
-    info "已有可用的 Debian 容器，直接复用（不会重装）"
+  if resolve_rootfs; then
+    info "已有可用的 Debian 容器，直接复用：$ROOTFS"
   else
     if [ -e "$ROOTFS" ]; then
-      warn "检测到不完整的 debian 容器（缺少 /etc），改名备份后重装"
-      mv "$ROOTFS" "$ROOTFS.broken.$(date +%s)" 2>/dev/null \
-        || { bad "清理旧容器失败"; exit 1; }
+      warn "容器目录不完整，改名备份后重装"
+      mv "$ROOTFS" "$ROOTFS.broken.$(date +%s)" 2>/dev/null || true
     fi
-    proot-distro install "$DISTRO" || { bad "容器安装失败"; exit 1; }
+    if ! proot-distro install "$DISTRO"; then
+      warn "同名容器已存在但不是坏的旧目录，交给 reset 重建"
+      printf 'y\n' | proot-distro reset "$DISTRO" >/dev/null 2>&1 || true
+      resolve_rootfs || { bad "容器重建后仍找不到目录，请把 'proot-distro info $DISTRO' 的输出发给我"; exit 1; }
+    fi
+    resolve_rootfs || { bad "容器安装失败，没有找到 rootfs"; exit 1; }
   fi
   mkdir -p "$ROOTFS/root"
 
