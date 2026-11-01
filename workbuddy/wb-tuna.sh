@@ -631,6 +631,10 @@ start_gui() {
   local BIN
   stop_gui
   sleep 1
+  # Termux 被杀过的话残留的 X 锁会让 Xvfb 报 "Server is already active for display 1"
+  RUN sh -c 'pkill -x Xvfb 2>/dev/null; pkill -x x11vnc 2>/dev/null; rm -f /tmp/.X1-lock /tmp/.X11-unix/X1; true' >/dev/null 2>&1
+  rm -f "$ROOT/tmp/.X1-lock" "$ROOT/tmp/.X11-unix/X1" 2>/dev/null
+  sleep 1
   termux-wake-lock 2>/dev/null || warn "拿不到 wake-lock，切换应用时容器可能被杀"
   wb_bg xvfb /usr/bin/Xvfb :1 -screen 0 1280x800x24
   sleep 3
