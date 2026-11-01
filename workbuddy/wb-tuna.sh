@@ -473,6 +473,14 @@ prepare_hosts() {
       warn "解析不到 $h，容器内可能连不上网"
     fi
   done
+  # 每次强制重写回域名源（历史上改过 IP 源，残留会导致索引对不上）
+  rm -f "$ROOT/etc/apt/sources.list"
+  cat > "$ROOT/etc/apt/sources.list" <<'EOS'
+deb http://mirrors.tuna.tsinghua.edu.cn/debian bookworm main contrib non-free non-free-firmware
+deb http://mirrors.tuna.tsinghua.edu.cn/debian bookworm-updates main contrib non-free non-free-firmware
+deb http://mirrors.tuna.tsinghua.edu.cn/debian-security bookworm-security main contrib non-free non-free-firmware
+EOS
+  info "apt 源已重置为清华域名源"
 }
 
 fetch_deb() {
@@ -531,8 +539,10 @@ set -u
 export DEBIAN_FRONTEND=noninteractive
 apt-get -o Acquire::Retries=3 update >/tmp/upd.log 2>&1
 tail -6 /tmp/upd.log
-if ! apt-cache show libgtk-3-0 >/dev/null 2>&1; then
-  echo "[容器] apt 索引还是空的，装不了，先别继续"; exit 1
+if ! apt-get -s install -y --no-install-recommends libgtk-3-0 >/tmp/chk.log 2>&1; then
+  echo "[容器] apt 索引对不上，装不了。最后几行："
+  tail -5 /tmp/chk.log
+  exit 1
 fi
 BASE="ca-certificates procps dbus dbus-x11 xvfb x11vnc fonts-noto-cjk xdg-utils xz-utils"
 apt-get install -y --no-install-recommends $BASE || apt-get install -y $BASE || true
