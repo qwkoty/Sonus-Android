@@ -374,39 +374,7 @@ fetch_rootfs() {
   return 1
 }
 
-extract_rootfs() {
-  [ -s "$APP/rootfs.tar.xz" ] || { bad "rootfs 文件为空"; return 1; }
-  rm -rf "$ROOT"; mkdir -p "$ROOT"
-  info "解压中，约 300MB，请稍等..."
-  local ok=0
-  tar -xf "$APP/rootfs.tar.xz" -C "$ROOT" 2>/dev/null && ok=1
-  if [ "$ok" = "0" ]; then
-    warn "系统拒绝创建硬链接，改用 --hard-dereference（用复制代替硬链接）"
-    rm -rf "$ROOT"; mkdir -p "$ROOT"
-    tar --hard-dereference -xf "$APP/rootfs.tar.xz" -C "$ROOT" 2>/dev/null && ok=1
-  fi
-  if [ "$ok" = "0" ]; then
-    warn "改用 xz 解一层后再解开"
-    rm -rf "$ROOT"; mkdir -p "$ROOT"
-    xz -dc "$APP/rootfs.tar.xz" > "$APP/rootfs.tar" \
-      && tar --hard-dereference -xf "$APP/rootfs.tar" -C "$ROOT" 2>/dev/null && ok=1
-    rm -f "$APP/rootfs.tar"
-  fi
-  if [ "$ok" = "0" ]; then
-    warn "最后一种方式：交给 proot 的 link2symlink 解压"
-    rm -rf "$ROOT"; mkdir -p "$ROOT"
-    xz -dc "$APP/rootfs.tar.xz" > "$APP/rootfs.tar"
-    proot --link2symlink -0 -r / -w "$ROOT" /usr/bin/env PATH="$PATH" \
-      tar -xf "$APP/rootfs.tar" -C "$ROOT" 2>/dev/null && ok=1
-    rm -f "$APP/rootfs.tar"
-  fi
-  [ "$ok" = "1" ] || { rm -rf "$ROOT"; bad "解压失败"; return 1; }
-  if [ ! -x "$ROOT/usr/bin/env" ] || [ ! -x "$ROOT/usr/bin/apt-get" ] || [ ! -f "$ROOT/etc/debian_version" ]; then
-    rm -rf "$ROOT"
-    bad "解压出来的系统不完整（缺 env/apt-get），已清掉，请重跑"
-    return 1
-  fi
-  touch "$ROOT/.wb-rootfs-ok"
+init_rootfs() {
   mkdir -p "$ROOT/root" "$ROOT/etc/apt"
   printf 'nameserver 114.114.114.114\nnameserver 223.5.5.5\n' > "$ROOT/etc/resolv.conf"
   cat > "$ROOT/etc/apt/sources.list" <<'EOS'
@@ -415,6 +383,34 @@ deb http://mirrors.tuna.tsinghua.edu.cn/debian bookworm-updates main contrib non
 deb http://mirrors.tuna.tsinghua.edu.cn/debian-security bookworm-security main contrib non-free non-free-firmware
 EOS
   rm -f "$ROOT"/etc/apt/sources.list.d/*.list 2>/dev/null || true
+  touch "$ROOT/.wb-rootfs-ok"
+}
+
+rootfs_unpacked() {
+  [ -x "$ROOT/usr/bin/env" ] && [ -x "$ROOT/usr/bin/apt-get" ] && [ -f "$ROOT/etc/debian_version" ]
+}
+
+extract_rootfs() {
+  [ -s "$APP/rootfs.tar.xz" ] || { bad "rootfs 文件为空"; return 1; }
+  rm -rf "$ROOT"; mkdir -p "$ROOT"
+  info "解压中，约 466MB，请稍等..."
+  local ok=0
+  # 本机内核禁止创建硬链接，先用 proot 的 link2symlink 把硬链接改成软链接
+  proot --link2symlink -0 -r / -w "$ROOT" \
+    "$PREFIX_DIR/bin/tar" -xf "$APP/rootfs.tar.xz" -C "$ROOT" 2>/dev/null && ok=1
+  if [ "$ok" = "0" ]; then
+    warn "proot 解压失败，退回普通 tar"
+    rm -rf "$ROOT"; mkdir -p "$ROOT"
+    tar -xf "$APP/rootfs.tar.xz" -C "$ROOT" 2>/dev/null && ok=1
+  fi
+  if [ "$ok" = "0" ]; then
+    warn "改用 --hard-dereference（用复制代替硬链接）"
+    rm -rf "$ROOT"; mkdir -p "$ROOT"
+    tar --hard-dereference -xf "$APP/rootfs.tar.xz" -C "$ROOT" 2>/dev/null && ok=1
+  fi
+  [ "$ok" = "1" ] || { rm -rf "$ROOT"; bad "解压失败"; return 1; }
+  rootfs_unpacked || { rm -rf "$ROOT"; bad "解压出来的系统不完整，已清掉，请重跑"; return 1; }
+  init_rootfs
   rm -f "$APP/rootfs.tar.xz"
 }
 
@@ -433,11 +429,16 @@ install_all() {
   fi
 
   if ! rootfs_ok; then
-    [ -d "$ROOT" ] && warn "发现不完整的 rootfs（上次解压中断），会重新解压"
-    step "1/6 下载 Debian 根文件系统（国内镜像）"
-    fetch_rootfs || { bad "下载失败，检查网络后重跑"; exit 1; }
-    step "2/6 解压并初始化"
-    extract_rootfs || exit 1
+    if rootfs_unpacked; then
+      info "rootfs 已解压完成，直接初始化"
+      init_rootfs
+    else
+      [ -d "$ROOT" ] && warn "发现不完整的 rootfs（上次中断），会重新解压"
+      step "1/6 下载 Debian 根文件系统（国内镜像）"
+      fetch_rootfs || { bad "下载失败，检查网络后重跑"; exit 1; }
+      step "2/6 解压并初始化"
+      extract_rootfs || exit 1
+    fi
     info "rootfs 就绪：$ROOT"
   else
     info "复用已有 rootfs：$ROOT"
