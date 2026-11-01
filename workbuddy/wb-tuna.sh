@@ -375,8 +375,12 @@ fetch_rootfs() {
 }
 
 init_rootfs() {
-  mkdir -p "$ROOT/root" "$ROOT/etc/apt"
-  printf 'nameserver 114.114.114.114\nnameserver 223.5.5.5\n' > "$ROOT/etc/resolv.conf"
+  [ -d "$ROOT/etc" ] || { bad "rootfs 里没有 /etc，解压不完整"; return 1; }
+  mkdir -p "$ROOT/root" "$ROOT/etc/apt" 2>/dev/null
+  rm -f "$ROOT/etc/resolv.conf" 2>/dev/null
+  printf 'nameserver 114.114.114.114\nnameserver 223.5.5.5\n' > "$ROOT/etc/resolv.conf" \
+    || { bad "写 resolv.conf 失败"; return 1; }
+  rm -f "$ROOT/etc/apt/sources.list" 2>/dev/null
   cat > "$ROOT/etc/apt/sources.list" <<'EOS'
 deb http://mirrors.tuna.tsinghua.edu.cn/debian bookworm main contrib non-free non-free-firmware
 deb http://mirrors.tuna.tsinghua.edu.cn/debian bookworm-updates main contrib non-free non-free-firmware
@@ -387,7 +391,12 @@ EOS
 }
 
 rootfs_unpacked() {
-  [ -x "$ROOT/usr/bin/env" ] && [ -x "$ROOT/usr/bin/apt-get" ] && [ -f "$ROOT/etc/debian_version" ]
+  [ -x "$ROOT/usr/bin/env" ] || return 1
+  [ -x "$ROOT/usr/bin/apt-get" ] || return 1
+  [ -f "$ROOT/etc/debian_version" ] || return 1
+  [ -e "$ROOT/lib/ld-linux-aarch64.so.1" ] || [ -e "$ROOT/lib/ld-linux-x86-64.so.2" ] \
+    || [ -e "$ROOT/lib64/ld-linux-x86-64.so.2" ] || return 1
+  return 0
 }
 
 extract_rootfs() {
@@ -397,20 +406,25 @@ extract_rootfs() {
   local ok=0
   # 本机内核禁止创建硬链接，先用 proot 的 link2symlink 把硬链接改成软链接
   proot --link2symlink -0 -r / -w "$ROOT" \
-    "$PREFIX_DIR/bin/tar" -xf "$APP/rootfs.tar.xz" -C "$ROOT" 2>/dev/null && ok=1
+    "$PREFIX_DIR/bin/tar" -xf "$APP/rootfs.tar.xz" -C "$ROOT" 2>"$APP/tar.err" && ok=1
   if [ "$ok" = "0" ]; then
     warn "proot 解压失败，退回普通 tar"
     rm -rf "$ROOT"; mkdir -p "$ROOT"
-    tar -xf "$APP/rootfs.tar.xz" -C "$ROOT" 2>/dev/null && ok=1
+    tar -xf "$APP/rootfs.tar.xz" -C "$ROOT" 2>"$APP/tar.err" && ok=1
   fi
   if [ "$ok" = "0" ]; then
     warn "改用 --hard-dereference（用复制代替硬链接）"
     rm -rf "$ROOT"; mkdir -p "$ROOT"
-    tar --hard-dereference -xf "$APP/rootfs.tar.xz" -C "$ROOT" 2>/dev/null && ok=1
+    tar --hard-dereference -xf "$APP/rootfs.tar.xz" -C "$ROOT" 2>"$APP/tar.err" && ok=1
   fi
-  [ "$ok" = "1" ] || { rm -rf "$ROOT"; bad "解压失败"; return 1; }
+  if [ "$ok" = "0" ]; then
+    rm -rf "$ROOT"
+    bad "解压失败，最后几行报错："
+    tail -5 "$APP/tar.err" 2>/dev/null
+    return 1
+  fi
   rootfs_unpacked || { rm -rf "$ROOT"; bad "解压出来的系统不完整，已清掉，请重跑"; return 1; }
-  init_rootfs
+  init_rootfs || { rm -rf "$ROOT"; return 1; }
   rm -f "$APP/rootfs.tar.xz"
 }
 
@@ -431,7 +445,7 @@ install_all() {
   if ! rootfs_ok; then
     if rootfs_unpacked; then
       info "rootfs 已解压完成，直接初始化"
-      init_rootfs
+      init_rootfs || exit 1
     else
       [ -d "$ROOT" ] && warn "发现不完整的 rootfs（上次中断），会重新解压"
       step "1/6 下载 Debian 根文件系统（国内镜像）"
