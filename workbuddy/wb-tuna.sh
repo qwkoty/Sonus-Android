@@ -79,6 +79,14 @@ function find(){
   if(process.env.APPDATA)l.push(path.join(process.env.APPDATA,...REL));
   if(home){l.push(path.join(home,'Library','Application Support',...REL));l.push(path.join(home,'.config',...REL));}
   for(const p of l){try{if(fs.existsSync(p))return p;}catch(e){}}
+  function walk(d,dep){
+    if(dep>7)return null;
+    let es=[];try{es=fs.readdirSync(d,{withFileTypes:true});}catch(e){return null;}
+    for(const e of es){if(e.isFile()&&e.name==='workbuddy-desktop.info')return path.join(d,e.name);}
+    for(const e of es){if(e.isDirectory()){const r=walk(path.join(d,e.name),dep+1);if(r)return r;}}
+    return null;
+  }
+  for(const r of [home,'/root','/home']){if(r){const p=walk(r,0);if(p)return p;}}
   return null;
 }
 function u32(n){const b=Buffer.alloc(4);b.writeUInt32BE(n>>>0,0);return b;}
@@ -490,7 +498,7 @@ prepare_hosts() {
   local h ip tuna_ip=""
   mkdir -p "$ROOT/etc"
   [ -f "$ROOT/etc/hosts" ] || : > "$ROOT/etc/hosts"
-  for h in mirrors.tuna.tsinghua.edu.cn download.codebuddy.cn; do
+  for h in mirrors.tuna.tsinghua.edu.cn download.codebuddy.cn www.workbuddy.cn workbuddy.cn api.workbuddy.cn; do
     ip=$(curl -sS -m 10 -o /dev/null -w '%{remote_ip}' "http://$h/" 2>/dev/null)
     if [ -z "$ip" ] || [ "$ip" = "0.0.0.0" ]; then
       ip=$(curl -sS -m 10 -o /dev/null -w '%{remote_ip}' "https://$h/" 2>/dev/null)
@@ -651,11 +659,23 @@ except Exception: sys.exit(1)' 2>/dev/null; then
   echo "================================================================"
 }
 
+# 客户端登录后写入的位置可能随版本变化，这里在容器内自动找
+find_info() {
+  local p
+  if [ -s "$INFO_FILE" ]; then return 0; fi
+  [ -x "$ROOT/bin/bash" ] || return 1
+  p=$(RUN find /root /home -maxdepth 8 -type f -name 'workbuddy-desktop.info' 2>/dev/null | head -n1)
+  if [ -n "${p:-}" ] && [ -s "$ROOT$p" ]; then INFO_FILE="$ROOT$p"; info "登录态文件：$INFO_FILE"; return 0; fi
+  p=$(RUN find /root /home -maxdepth 8 -type f -name '*.info' -path '*/auth/*' 2>/dev/null | head -n1)
+  if [ -n "${p:-}" ] && [ -s "$ROOT$p" ]; then INFO_FILE="$ROOT$p"; info "登录态文件：$INFO_FILE"; return 0; fi
+  return 1
+}
+
 wait_login() {
   step "5/6 等待登录"
   local w=0
   while [ "$w" -lt "$WAIT" ]; do
-    if [ -s "$INFO_FILE" ]; then
+    if [ -s "$INFO_FILE" ] || find_info >/dev/null 2>&1; then
       info "检测到登录状态，继续。"
       sleep 3
       return 0
@@ -671,8 +691,13 @@ wait_login() {
 get_token() {
   step "取凭证"
   [ -x "$ROOT/bin/bash" ] || { bad "rootfs 还没准备好"; return 1; }
-  [ -s "$INFO_FILE" ] || { bad "还没检测到登录，先登录"; return 1; }
   probe_run || return 1
+  if ! find_info; then
+    bad "容器里没找到登录态文件（客户端可能没真正登录成功）"
+    warn "下面是容器 /root/.config 的实际情况，请截图发我："
+    RUN sh -c 'ls -la /root/.config 2>/dev/null; for d in /root/.config/*/; do echo "--- $d"; ls -la "$d" 2>/dev/null | head -8; done' 2>&1 | head -60
+    return 1
+  fi
   write_token_js
   cp "$APP/wb-token.js" "$ROOT/root/wb-token.js" || { bad "复制脚本失败"; return 1; }
   stop_gui
@@ -721,6 +746,13 @@ echo "== DNS =="; getent hosts mirrors.tuna.tsinghua.edu.cn || echo "DNS 解析�
 echo "== apt-get update =="; apt-get update 2>&1 | tail -25; echo "update_rc=${PIPESTATUS[0]}"
 echo "== 能否找到包 =="; apt-cache policy libgtk-3-0 | head -4
 ' 2>&1
+  info "--- 登录态文件 ---"
+  if find_info >/dev/null 2>&1; then
+    ls -l "$INFO_FILE" 2>&1
+  else
+    info "没找到 workbuddy-desktop.info，容器里的 .config 目录："
+    RUN sh -c 'for d in /root/.config/*/; do echo "--- $d"; ls -la "$d" 2>/dev/null | head -6; done' 2>&1 | head -40
+  fi
 }
 
 all_flow() {
