@@ -365,11 +365,13 @@ stop_gui() {
   if [ -x "$ROOT/bin/bash" ]; then
     RUN bash -lc 'pkill -f workbuddy 2>/dev/null; pkill -x x11vnc 2>/dev/null; pkill -x Xvfb 2>/dev/null; true' >/dev/null 2>&1
   fi
-  if [ -f "$APP/gui.pid" ]; then
-    p=$(cat "$APP/gui.pid" 2>/dev/null)
-    [ -n "${p:-}" ] && kill "$p" 2>/dev/null
-    rm -f "$APP/gui.pid"
-  fi
+  for n in gui vnc xvfb; do
+    if [ -f "$APP/$n.pid" ]; then
+      p=$(cat "$APP/$n.pid" 2>/dev/null)
+      [ -n "${p:-}" ] && kill "$p" 2>/dev/null
+      rm -f "$APP/$n.pid"
+    fi
+  done
 }
 
 latest_snapshot() {
@@ -575,25 +577,30 @@ EOS
   RUN bash /root/install.sh || { bad "容器内安装失败，看上面报错"; exit 1; }
 }
 
-start_gui() {
-  step "4/6 启动虚拟桌面"
-  cat > "$ROOT/root/start.sh" <<'EOS'
-set -u
-export DISPLAY=:1
-pidof Xvfb >/dev/null 2>&1 || { Xvfb :1 -screen 0 1280x800x24 >/tmp/xvfb.log 2>&1 & sleep 2; }
-pidof x11vnc >/dev/null 2>&1 || { x11vnc -display :1 -forever -nopw -shared -rfbport 5900 -localhost >/tmp/vnc.log 2>&1 & sleep 1; }
-BIN=$(cat /opt/.wb-bin 2>/dev/null)
-[ -x "${BIN:-}" ] || BIN=/opt/WorkBuddy/workbuddy
-exec dbus-run-session -- "$BIN" --no-sandbox --disable-gpu --disable-dev-shm-usage
-EOS
-  stop_gui
-  sleep 1
+# 后台起一个容器内程序（独立 proot 进程，互不拖累）
+wb_bg() {
+  local name="$1"; shift
   nohup env -u LD_PRELOAD proot $L2S -0 -r "$ROOT" -b /dev -b /proc -b /sys -w /root \
     "$LOADER" --library-path "$LIBPATH" \
-    /usr/bin/env -i HOME=/root TERM=xterm-256color LANG=C.UTF-8 \
+    /usr/bin/env -i HOME=/root TERM=xterm-256color LANG=C.UTF-8 DISPLAY=:1 \
       PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
-      /bin/bash /root/start.sh >"$APP/gui.log" 2>&1 &
-  echo $! > "$APP/gui.pid"
+      "$@" >"$APP/$name.log" 2>&1 &
+  echo $! > "$APP/$name.pid"
+}
+
+start_gui() {
+  step "4/6 启动虚拟桌面"
+  local BIN
+  stop_gui
+  sleep 1
+  termux-wake-lock 2>/dev/null || warn "拿不到 wake-lock，切换应用时容器可能被杀"
+  wb_bg xvfb /usr/bin/Xvfb :1 -screen 0 1280x800x24
+  sleep 3
+  wb_bg vnc /usr/bin/x11vnc -display :1 -forever -nopw -shared -rfbport 5900 -localhost -noshm
+  sleep 2
+  BIN=$(bin_path)
+  [ -n "${BIN:-}" ] || BIN=/opt/WorkBuddy/workbuddy
+  wb_bg gui /usr/bin/dbus-run-session -- "$BIN" --no-sandbox --disable-gpu --disable-dev-shm-usage
   sleep 8
   if python3 -c 'import socket,sys
 s=socket.socket(); s.settimeout(2)
@@ -601,14 +608,16 @@ try: s.connect(("127.0.0.1",5900))
 except Exception: sys.exit(1)' 2>/dev/null; then
     info "[本机] 5900 端口已开放，可以连了"
   else
-    warn "5900 端口没开放（x11vnc 没起来）"
-    RUN bash -lc 'tail -12 /tmp/vnc.log 2>/dev/null' 2>&1
+    warn "5900 端口没开放，日志如下："
+    tail -8 "$APP/vnc.log" 2>/dev/null
+    tail -8 "$APP/xvfb.log" 2>/dev/null
+    return 1
   fi
   echo ""
   echo "================================================================"
   echo " 用手机上的 VNC 客户端（bVNC / VNC Viewer）连接："
   echo "     地址 127.0.0.1    端口 5900"
-  echo " 连上后在 WorkBuddy 窗口里登录。脚本会自动检测并继续。"
+  echo " 连上后在 WorkBuddy 窗口里登录。登录完回这里运行： bash ~/wb.sh token"
   echo "================================================================"
 }
 
@@ -652,16 +661,11 @@ get_token() {
 
 vnc() {
   step "图形桌面诊断"
-  info "--- 宿主 gui.log（启动脚本输出）---"
-  tail -20 "$APP/gui.log" 2>/dev/null || info "(无)"
+  info "--- xvfb.log ---"; tail -6 "$APP/xvfb.log" 2>/dev/null || info "(无)"
+  info "--- vnc.log ---"; tail -8 "$APP/vnc.log" 2>/dev/null || info "(无)"
+  info "--- gui.log ---"; tail -6 "$APP/gui.log" 2>/dev/null || info "(无)"
   probe_run >/dev/null 2>&1
-  RUN bash -lc '
-echo "--- 容器内进程 ---"
-ps -ef 2>/dev/null | grep -E "Xvfb|x11vnc|workbuddy" | grep -v grep || echo "一个都没有"
-echo "--- 5900 监听 ---"
-(ss -ltn 2>/dev/null || netstat -ltn 2>/dev/null) | grep 5900 || echo "没有监听 5900"
-echo "--- vnc.log 尾 ---"; tail -5 /tmp/vnc.log 2>/dev/null
-echo "--- xvfb.log 尾 ---"; tail -5 /tmp/xvfb.log 2>/dev/null' 2>&1
+  RUN bash -lc 'echo "--- 容器内进程 ---"; ps -ef 2>/dev/null | grep -E "Xvfb|x11vnc|workbuddy" | grep -v grep || echo "一个都没有"' 2>&1
   info "--- 宿主侧连通性 ---"
   python3 -c 'import socket,sys
 s=socket.socket(); s.settimeout(2)
