@@ -455,7 +455,7 @@ extract_rootfs() {
 # 容器内 DNS 不可用（Android 不放行直连 DNS），
 # 在 Termux 侧解析出 IP 写进容器的 /etc/hosts，这样 apt 走 hosts 就能上网
 prepare_hosts() {
-  local h ip
+  local h ip tuna_ip=""
   mkdir -p "$ROOT/etc"
   [ -f "$ROOT/etc/hosts" ] || : > "$ROOT/etc/hosts"
   for h in mirrors.tuna.tsinghua.edu.cn download.codebuddy.cn; do
@@ -468,10 +468,23 @@ prepare_hosts() {
       printf '%s %s\n' "$ip" "$h" >> "$ROOT/etc/hosts.new"
       mv "$ROOT/etc/hosts.new" "$ROOT/etc/hosts"
       info "hosts: $h -> $ip"
+      [ "$h" = "mirrors.tuna.tsinghua.edu.cn" ] && tuna_ip="$ip"
     else
       warn "解析不到 $h，容器内可能连不上网"
     fi
   done
+  # apt 不走 /etc/hosts，直接用 IP 写源，彻底绕开域名解析
+  if [ -n "$tuna_ip" ]; then
+    rm -f "$ROOT/etc/apt/sources.list"
+    cat > "$ROOT/etc/apt/sources.list" <<EOS
+deb http://$tuna_ip/debian bookworm main contrib non-free non-free-firmware
+deb http://$tuna_ip/debian bookworm-updates main contrib non-free non-free-firmware
+deb http://$tuna_ip/debian-security bookworm-security main contrib non-free non-free-firmware
+EOS
+    info "apt 源改成直连 IP：$tuna_ip"
+    # 清掉镜像自带的 deb.debian.org 旧索引（源已对不上，还会占空间）
+    rm -f "$ROOT"/var/lib/apt/lists/deb.debian.org_* 2>/dev/null || :
+  fi
 }
 
 fetch_deb() {
