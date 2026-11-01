@@ -12,11 +12,15 @@ set -uo pipefail
 
 APP="$HOME/.wb"
 ROOT="$HOME/.wb-root"
+PREFIX_DIR="${PREFIX:-/data/data/com.termux/files/usr}"
 MARK="$ROOT/root/.wb-ok"
 INFO_FILE="$ROOT/root/.config/CodeBuddyExtension/Data/Public/auth/workbuddy-desktop.info"
 WAIT=1500
 MIRROR_BASE="https://mirrors.tuna.tsinghua.edu.cn/lxc-images/images/debian/bookworm"
 ARCH_PATH="arm64"
+LOADER="/lib/ld-linux-aarch64.so.1"
+LIBPATH="/usr/lib/aarch64-linux-gnu:/usr/lib"
+L2S="--link2symlink"
 
 step() { printf "\n\033[1;36m===== %s =====\033[0m\n" "$1"; }
 info() { printf "%s\n" "$1"; }
@@ -25,21 +29,41 @@ bad()  { printf "\033[1;31m[失败] %s\033[0m\n" "$1"; }
 
 detect_arch() {
   case "$(uname -m)" in
-    aarch64|arm64) ARCH_PATH="arm64" ;;
-    x86_64|amd64)  ARCH_PATH="amd64" ;;
+    aarch64|arm64)
+      ARCH_PATH="arm64"
+      LOADER="/lib/ld-linux-aarch64.so.1"
+      LIBPATH="/usr/lib/aarch64-linux-gnu:/usr/lib" ;;
+    x86_64|amd64)
+      ARCH_PATH="amd64"
+      LOADER="/lib64/ld-linux-x86-64.so.2"
+      LIBPATH="/usr/lib/x86_64-linux-gnu:/usr/lib:/lib32" ;;
     *) bad "这个架构 ($(uname -m)) 不支持，需要用 64 位 Termux"; return 1 ;;
   esac
 }
 
-# 统一入口：在 rootfs 里以 root 身份执行命令
+# 统一入口：在 rootfs 里以 root 身份执行命令。
+# 直接 proot /usr/bin/env 在本机会报 execve ENOENT（proot 解析 ELF 解释器失败），
+# 所以显式用容器内的 ld.so 启动，实测可用；同时清掉 Termux 的 LD_PRELOAD 干扰。
 RUN() {
-  proot --link2symlink -0 -r "$ROOT" \
+  env -u LD_PRELOAD proot $L2S -0 -r "$ROOT" \
     -b /dev -b /proc -b /sys \
     -w /root \
+    "$LOADER" --library-path "$LIBPATH" \
     /usr/bin/env -i \
       HOME=/root TERM=xterm-256color LANG=C.UTF-8 \
       PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
       "$@"
+}
+
+# 启动自检：带 link2symlink 起不来就退回不带，两种都不行才报错
+probe_run() {
+  if RUN true >/dev/null 2>&1; then return 0; fi
+  warn "带 link2symlink 启动失败，改用普通模式"
+  L2S=""
+  if RUN true >/dev/null 2>&1; then return 0; fi
+  bad "容器无法启动，输出如下："
+  RUN true 2>&1 | tail -20
+  return 1
 }
 
 mkdir -p "$APP"
@@ -458,6 +482,8 @@ install_all() {
     info "复用已有 rootfs：$ROOT"
   fi
 
+  probe_run || exit 1
+
   step "3/6 容器内安装 WorkBuddy（最慢，请耐心）"
   cat > "$ROOT/root/install.sh" <<'EOS'
 set -u
@@ -512,10 +538,11 @@ exec dbus-run-session -- "$BIN" --no-sandbox --disable-gpu --disable-dev-shm-usa
 EOS
   stop_gui
   sleep 1
-  nohup proot --link2symlink -0 -r "$ROOT" -b /dev -b /proc -b /sys -w /root \
+  nohup env -u LD_PRELOAD proot $L2S -0 -r "$ROOT" -b /dev -b /proc -b /sys -w /root \
+    "$LOADER" --library-path "$LIBPATH" \
     /usr/bin/env -i HOME=/root TERM=xterm-256color LANG=C.UTF-8 \
       PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
-      bash /root/start.sh >"$APP/gui.log" 2>&1 &
+      /bin/bash /root/start.sh >"$APP/gui.log" 2>&1 &
   echo $! > "$APP/gui.pid"
   sleep 8
   echo ""
@@ -547,6 +574,7 @@ get_token() {
   step "取凭证"
   [ -x "$ROOT/bin/bash" ] || { bad "rootfs 还没准备好"; return 1; }
   [ -s "$INFO_FILE" ] || { bad "还没检测到登录，先登录"; return 1; }
+  probe_run || return 1
   write_token_js
   cp "$APP/wb-token.js" "$ROOT/root/wb-token.js" || { bad "复制脚本失败"; return 1; }
   stop_gui
