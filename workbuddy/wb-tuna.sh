@@ -350,7 +350,12 @@ latest_snapshot() {
 }
 
 fetch_rootfs() {
-  local ts dir url i
+  local ts dir url i sz
+  sz=$(stat -c %s "$APP/rootfs.tar.xz" 2>/dev/null || echo 0)
+  if [ "$sz" -gt 50000000 ]; then
+    info "复用已下载的 rootfs.tar.xz（$((sz / 1048576))MB）"
+    return 0
+  fi
   ts="${WB_TS:-}"
   [ -n "$ts" ] || ts=$(latest_snapshot)
   [ -n "$ts" ] || { bad "取不到镜像列表（网络不通？）"; return 1; }
@@ -369,12 +374,29 @@ extract_rootfs() {
   [ -s "$APP/rootfs.tar.xz" ] || { bad "rootfs 文件为空"; return 1; }
   rm -rf "$ROOT"; mkdir -p "$ROOT"
   info "解压中，约 300MB，请稍等..."
-  if ! tar -xf "$APP/rootfs.tar.xz" -C "$ROOT" 2>/dev/null; then
-    warn "tar 直接解压失败，改用 xz 解一层"
-    xz -dc "$APP/rootfs.tar.xz" > "$APP/rootfs.tar" || { bad "xz 解压失败"; return 1; }
-    tar -xf "$APP/rootfs.tar" -C "$ROOT" || { bad "tar 解包失败"; return 1; }
+  local ok=0
+  tar -xf "$APP/rootfs.tar.xz" -C "$ROOT" 2>/dev/null && ok=1
+  if [ "$ok" = "0" ]; then
+    warn "系统拒绝创建硬链接，改用 --hard-dereference（用复制代替硬链接）"
+    rm -rf "$ROOT"; mkdir -p "$ROOT"
+    tar --hard-dereference -xf "$APP/rootfs.tar.xz" -C "$ROOT" 2>/dev/null && ok=1
+  fi
+  if [ "$ok" = "0" ]; then
+    warn "改用 xz 解一层后再解开"
+    rm -rf "$ROOT"; mkdir -p "$ROOT"
+    xz -dc "$APP/rootfs.tar.xz" > "$APP/rootfs.tar" \
+      && tar --hard-dereference -xf "$APP/rootfs.tar" -C "$ROOT" 2>/dev/null && ok=1
     rm -f "$APP/rootfs.tar"
   fi
+  if [ "$ok" = "0" ]; then
+    warn "最后一种方式：交给 proot 的 link2symlink 解压"
+    rm -rf "$ROOT"; mkdir -p "$ROOT"
+    xz -dc "$APP/rootfs.tar.xz" > "$APP/rootfs.tar"
+    proot --link2symlink -0 -r / -w "$ROOT" /usr/bin/env PATH="$PATH" \
+      tar -xf "$APP/rootfs.tar" -C "$ROOT" 2>/dev/null && ok=1
+    rm -f "$APP/rootfs.tar"
+  fi
+  [ "$ok" = "1" ] || { bad "解压失败"; return 1; }
   [ -x "$ROOT/bin/bash" ] || { bad "解压后没有 /bin/bash，镜像可能不完整"; return 1; }
   mkdir -p "$ROOT/root" "$ROOT/etc/apt"
   printf 'nameserver 114.114.114.114\nnameserver 223.5.5.5\n' > "$ROOT/etc/resolv.conf"
