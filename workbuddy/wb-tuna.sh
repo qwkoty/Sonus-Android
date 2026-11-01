@@ -473,18 +473,6 @@ prepare_hosts() {
       warn "解析不到 $h，容器内可能连不上网"
     fi
   done
-  # apt 不走 /etc/hosts，直接用 IP 写源，彻底绕开域名解析
-  if [ -n "$tuna_ip" ]; then
-    rm -f "$ROOT/etc/apt/sources.list"
-    cat > "$ROOT/etc/apt/sources.list" <<EOS
-deb http://$tuna_ip/debian bookworm main contrib non-free non-free-firmware
-deb http://$tuna_ip/debian bookworm-updates main contrib non-free non-free-firmware
-deb http://$tuna_ip/debian-security bookworm-security main contrib non-free non-free-firmware
-EOS
-    info "apt 源改成直连 IP：$tuna_ip"
-    # 清掉镜像自带的 deb.debian.org 旧索引（源已对不上，还会占空间）
-    rm -f "$ROOT"/var/lib/apt/lists/deb.debian.org_* 2>/dev/null || :
-  fi
 }
 
 fetch_deb() {
@@ -541,8 +529,11 @@ install_all() {
   cat > "$ROOT/root/install.sh" <<'EOS'
 set -u
 export DEBIAN_FRONTEND=noninteractive
-apt-get -o Acquire::Retries=3 update 2>&1 | tail -20
-apt-get -o Acquire::Retries=3 install -y --no-install-recommends ca-certificates >/dev/null 2>&1 || true
+apt-get -o Acquire::Retries=3 update >/tmp/upd.log 2>&1
+tail -6 /tmp/upd.log
+if ! apt-cache show libgtk-3-0 >/dev/null 2>&1; then
+  echo "[容器] apt 索引还是空的，装不了，先别继续"; exit 1
+fi
 BASE="ca-certificates procps dbus dbus-x11 xvfb x11vnc fonts-noto-cjk xdg-utils xz-utils"
 apt-get install -y --no-install-recommends $BASE || apt-get install -y $BASE || true
 LIBS="libgtk-3-0 libnotify4 libnss3 libxss1 libxtst6 libatspi2.0-0 libuuid1 libsecret-1-0 \
