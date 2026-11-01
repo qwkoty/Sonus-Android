@@ -591,6 +591,22 @@ get_token() {
   return 0
 }
 
+diag() {
+  step "环境诊断"
+  probe_run >/dev/null 2>&1
+  du -sh "$ROOT" 2>/dev/null
+  RUN bash -c '
+echo "== sources.list =="; cat /etc/apt/sources.list
+echo "== sources.list.d =="; ls -l /etc/apt/sources.list.d/ 2>&1
+echo "== /etc/apt/apt.conf.d 里的代理 =="; grep -ril proxy /etc/apt/apt.conf.d/ 2>/dev/null || echo "(无)"
+echo "== /var/lib/apt/lists =="; ls /var/lib/apt/lists 2>&1 | head -10
+echo "== dpkg 包数 =="; grep -c "^Package:" /var/lib/dpkg/status 2>/dev/null
+echo "== DNS =="; getent hosts mirrors.tuna.tsinghua.edu.cn || echo "DNS 解析失败"
+echo "== apt-get update =="; apt-get update 2>&1 | tail -25; echo "update_rc=${PIPESTATUS[0]}"
+echo "== 能否找到包 =="; apt-cache policy libgtk-3-0 | head -4
+' 2>&1
+}
+
 all_flow() {
   write_app_py
   write_token_js
@@ -617,5 +633,6 @@ case "${1:-all}" in
   status) ensure_python && write_app_py && python3 -u "$APP/app.py" status ;;
   auto) ensure_python && write_app_py && python3 -u "$APP/app.py" auto "${2:-}" ;;
   stop) stop_gui; info "已关闭图形界面" ;;
-  *) echo "用法: $0 [all|token|checkin|status|auto [off]|stop]"; exit 1 ;;
+  diag) detect_arch >/dev/null 2>&1; diag ;;
+  *) echo "用法: $0 [all|token|checkin|status|auto [off]|stop|diag]"; exit 1 ;;
 esac
