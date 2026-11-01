@@ -333,6 +333,10 @@ ensure_tools() {
 
 bin_path() { cat "$ROOT/opt/.wb-bin" 2>/dev/null; }
 
+rootfs_ok() {
+  [ -f "$ROOT/.wb-rootfs-ok" ] && [ -x "$ROOT/usr/bin/env" ] && [ -x "$ROOT/usr/bin/apt-get" ]
+}
+
 stop_gui() {
   if [ -x "$ROOT/bin/bash" ]; then
     RUN bash -lc 'pkill -f workbuddy 2>/dev/null; pkill -x x11vnc 2>/dev/null; pkill -x Xvfb 2>/dev/null; true' >/dev/null 2>&1
@@ -396,8 +400,13 @@ extract_rootfs() {
       tar -xf "$APP/rootfs.tar" -C "$ROOT" 2>/dev/null && ok=1
     rm -f "$APP/rootfs.tar"
   fi
-  [ "$ok" = "1" ] || { bad "解压失败"; return 1; }
-  [ -x "$ROOT/bin/bash" ] || { bad "解压后没有 /bin/bash，镜像可能不完整"; return 1; }
+  [ "$ok" = "1" ] || { rm -rf "$ROOT"; bad "解压失败"; return 1; }
+  if [ ! -x "$ROOT/usr/bin/env" ] || [ ! -x "$ROOT/usr/bin/apt-get" ] || [ ! -f "$ROOT/etc/debian_version" ]; then
+    rm -rf "$ROOT"
+    bad "解压出来的系统不完整（缺 env/apt-get），已清掉，请重跑"
+    return 1
+  fi
+  touch "$ROOT/.wb-rootfs-ok"
   mkdir -p "$ROOT/root" "$ROOT/etc/apt"
   printf 'nameserver 114.114.114.114\nnameserver 223.5.5.5\n' > "$ROOT/etc/resolv.conf"
   cat > "$ROOT/etc/apt/sources.list" <<'EOS'
@@ -418,12 +427,13 @@ install_all() {
   ensure_python || exit 1
   ensure_tools || exit 1
 
-  if [ -x "$ROOT/bin/bash" ] && [ -f "$MARK" ]; then
+  if rootfs_ok && [ -f "$MARK" ]; then
     info "已装过 WorkBuddy，跳过下载与安装"
     return 0
   fi
 
-  if [ ! -x "$ROOT/bin/bash" ]; then
+  if ! rootfs_ok; then
+    [ -d "$ROOT" ] && warn "发现不完整的 rootfs（上次解压中断），会重新解压"
     step "1/6 下载 Debian 根文件系统（国内镜像）"
     fetch_rootfs || { bad "下载失败，检查网络后重跑"; exit 1; }
     step "2/6 解压并初始化"
