@@ -595,6 +595,9 @@ EOS
       /bin/bash /root/start.sh >"$APP/gui.log" 2>&1 &
   echo $! > "$APP/gui.pid"
   sleep 8
+  RUN bash -lc 'if ! pidof Xvfb >/dev/null 2>&1; then echo "[警告] Xvfb 没起来"; tail -12 /tmp/xvfb.log 2>/dev/null; fi
+if ! pidof x11vnc >/dev/null 2>&1; then echo "[警告] x11vnc 没起来，日志："; tail -12 /tmp/vnc.log 2>/dev/null; fi
+echo "[容器] Xvfb=$(pidof Xvfb 2>/dev/null || echo 无) x11vnc=$(pidof x11vnc 2>/dev/null || echo 无) workbuddy=$(pidof workbuddy 2>/dev/null || echo 无)"' 2>&1
   echo ""
   echo "================================================================"
   echo " 用手机上的 VNC 客户端（bVNC / VNC Viewer）连接："
@@ -685,6 +688,9 @@ case "${1:-all}" in
   status) ensure_python && write_app_py && python3 -u "$APP/app.py" status ;;
   auto) ensure_python && write_app_py && python3 -u "$APP/app.py" auto "${2:-}" ;;
   stop) stop_gui; info "已关闭图形界面" ;;
+  gui) [ -x "$ROOT/bin/bash" ] || { bad "rootfs 还没准备好"; exit 1; }
+       probe_run || exit 1
+       start_gui ;;
   diag) detect_arch >/dev/null 2>&1; diag ;;
-  *) echo "用法: $0 [all|token|checkin|status|auto [off]|stop|diag]"; exit 1 ;;
+  *) echo "用法: $0 [all|token|checkin|status|auto [off]|stop|gui|diag]"; exit 1 ;;
 esac
