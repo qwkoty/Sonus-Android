@@ -595,7 +595,10 @@ EOS
       /bin/bash /root/start.sh >"$APP/gui.log" 2>&1 &
   echo $! > "$APP/gui.pid"
   sleep 8
-  if (exec 3<>/dev/tcp/127.0.0.1/5900) 2>/dev/null; then
+  if python3 -c 'import socket,sys
+s=socket.socket(); s.settimeout(2)
+try: s.connect(("127.0.0.1",5900))
+except Exception: sys.exit(1)' 2>/dev/null; then
     info "[本机] 5900 端口已开放，可以连了"
   else
     warn "5900 端口没开放（x11vnc 没起来）"
