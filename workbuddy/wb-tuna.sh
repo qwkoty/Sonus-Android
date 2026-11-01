@@ -452,6 +452,43 @@ extract_rootfs() {
   rm -f "$APP/rootfs.tar.xz"
 }
 
+# 容器内 DNS 不可用（Android 不放行直连 DNS），
+# 在 Termux 侧解析出 IP 写进容器的 /etc/hosts，这样 apt 走 hosts 就能上网
+prepare_hosts() {
+  local h ip
+  mkdir -p "$ROOT/etc"
+  [ -f "$ROOT/etc/hosts" ] || : > "$ROOT/etc/hosts"
+  for h in mirrors.tuna.tsinghua.edu.cn download.codebuddy.cn; do
+    ip=$(curl -sS -m 10 -o /dev/null -w '%{remote_ip}' "http://$h/" 2>/dev/null)
+    if [ -z "$ip" ] || [ "$ip" = "0.0.0.0" ]; then
+      ip=$(curl -sS -m 10 -o /dev/null -w '%{remote_ip}' "https://$h/" 2>/dev/null)
+    fi
+    if [ -n "$ip" ] && [ "$ip" != "0.0.0.0" ]; then
+      grep -v " $h$" "$ROOT/etc/hosts" > "$ROOT/etc/hosts.new" 2>/dev/null || :
+      printf '%s %s\n' "$ip" "$h" >> "$ROOT/etc/hosts.new"
+      mv "$ROOT/etc/hosts.new" "$ROOT/etc/hosts"
+      info "hosts: $h -> $ip"
+    else
+      warn "解析不到 $h，容器内可能连不上网"
+    fi
+  done
+}
+
+fetch_deb() {
+  local url="https://download.codebuddy.cn/workbuddy/saas/linux-arm64-deb/WorkBuddy-linux-arm64-deb-5.6.2.40046327-c7b525f3.deb"
+  local i
+  if [ -s "$APP/wb.deb" ]; then
+    info "复用已下载的客户端安装包"
+    return 0
+  fi
+  for i in 1 2 3; do
+    if curl -fL --retry 3 -m 900 -o "$APP/wb.deb" "$url"; then return 0; fi
+    warn "客户端下载失败，重试 $i"
+    sleep 3
+  done
+  return 1
+}
+
 install_all() {
   step "0/6 环境检查"
   command -v pkg >/dev/null 2>&1 || { bad "必须在 Termux 里运行"; exit 1; }
@@ -483,13 +520,17 @@ install_all() {
   fi
 
   probe_run || exit 1
-
+  prepare_hosts
   step "3/6 容器内安装 WorkBuddy（最慢，请耐心）"
+  fetch_deb || { bad "客户端安装包下载失败"; exit 1; }
+  mkdir -p "$ROOT/tmp"
+  cp "$APP/wb.deb" "$ROOT/tmp/wb.deb" || { bad "安装包送不进去"; exit 1; }
   cat > "$ROOT/root/install.sh" <<'EOS'
 set -u
 export DEBIAN_FRONTEND=noninteractive
-apt-get update || { echo "[容器] apt update 失败"; exit 1; }
-BASE="wget ca-certificates procps dbus dbus-x11 xvfb x11vnc fonts-noto-cjk xdg-utils xz-utils"
+apt-get -o Acquire::Retries=3 update 2>&1 | tail -20
+apt-get -o Acquire::Retries=3 install -y --no-install-recommends ca-certificates >/dev/null 2>&1 || true
+BASE="ca-certificates procps dbus dbus-x11 xvfb x11vnc fonts-noto-cjk xdg-utils xz-utils"
 apt-get install -y --no-install-recommends $BASE || apt-get install -y $BASE || true
 LIBS="libgtk-3-0 libnotify4 libnss3 libxss1 libxtst6 libatspi2.0-0 libuuid1 libsecret-1-0 \
 libgbm1 libdrm2 libxkbcommon0 libxcomposite1 libxdamage1 libxrandr2 libpango-1.0-0 \
@@ -504,13 +545,8 @@ if ! apt-get install -y --no-install-recommends $LIBS; then
 fi
 apt-get install -y --no-install-recommends libasound2 >/dev/null 2>&1 \
   || apt-get install -y --no-install-recommends libasound2t64 >/dev/null 2>&1 || true
-URL="https://download.codebuddy.cn/workbuddy/saas/linux-arm64-deb/WorkBuddy-linux-arm64-deb-5.6.2.40046327-c7b525f3.deb"
-ok=0
-for i in 1 2 3; do
-  if wget -O /tmp/wb.deb "$URL"; then ok=1; break; fi
-  echo "  下载失败，重试 $i"; sleep 3
-done
-[ "$ok" = "1" ] && [ -s /tmp/wb.deb ] || { echo "[容器] deb 下载失败"; exit 1; }
+URL="(客户端已由 Termux 侧下载)"
+[ -s /tmp/wb.deb ] || { echo "[容器] 没找到 /tmp/wb.deb，安装包没送进来"; exit 1; }
 dpkg -i /tmp/wb.deb || apt-get -f install -y || true
 BIN=""
 for c in /opt/WorkBuddy/workbuddy /opt/workbuddy/workbuddy /usr/bin/workbuddy /usr/share/workbuddy/workbuddy; do
@@ -594,8 +630,10 @@ get_token() {
 diag() {
   step "环境诊断"
   probe_run >/dev/null 2>&1
+  prepare_hosts
   du -sh "$ROOT" 2>/dev/null
   RUN bash -c '
+echo "== /etc/hosts =="; tail -4 /etc/hosts
 echo "== sources.list =="; cat /etc/apt/sources.list
 echo "== sources.list.d =="; ls -l /etc/apt/sources.list.d/ 2>&1
 echo "== /etc/apt/apt.conf.d 里的代理 =="; grep -ril proxy /etc/apt/apt.conf.d/ 2>/dev/null || echo "(无)"
