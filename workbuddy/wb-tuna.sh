@@ -650,6 +650,27 @@ get_token() {
   return 0
 }
 
+vnc() {
+  step "图形桌面诊断"
+  info "--- 宿主 gui.log（启动脚本输出）---"
+  tail -20 "$APP/gui.log" 2>/dev/null || info "(无)"
+  probe_run >/dev/null 2>&1
+  RUN bash -lc '
+echo "--- 容器内进程 ---"
+ps -ef 2>/dev/null | grep -E "Xvfb|x11vnc|workbuddy" | grep -v grep || echo "一个都没有"
+echo "--- 5900 监听 ---"
+(ss -ltn 2>/dev/null || netstat -ltn 2>/dev/null) | grep 5900 || echo "没有监听 5900"
+echo "--- vnc.log 尾 ---"; tail -5 /tmp/vnc.log 2>/dev/null
+echo "--- xvfb.log 尾 ---"; tail -5 /tmp/xvfb.log 2>/dev/null' 2>&1
+  info "--- 宿主侧连通性 ---"
+  python3 -c 'import socket,sys
+s=socket.socket(); s.settimeout(2)
+try:
+    s.connect(("127.0.0.1",5900)); print("5900 可连")
+except Exception as e:
+    print("5900 不通:", e)' 2>&1
+}
+
 diag() {
   step "环境诊断"
   probe_run >/dev/null 2>&1
@@ -699,5 +720,6 @@ case "${1:-all}" in
        probe_run || exit 1
        start_gui ;;
   diag) detect_arch >/dev/null 2>&1; diag ;;
-  *) echo "用法: $0 [all|token|checkin|status|auto [off]|stop|gui|diag]"; exit 1 ;;
+  vnc) vnc ;;
+  *) echo "用法: $0 [all|token|checkin|status|auto [off]|stop|gui|diag|vnc]"; exit 1 ;;
 esac
