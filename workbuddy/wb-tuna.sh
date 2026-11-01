@@ -123,7 +123,8 @@ import base64, datetime, json, os, signal, subprocess, sys, time
 import urllib.error, urllib.request
 
 APP = os.path.join(os.environ.get("HOME", "."), ".wb")
-TOK = os.path.join(APP, "token.json")
+TOK = os.path.join(APP, "accounts.json")
+OLD = os.path.join(APP, "token.json")
 LOG = os.path.join(APP, "checkin.log")
 PID = os.path.join(APP, "daemon.pid")
 DOM = "www.workbuddy.cn"
@@ -141,17 +142,35 @@ def log(m):
 
 
 def load():
+    """返回账号列表"""
     try:
         with open(TOK, "r", encoding="utf-8") as f:
-            return json.load(f)
+            o = json.load(f)
+        if isinstance(o, dict) and isinstance(o.get("accounts"), list):
+            return o["accounts"]
+        if isinstance(o, dict) and o.get("accessToken"):
+            return [o]
     except Exception:
-        return None
+        pass
+    try:
+        with open(OLD, "r", encoding="utf-8") as f:
+            o = json.load(f)
+        if isinstance(o, dict) and o.get("accessToken"):
+            save([o])
+            try:
+                os.remove(OLD)
+            except Exception:
+                pass
+            return [o]
+    except Exception:
+        pass
+    return []
 
 
-def save(o):
+def save(accts):
     os.makedirs(APP, exist_ok=True)
     with open(TOK, "w", encoding="utf-8") as f:
-        json.dump(o, f, ensure_ascii=False)
+        json.dump({"accounts": accts}, f, ensure_ascii=False)
     try:
         os.chmod(TOK, 0o600)
     except Exception:
@@ -194,26 +213,32 @@ def api(acct, path):
 
 
 def checkin():
-    acct = load()
-    if not acct or not acct.get("accessToken"):
-        log("还没导入凭证，先运行： ./wb.sh token")
+    accts = load()
+    if not accts:
+        log("还没导入凭证，先运行： bash ~/wb.sh token")
         return 2
-    if not acct.get("uid"):
-        acct["uid"] = str(jwt(acct["accessToken"]).get("uid") or "")
-        save(acct)
-    st, data = api(acct, "/v2/billing/meter/daily-checkin")
-    code = data.get("code") if isinstance(data, dict) else None
-    if st == 401:
-        log("凭证已失效，需要重新取 token： ./wb.sh token")
-        return 3
-    if st == 200 and code == 0:
-        log("签到成功，今日积分已领取。")
-        return 0
-    if code == 10001:
-        log("今天已经签到过了。")
-        return 0
-    log("签到未成功：HTTP %s  %s" % (st, json.dumps(data, ensure_ascii=False)))
-    return 1
+    rc = 0
+    changed = False
+    for a in accts:
+        if not a.get("uid"):
+            a["uid"] = str(jwt(a.get("accessToken") or "").get("uid") or "")
+            changed = True
+        who = a.get("uid") or "未知账号"
+        st, data = api(a, "/v2/billing/meter/daily-checkin")
+        code = data.get("code") if isinstance(data, dict) else None
+        if st == 401:
+            log("[%s] 凭证已失效，需要重新取 token： bash ~/wb.sh token" % who)
+            rc = max(rc, 3)
+        elif st == 200 and code == 0:
+            log("[%s] 签到成功，今日积分已领取。" % who)
+        elif code == 10001:
+            log("[%s] 今天已经签到过了。" % who)
+        else:
+            log("[%s] 签到未成功：HTTP %s  %s" % (who, st, json.dumps(data, ensure_ascii=False)))
+            rc = max(rc, 1)
+    if changed:
+        save(accts)
+    return rc
 
 
 def do_import(blob):
@@ -232,10 +257,12 @@ def do_import(blob):
         return 1
     if not acct["uid"]:
         acct["uid"] = str(jwt(acct["accessToken"]).get("uid") or "")
-    save(acct)
+    accts = [x for x in load() if str(x.get("uid") or "") != acct["uid"] or not acct["uid"]]
+    accts.append(acct)
+    save(accts)
     exp = jwt(acct["accessToken"]).get("exp")
     when = datetime.datetime.fromtimestamp(int(exp)).strftime("%Y-%m-%d") if exp else "未知"
-    log("凭证已导入，到期约 %s" % when)
+    log("凭证已导入（uid=%s），当前共 %d 个账号，到期约 %s" % (acct["uid"] or "?", len(accts), when))
     return 0
 
 
@@ -256,13 +283,16 @@ def alive(pid):
 
 
 def status():
-    acct = load()
-    if not acct:
+    accts = load()
+    if not accts:
         log("状态：未导入凭证")
         return 1
-    exp = jwt(acct.get("accessToken", "")).get("exp")
-    log("域名：%s  uid：%s" % (acct.get("domain"), acct.get("uid") or "(空)"))
-    log("token 到期：%s" % (datetime.datetime.fromtimestamp(int(exp)).strftime("%Y-%m-%d") if exp else "未知"))
+    log("账号数：%d" % len(accts))
+    for a in accts:
+        exp = jwt(a.get("accessToken", "")).get("exp")
+        log("  uid=%s  域名=%s  到期=%s" % (
+            a.get("uid") or "(空)", a.get("domain"),
+            datetime.datetime.fromtimestamp(int(exp)).strftime("%Y-%m-%d") if exp else "未知"))
     pid = read_pid()
     log("自动签到：%s" % ("运行中 (PID %d)" % pid if pid and alive(pid) else "未开启"))
     return 0
