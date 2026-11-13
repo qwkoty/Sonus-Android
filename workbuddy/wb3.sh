@@ -55,15 +55,21 @@ try_rish() {
 }
 
 connect_any() {
-  try_rish && return 0
+  info "检查 rish（Shizuku）..."
+  if try_rish; then return 0; fi
+  if ! command -v rish >/dev/null 2>&1; then
+    bad "没找到 rish，先运行： bash ~/rish.sh"
+  else
+    warn "rish 连不上（Shizuku 可能没启动），改用 adb 无线调试"
+  fi
   MODE=adb
   do_connect
 }
 
 ensure_adb() {
   if command -v adb >/dev/null 2>&1; then return 0; fi
-  info "正在安装 android-tools（提供 adb，只需一次）..."
-  pkg install -y android-tools >/dev/null 2>&1 || pkg install -y android-tools
+  info "正在安装 android-tools（提供 adb，只需一次，可能要一两分钟）..."
+  pkg install -y android-tools
   command -v adb >/dev/null 2>&1 || { bad "adb 安装失败，手动执行： pkg install android-tools"; return 1; }
 }
 
@@ -150,6 +156,7 @@ find_pkg() {
 
 new_user() {
   local out uid
+  info "正在创建工作资料，等系统返回（最多 90 秒）..."
   out=$(S "pm create-user --profileOf 0 --managed $NAME")
   uid=$(printf '%s' "$out" | grep -oE 'id [0-9]+' | grep -oE '[0-9]+' | head -1)
   if [ -n "${uid:-}" ]; then
