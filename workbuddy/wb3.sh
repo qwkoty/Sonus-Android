@@ -20,13 +20,44 @@ info() { printf "%s\n" "$1"; }
 warn() { printf "\033[1;33m[提示] %s\033[0m\n" "$1"; }
 bad()  { printf "\033[1;31m[失败] %s\033[0m\n" "$1"; }
 
+MODE=""   # rish | adb
+
 # 以 shell 身份执行一条命令
 S() {
-  if [ -n "$TARGET" ]; then
+  if [ "$MODE" = "rish" ]; then
+    if command -v timeout >/dev/null 2>&1; then
+      timeout 90 rish -c "$1" 2>&1
+    else
+      rish -c "$1" 2>&1
+    fi
+  elif [ -n "$TARGET" ]; then
     adb -s "$TARGET" shell "$1" 2>&1 | tr -d '\r'
   else
     adb shell "$1" 2>&1 | tr -d '\r'
   fi
+}
+
+# 优先用 rish（Shizuku），不行再走 adb 无线调试
+try_rish() {
+  command -v rish >/dev/null 2>&1 || return 1
+  local out
+  if command -v timeout >/dev/null 2>&1; then
+    out=$(timeout 60 rish -c 'id' 2>&1) || true
+  else
+    out=$(rish -c 'id' 2>&1) || true
+  fi
+  if printf '%s' "$out" | grep -q 'uid=2000'; then
+    MODE=rish
+    info "已通过 rish 连上（Shizuku）"
+    return 0
+  fi
+  return 1
+}
+
+connect_any() {
+  try_rish && return 0
+  MODE=adb
+  do_connect
 }
 
 ensure_adb() {
@@ -178,7 +209,7 @@ do_install() {
 }
 
 one_click() {
-  do_connect || return 1
+  connect_any || return 1
   check_shell || return 1
 
   step "1/3 找 WorkBuddy"
@@ -208,9 +239,9 @@ one_click() {
 case "${1:-}" in
   ""|all|run) one_click ;;
   connect)    do_connect ;;
-  list)       do_connect >/dev/null && check_shell && do_list ;;
-  switch)     shift; do_connect >/dev/null && check_shell && do_switch "${1:-}" ;;
-  install)    shift; do_connect >/dev/null && check_shell && do_install "${1:-}" "${2:-}" ;;
-  remove)     shift; do_connect >/dev/null && check_shell && do_remove "${1:-}" ;;
+  list)       connect_any >/dev/null && check_shell && do_list ;;
+  switch)     shift; connect_any >/dev/null && check_shell && do_switch "${1:-}" ;;
+  install)    shift; connect_any >/dev/null && check_shell && do_install "${1:-}" "${2:-}" ;;
+  remove)     shift; connect_any >/dev/null && check_shell && do_remove "${1:-}" ;;
   *) echo "用法: $0 [connect|list|switch <id>|install <id> [包名]|remove <id>]"; exit 1 ;;
 esac
