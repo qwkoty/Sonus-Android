@@ -47,39 +47,45 @@ case "${1:-}" in
     exit 0 ;;
 esac
 
-step "1/5 清掉旧的临时用户"
+step "1/4 找现成的工作资料"
 USERS=$(S 'pm list users')
-OLD_IDS=$(printf '%s\n' "$USERS" | sed -n 's/.*UserInfo{\([0-9][0-9]*\):\(WB3\|IslandWB\)[:}].*/\1/p')
-if [ -n "$OLD_IDS" ]; then
-  for id in $OLD_IDS; do
-    info "删除旧用户 $id ..."
-    S "pm remove-user $id" | tail -1
-  done
+ALL_IDS=$(printf '%s\n' "$USERS" | sed -n 's/.*UserInfo{\([0-9][0-9]*\):.*/\1/p')
+UID3=""
+for x in $ALL_IDS; do
+  case "$x" in
+    0|999) ;;
+    *) [ -z "$UID3" ] && UID3="$x" ;;
+  esac
+done
+if [ -n "$UID3" ]; then
+  info "已有工作资料（Island 叫「壶中界」），用户 id = $UID3，直接复用"
 else
-  info "没有需要清理的旧用户"
+  info "没有现成的工作资料，创建中 ..."
+  OUT=$(S "pm create-user --profileOf 0 --managed $PROFILE_NAME")
+  printf '%s\n' "$OUT"
+  UID3=$(printf '%s' "$OUT" | sed -n 's/.*user id \([0-9][0-9]*\).*/\1/p')
+  if [ -z "$UID3" ]; then
+    bad "建不出工作资料，多半是小米系统限制。改用手机分身+双开凑到 3 个。"
+    exit 1
+  fi
+  info "新工作资料用户 id = $UID3"
 fi
 
-step "2/5 创建工作资料"
-OUT=$(S "pm create-user --profileOf 0 --managed $PROFILE_NAME")
-printf '%s\n' "$OUT"
-UID3=$(printf '%s' "$OUT" | sed -n 's/.*user id \([0-9][0-9]*\).*/\1/p')
-if [ -z "$UID3" ]; then
-  bad "建不出工作资料，多半是小米系统限制。改用手机分身+双开凑到 3 个。"
-  exit 1
-fi
-info "新工作资料用户 id = $UID3"
-
-step "3/5 把 Island 装进工作资料"
+step "2/4 把 Island 装进工作资料"
 S "pm install-existing --user $UID3 $DPC_PKG" | tail -2
 
-step "4/5 激活工作资料（设为设备管理）"
+step "3/4 激活工作资料（设为设备管理）"
 DP=$(S "dpm set-profile-owner --user $UID3 $DPC_CMP" 2>&1)
 printf '%s\n' "$DP" | tail -3
-if ! printf '%s' "$DP" | grep -qiE 'success|active'; then
-  bad "激活失败，工作资料可能无法启动。把上面输出发我。"
+if printf '%s' "$DP" | grep -qiE 'success|active'; then
+  info "激活成功"
+elif printf '%s' "$DP" | grep -qiE 'already|owner'; then
+  info "这个工作资料之前已激活过，跳过"
+else
+  warn "激活输出异常，继续尝试安装 WorkBuddy；若图标点不开再回来处理"
 fi
 
-step "5/5 装 WorkBuddy"
+step "4/4 装 WorkBuddy"
 S "pm install-existing --user $UID3 $WB_PKG" | tail -2
 S "pm list packages --user $UID3 | grep -i workbuddy" || warn "没查到，可能包名不同"
 
