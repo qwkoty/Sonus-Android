@@ -26,9 +26,9 @@ MODE=""   # rish | adb
 S() {
   if [ "$MODE" = "rish" ]; then
     if command -v timeout >/dev/null 2>&1; then
-      timeout 90 rish -c "$1" 2>&1
+      timeout 90 rish -c "$1" </dev/null 2>&1
     else
-      rish -c "$1" 2>&1
+      rish -c "$1" </dev/null 2>&1
     fi
   elif [ -n "$TARGET" ]; then
     adb -s "$TARGET" shell "$1" 2>&1 | tr -d '\r'
@@ -41,16 +41,19 @@ S() {
 try_rish() {
   command -v rish >/dev/null 2>&1 || return 1
   local out
+  info "正在探测 rish（最多 25 秒）..."
   if command -v timeout >/dev/null 2>&1; then
-    out=$(timeout 60 rish -c 'id' 2>&1) || true
+    out=$(timeout 25 rish -c 'id' </dev/null 2>&1) || true
   else
-    out=$(rish -c 'id' 2>&1) || true
+    out=$(rish -c 'id' </dev/null 2>&1) || true
   fi
   if printf '%s' "$out" | grep -q 'uid=2000'; then
     MODE=rish
     info "已通过 rish 连上（Shizuku）"
     return 0
   fi
+  warn "rish 探测没有拿到 shell 权限，输出："
+  printf '%s\n' "$out" | tail -5
   return 1
 }
 
